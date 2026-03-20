@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getStudentBySlug, updateStudent, getWorks, createWork, updateWork, deleteWork, getNotes, createNote, deleteNote } from '../api';
+import { getStudentBySlug, updateStudent, uploadPhoto, getWorks, createWork, updateWork, deleteWork, getNotes, createNote, deleteNote } from '../api';
 import { getTokenPayload } from '../auth';
 
 const STATUS_LABELS = { graduacao: 'Graduação', mestrado: 'Mestrado', doutorado: 'Doutorado', professor: 'Professor' };
@@ -119,8 +119,22 @@ function ProfileSection({ student, canEdit, onSaved }) {
     interesses: student.interesses || '',
   });
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState(student.photo_url || null);
+  const [pendingPhotoUrl, setPendingPhotoUrl] = useState(null);
+  const photoRef = useRef();
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+
+  async function handlePhotoSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadingPhoto(true);
+    const res = await uploadPhoto(file);
+    setPendingPhotoUrl(res.url);
+    setPhotoPreview(res.url);
+    setUploadingPhoto(false);
+  }
 
   async function handleSave(e) {
     e.preventDefault();
@@ -131,10 +145,18 @@ function ProfileSection({ student, canEdit, onSaved }) {
       linkedin_url: form.linkedin_url || null,
       github_url: form.github_url || null,
       interesses: form.interesses || null,
+      ...(pendingPhotoUrl ? { photo_url: pendingPhotoUrl } : {}),
     });
     setSaving(false);
     setEditing(false);
+    setPendingPhotoUrl(null);
     onSaved();
+  }
+
+  function handleCancel() {
+    setEditing(false);
+    setPhotoPreview(student.photo_url || null);
+    setPendingPhotoUrl(null);
   }
 
   const links = [
@@ -157,6 +179,30 @@ function ProfileSection({ student, canEdit, onSaved }) {
 
       {editing ? (
         <form onSubmit={handleSave} className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-2">Foto de perfil</label>
+            <div className="flex items-center gap-3">
+              {photoPreview ? (
+                <img src={photoPreview} alt="" className="w-14 h-14 rounded-full object-cover border-2 border-gray-200" />
+              ) : (
+                <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 text-xs border-2 border-dashed border-gray-300">
+                  sem foto
+                </div>
+              )}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => photoRef.current.click()}
+                  disabled={uploadingPhoto}
+                  className="text-sm text-blue-600 hover:underline disabled:opacity-50"
+                >
+                  {uploadingPhoto ? 'Enviando...' : 'Escolher imagem'}
+                </button>
+                <p className="text-xs text-gray-400 mt-0.5">JPG, PNG ou WebP · máx. 5 MB</p>
+                <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoSelect} />
+              </div>
+            </div>
+          </div>
           {[
             { key: 'lattes_url', label: 'Lattes', placeholder: 'http://lattes.cnpq.br/...' },
             { key: 'scholar_url', label: 'Google Scholar', placeholder: 'https://scholar.google.com/...' },
@@ -187,7 +233,7 @@ function ProfileSection({ student, canEdit, onSaved }) {
             <button type="submit" disabled={saving} className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
               {saving ? 'Salvando...' : 'Salvar'}
             </button>
-            <button type="button" onClick={() => setEditing(false)} className="bg-gray-200 px-4 py-1.5 rounded-lg text-sm hover:bg-gray-300">
+            <button type="button" onClick={handleCancel} className="bg-gray-200 px-4 py-1.5 rounded-lg text-sm hover:bg-gray-300">
               Cancelar
             </button>
           </div>
@@ -315,6 +361,8 @@ export default function StudentPage() {
   const navigate = useNavigate();
   const [student, setStudent] = useState(null);
   const [works, setWorks] = useState([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef();
 
   const payload = getTokenPayload();
   const isProfessor = payload?.role === 'professor';
@@ -329,6 +377,16 @@ export default function StudentPage() {
   }
 
   useEffect(() => { load(); }, [slug]);
+
+  async function handlePhotoChange(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploadingPhoto(true);
+    const res = await uploadPhoto(file);
+    await updateStudent(student.id, { photo_url: res.url });
+    setUploadingPhoto(false);
+    load();
+  }
 
   if (!student) {
     return <div className="flex items-center justify-center h-screen text-gray-400">Carregando...</div>;
@@ -346,13 +404,39 @@ export default function StudentPage() {
           Retornar
         </button>
         <div className="w-px h-6 bg-gray-200" />
-        {student.photo_url ? (
-          <img src={student.photo_url} alt={student.nome} className="w-12 h-12 rounded-full object-cover border-2" style={{ borderColor: color }} />
-        ) : (
-          <div className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold" style={{ backgroundColor: color }}>
-            {student.nome.charAt(0).toUpperCase()}
-          </div>
-        )}
+        <div className="relative group shrink-0">
+          {student.photo_url ? (
+            <img src={student.photo_url} alt={student.nome} className="w-12 h-12 rounded-full object-cover border-2" style={{ borderColor: color }} />
+          ) : (
+            <div className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold" style={{ backgroundColor: color }}>
+              {student.nome.charAt(0).toUpperCase()}
+            </div>
+          )}
+          {canEdit && (
+            <>
+              <button
+                type="button"
+                onClick={() => photoInputRef.current.click()}
+                disabled={uploadingPhoto}
+                className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-100"
+                title="Alterar foto"
+              >
+                {uploadingPhoto ? (
+                  <svg className="w-4 h-4 text-white animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                )}
+              </button>
+              <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+            </>
+          )}
+        </div>
         <div>
           <h1 className="text-xl font-bold text-gray-900">{student.nome}</h1>
           <div className="flex items-center gap-2 mt-0.5">
