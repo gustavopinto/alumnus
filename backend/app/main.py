@@ -1,7 +1,10 @@
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from .database import engine, Base
 from .routers import students, relationships, graph, upload, works, notes, auth, files
@@ -19,14 +22,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(students.router)
-app.include_router(relationships.router)
-app.include_router(graph.router)
-app.include_router(upload.router)
-app.include_router(works.router)
-app.include_router(notes.router)
-app.include_router(auth.router)
-app.include_router(files.router)
+app.include_router(students.router,      prefix="/api")
+app.include_router(relationships.router, prefix="/api")
+app.include_router(graph.router,         prefix="/api")
+app.include_router(upload.router,        prefix="/api")
+app.include_router(works.router,         prefix="/api")
+app.include_router(notes.router,         prefix="/api")
+app.include_router(auth.router,          prefix="/api")
+app.include_router(files.router,         prefix="/api")
 
 
 @app.on_event("startup")
@@ -39,3 +42,14 @@ def on_startup():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# Serve React frontend for all other routes (must be last)
+FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
+
+if FRONTEND_DIST.exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
+
+    @app.get("/{full_path:path}")
+    def serve_spa(full_path: str):
+        return FileResponse(FRONTEND_DIST / "index.html")
