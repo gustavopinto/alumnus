@@ -2,10 +2,9 @@ import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from .database import engine, Base
-from .routers import students, relationships, graph, upload, works, notes, auth
+from .routers import students, relationships, graph, upload, works, notes, auth, files
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -27,8 +26,7 @@ app.include_router(upload.router)
 app.include_router(works.router)
 app.include_router(notes.router)
 app.include_router(auth.router)
-
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+app.include_router(files.router)
 
 
 @app.on_event("startup")

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getStudentBySlug, updateStudent, getWorks, createWork, updateWork, deleteWork, getNotes, createNote, deleteNote } from '../api';
+import { getTokenPayload } from '../auth';
 
 const STATUS_LABELS = { graduacao: 'Graduação', mestrado: 'Mestrado', doutorado: 'Doutorado', professor: 'Professor' };
 const STATUS_COLORS = { graduacao: '#3B82F6', mestrado: '#F59E0B', doutorado: '#10B981', professor: '#7C3AED' };
@@ -108,6 +109,114 @@ function NotesSection({ studentId }) {
   );
 }
 
+function ProfileSection({ student, canEdit, onSaved }) {
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({
+    lattes_url: student.lattes_url || '',
+    scholar_url: student.scholar_url || '',
+    linkedin_url: student.linkedin_url || '',
+    github_url: student.github_url || '',
+    interesses: student.interesses || '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+
+  async function handleSave(e) {
+    e.preventDefault();
+    setSaving(true);
+    await updateStudent(student.id, {
+      lattes_url: form.lattes_url || null,
+      scholar_url: form.scholar_url || null,
+      linkedin_url: form.linkedin_url || null,
+      github_url: form.github_url || null,
+      interesses: form.interesses || null,
+    });
+    setSaving(false);
+    setEditing(false);
+    onSaved();
+  }
+
+  const links = [
+    { key: 'lattes_url', label: 'Lattes', value: student.lattes_url },
+    { key: 'scholar_url', label: 'Google Scholar', value: student.scholar_url },
+    { key: 'linkedin_url', label: 'LinkedIn', value: student.linkedin_url },
+    { key: 'github_url', label: 'GitHub', value: student.github_url },
+  ];
+
+  return (
+    <section className="bg-white rounded-xl shadow-sm border p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold text-gray-800">Perfil</h2>
+        {canEdit && !editing && (
+          <button onClick={() => setEditing(true)} className="text-sm text-blue-600 hover:underline">
+            Editar
+          </button>
+        )}
+      </div>
+
+      {editing ? (
+        <form onSubmit={handleSave} className="space-y-3">
+          {[
+            { key: 'lattes_url', label: 'Lattes', placeholder: 'http://lattes.cnpq.br/...' },
+            { key: 'scholar_url', label: 'Google Scholar', placeholder: 'https://scholar.google.com/...' },
+            { key: 'linkedin_url', label: 'LinkedIn', placeholder: 'https://linkedin.com/in/...' },
+            { key: 'github_url', label: 'GitHub', placeholder: 'https://github.com/...' },
+          ].map(({ key, label, placeholder }) => (
+            <div key={key}>
+              <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
+              <input
+                type="url"
+                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                placeholder={placeholder}
+                value={form[key]}
+                onChange={set(key)}
+              />
+            </div>
+          ))}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Interesses de pesquisa</label>
+            <textarea
+              className="w-full border rounded-lg px-3 py-2 text-sm h-20 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="Ex: engenharia de software, mineração de repositórios..."
+              value={form.interesses}
+              onChange={set('interesses')}
+            />
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" disabled={saving} className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
+              {saving ? 'Salvando...' : 'Salvar'}
+            </button>
+            <button type="button" onClick={() => setEditing(false)} className="bg-gray-200 px-4 py-1.5 rounded-lg text-sm hover:bg-gray-300">
+              Cancelar
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {links.map(({ label, value }) => value ? (
+              <a key={label} href={value} target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                {label}
+              </a>
+            ) : null)}
+            {links.every(l => !l.value) && !student.interesses && (
+              <p className="text-sm text-gray-400 italic">Nenhuma informação de perfil cadastrada.</p>
+            )}
+          </div>
+          {student.interesses && (
+            <div>
+              <p className="text-xs font-medium text-gray-500 mb-1">Interesses de pesquisa</p>
+              <p className="text-sm text-gray-700">{student.interesses}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 function WorkSection({ title, type, works, studentId, onRefresh }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -207,6 +316,11 @@ export default function StudentPage() {
   const [student, setStudent] = useState(null);
   const [works, setWorks] = useState([]);
 
+  const payload = getTokenPayload();
+  const isProfessor = payload?.role === 'professor';
+  const isOwnProfile = payload?.student_id != null && student?.id === payload.student_id;
+  const canEdit = isProfessor || isOwnProfile;
+
   async function load() {
     const s = await getStudentBySlug(slug);
     const w = await getWorks(s.id);
@@ -251,6 +365,7 @@ export default function StudentPage() {
       </header>
 
       <main className="max-w-3xl mx-auto py-8 px-4 space-y-6">
+        <ProfileSection student={student} canEdit={canEdit} onSaved={load} />
         <NotesSection studentId={student.id} />
       </main>
     </div>

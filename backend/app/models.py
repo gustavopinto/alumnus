@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, JSON, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, JSON, Text, LargeBinary
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -84,6 +84,16 @@ class User(Base):
     created_at    = Column(DateTime, default=datetime.utcnow)
 
     student = relationship("Student", foreign_keys=[student_id])
+
+
+class FileUpload(Base):
+    __tablename__ = "file_uploads"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    data          = Column(LargeBinary, nullable=False)
+    mime_type     = Column(String(100), nullable=False)
+    original_name = Column(String(255), nullable=False)
+    created_at    = Column(DateTime, default=datetime.utcnow)
 
 
 class GraphLayout(Base):

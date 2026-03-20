@@ -27,7 +27,7 @@ async def create_note(
     file_url = None
     file_name = None
     if file and file.filename:
-        file_url, file_name = await save_upload(file)
+        file_url, file_name = await save_upload(file, db)
 
     note = Note(student_id=student_id, text=text, file_url=file_url, file_name=file_name)
     db.add(note)

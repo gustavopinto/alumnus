@@ -1,43 +1,36 @@
 import io
-import uuid
 import asyncio
 import logging
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
 from PIL import Image
+from sqlalchemy.orm import Session
+
+from .models import FileUpload
 
 logger = logging.getLogger(__name__)
 
-UPLOAD_DIR = Path("/app/uploads")
 MAX_BYTES = 5 * 1024 * 1024  # 5 MB
 ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".pdf"}
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
-IMAGE_MAX_DIM = 1024   # px
-IMAGE_QUALITY = 60     # JPEG quality
+IMAGE_MAX_DIM = 1024
+IMAGE_QUALITY = 60
 
 
-def _compress_image(content: bytes) -> tuple[bytes, str]:
-    """Resize and compress image, return (bytes, .jpg)."""
+def _compress_image(content: bytes) -> bytes:
     img = Image.open(io.BytesIO(content))
     if img.mode not in ("RGB", "L"):
         img = img.convert("RGB")
     img.thumbnail((IMAGE_MAX_DIM, IMAGE_MAX_DIM), Image.LANCZOS)
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=IMAGE_QUALITY, optimize=True)
-    return buf.getvalue(), ".jpg"
+    return buf.getvalue()
 
 
-def _save_file(content: bytes, ext: str) -> str:
-    filename = f"{uuid.uuid4().hex}{ext}"
-    (UPLOAD_DIR / filename).write_bytes(content)
-    logger.info("Saved file: %s (%d bytes)", filename, len(content))
-    return filename
-
-
-async def save_upload(file: UploadFile) -> tuple[str, str]:
+async def save_upload(file: UploadFile, db: Session) -> tuple[str, str]:
     """
-    Validate size, compress if image, save to disk.
+    Validate, compress if image, store in DB.
     Returns (url, original_filename).
     """
     content = await file.read()
@@ -48,10 +41,25 @@ async def save_upload(file: UploadFile) -> tuple[str, str]:
     ext = Path(file.filename).suffix.lower() if file.filename else ""
 
     if ext not in ALLOWED_EXTS:
-        raise HTTPException(status_code=415, detail="Apenas imagens (JPG, PNG, GIF, WebP) ou PDF são permitidos.")
+        raise HTTPException(
+            status_code=415,
+            detail="Apenas imagens (JPG, PNG, GIF, WebP) ou PDF são permitidos.",
+        )
 
     if ext in IMAGE_EXTS:
-        content, ext = await asyncio.to_thread(_compress_image, content)
+        content = await asyncio.to_thread(_compress_image, content)
+        mime_type = "image/jpeg"
+    else:
+        mime_type = "application/pdf"
 
-    filename = await asyncio.to_thread(_save_file, content, ext)
-    return f"/uploads/{filename}", file.filename or filename
+    record = FileUpload(
+        data=content,
+        mime_type=mime_type,
+        original_name=file.filename or "file",
+    )
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+
+    logger.info("Stored file id=%s (%d bytes)", record.id, len(content))
+    return f"/api/files/{record.id}", record.original_name

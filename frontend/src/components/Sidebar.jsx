@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import StudentForm from './StudentForm';
 import { deleteStudent } from '../api';
+
+function slugify(nome) {
+  return (nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
+}
 
 const DEADLINES = [
   { label: 'ICSE 2026', url: 'https://conf.researchr.org/home/icse-2026', date: '2026-01-24' },
@@ -54,7 +60,7 @@ export default function Sidebar({ students, onRefresh, role }) {
         <ul className="space-y-1">
           {students.map((s) => (
             <li key={s.id} className="flex items-center justify-between bg-white rounded px-2 py-1.5 text-sm shadow-sm">
-              <span className="truncate">{s.nome}</span>
+              <Link to={`/profile/${slugify(s.nome)}`} className="truncate hover:text-blue-600 hover:underline">{s.nome}</Link>
               {role === 'professor' && (
                 <span className="flex gap-1 shrink-0">
                   <button onClick={() => handleEdit(s)} className="text-blue-600 hover:underline text-xs">editar</button>
