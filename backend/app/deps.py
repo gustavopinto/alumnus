@@ -1,0 +1,40 @@
+import os
+
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import JWTError, jwt
+from sqlalchemy.orm import Session
+
+from .database import get_db
+from .models import User
+
+SECRET_KEY = os.getenv("SECRET_KEY", "alumnus_dev_secret_troque_em_producao")
+ALGORITHM  = "HS256"
+bearer     = HTTPBearer()
+
+
+def decode_token(token: str) -> dict:
+    try:
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token inválido ou expirado")
+
+
+def get_current_user(
+    creds: HTTPAuthorizationCredentials = Depends(bearer),
+    db: Session = Depends(get_db),
+) -> User:
+    payload = decode_token(creds.credentials)
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Token mal formado")
+    user = db.query(User).get(int(user_id))
+    if not user:
+        raise HTTPException(status_code=401, detail="Usuário não encontrado")
+    return user
+
+
+def require_professor(user: User = Depends(get_current_user)) -> User:
+    if user.role != "professor":
+        raise HTTPException(status_code=403, detail="Acesso restrito a professores")
+    return user
