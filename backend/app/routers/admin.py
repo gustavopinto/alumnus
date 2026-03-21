@@ -62,6 +62,8 @@ def list_users(db: Session = Depends(get_db), _: User = Depends(require_admin)):
             "is_admin": u.is_admin,
             "researcher_id": u.researcher_id,
             "researcher_nome": u.researcher.nome if u.researcher else None,
+            "whatsapp": u.researcher.whatsapp if u.researcher else None,
+            "photo_url": (u.researcher.photo_thumb_url or u.researcher.photo_url) if u.researcher else None,
             "last_login": u.last_login,
             "created_at": u.created_at,
             "pending": False,
@@ -79,6 +81,8 @@ def list_users(db: Session = Depends(get_db), _: User = Depends(require_admin)):
             "researcher_nome": r.nome,
             "last_login": None,
             "created_at": None,
+            "whatsapp": r.whatsapp,
+            "photo_url": r.photo_thumb_url or r.photo_url,
             "pending": True,
         }
         for r in pending
@@ -99,7 +103,7 @@ def update_user(
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
-    if data.role not in ("professor", "student"):
+    if data.role not in ("admin", "professor", "student"):
         raise HTTPException(status_code=400, detail="Perfil inválido")
     user.role = data.role
     user.is_admin = data.is_admin

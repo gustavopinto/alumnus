@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getAdminStats, getAdminUsers, updateUserRole, deleteUser, deletePendingResearcher } from '../api';
 
 const ROLE_LABELS = { admin: 'Admin', professor: 'Professor', student: 'Aluno' };
@@ -18,10 +19,16 @@ function StatCard({ label, value, color = 'text-blue-600' }) {
   );
 }
 
+function slugify(nome) {
+  return (nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
+}
+
 export default function AdminPage() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
-  const [editingId, setEditingId] = useState(null);
+  const [editingId, setEditingId] = useState(undefined);
   const [editRole, setEditRole] = useState('');
   const [editIsAdmin, setEditIsAdmin] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -94,7 +101,7 @@ export default function AdminPage() {
                   <th className="px-4 py-3">Nome</th>
                   <th className="px-4 py-3">Email</th>
                   <th className="px-4 py-3">Perfil</th>
-                  <th className="px-4 py-3">Pesquisador</th>
+                  <th className="px-4 py-3">WhatsApp</th>
                   <th className="px-4 py-3">Último acesso</th>
                   <th className="px-4 py-3"></th>
                 </tr>
@@ -102,7 +109,19 @@ export default function AdminPage() {
               <tbody className="divide-y divide-gray-100">
                 {users.map((u, idx) => (
                   <tr key={u.id ?? `pending-${idx}`} className={`hover:bg-gray-50 transition-colors ${u.pending ? 'opacity-60' : ''}`}>
-                    <td className="px-4 py-3 font-medium text-gray-800">{u.nome}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        {u.photo_url
+                          ? <img src={u.photo_url} alt="" className="w-7 h-7 rounded-full object-cover shrink-0" />
+                          : <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-500 shrink-0">{(u.nome || '?')[0].toUpperCase()}</div>
+                        }
+                        <span className="font-medium text-gray-800">
+                          {u.researcher_nome
+                            ? <a href={`/profile/${slugify(u.nome)}`} className="hover:text-blue-600 hover:underline">{u.nome}</a>
+                            : u.nome}
+                        </span>
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-gray-500">{u.email}</td>
                     <td className="px-4 py-3">
                       {u.pending ? (
@@ -116,6 +135,7 @@ export default function AdminPage() {
                             onChange={e => setEditRole(e.target.value)}
                             className="border rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-purple-400"
                           >
+                            <option value="admin">Admin</option>
                             <option value="professor">Professor</option>
                             <option value="student">Aluno</option>
                           </select>
@@ -136,7 +156,7 @@ export default function AdminPage() {
                             Salvar
                           </button>
                           <button
-                            onClick={() => setEditingId(null)}
+                            onClick={() => setEditingId(undefined)}
                             className="text-gray-500 hover:text-gray-700 text-xs px-1"
                           >
                             ✕
@@ -147,7 +167,7 @@ export default function AdminPage() {
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${ROLE_COLORS[u.role] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
                             {ROLE_LABELS[u.role] || u.role}
                           </span>
-                          {u.is_admin && (
+                          {u.is_admin && u.role !== 'admin' && (
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${ROLE_COLORS.admin}`}>
                               Admin
                             </span>
@@ -155,15 +175,25 @@ export default function AdminPage() {
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-500">{u.researcher_nome || '—'}</td>
+                    <td className="px-4 py-3 text-gray-500">
+                      {u.whatsapp
+                        ? <a href={`https://wa.me/${u.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="hover:text-green-600 hover:underline">{u.whatsapp}</a>
+                        : '—'}
+                    </td>
                     <td className="px-4 py-3 text-gray-400">{formatDate(u.last_login)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1 justify-end">
-                        {!u.pending && editingId !== u.id && (
+                        {editingId !== u.id && (
                           <button
-                            onClick={() => { setEditingId(u.id); setEditRole(u.role); setEditIsAdmin(u.is_admin ?? false); }}
+                            onClick={() => {
+                              if (u.pending) {
+                                navigate(`/profile/${slugify(u.nome)}`);
+                              } else {
+                                setEditingId(u.id); setEditRole(u.role); setEditIsAdmin(u.is_admin ?? false);
+                              }
+                            }}
                             className="p-1.5 rounded text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors"
-                            title="Editar perfil"
+                            title={u.pending ? 'Ver perfil' : 'Editar perfil'}
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
