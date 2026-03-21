@@ -125,7 +125,7 @@ export default function DeadlinesPage() {
               return slug ? (
                 <Link
                   key={i.user_id}
-                  to={`/profile/${slug}`}
+                  to={`/app/profile/${slug}`}
                   className="inline-block ring-2 ring-white rounded-full"
                   title={`Perfil de ${i.user_name}`}
                 >
@@ -171,7 +171,7 @@ export default function DeadlinesPage() {
                 <span key={i.user_id} className="inline-flex items-center gap-1">
                   {idx > 0 && <span className="text-gray-300">·</span>}
                   {slug ? (
-                    <Link to={`/profile/${slug}`} className="font-medium text-blue-600 hover:underline">
+                    <Link to={`/app/profile/${slug}`} className="font-medium text-blue-600 hover:underline">
                       {i.user_name}
                     </Link>
                   ) : (

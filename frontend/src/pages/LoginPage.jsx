@@ -63,7 +63,7 @@ export default function LoginPage() {
 
       if (payload.role === 'student') {
         if (!payload.researcher_id) {
-          navigate('/manual', { replace: true });
+          navigate('/app/manual', { replace: true });
         } else {
           const stuRes = await fetch(`/api/researchers/${payload.researcher_id}`, {
             headers: { Authorization: `Bearer ${data.access_token}` },
@@ -85,10 +85,10 @@ export default function LoginPage() {
             setError('Perfil incompleto. Contate o suporte.');
             return;
           }
-          navigate(`/profile/${slugify(stu.nome)}`, { replace: true });
+          navigate(`/app/profile/${slugify(stu.nome)}`, { replace: true });
         }
       } else {
-        navigate('/', { replace: true });
+        navigate('/app', { replace: true });
       }
     } catch (err) {
       console.error('[login] Erro inesperado', err);

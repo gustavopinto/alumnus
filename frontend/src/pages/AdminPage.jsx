@@ -117,7 +117,7 @@ export default function AdminPage() {
                         }
                         <span className="font-medium text-gray-800">
                           {u.researcher_nome
-                            ? <a href={`/profile/${slugify(u.nome)}`} className="hover:text-blue-600 hover:underline">{u.nome}</a>
+                            ? <a href={`/app/profile/${slugify(u.nome)}`} className="hover:text-blue-600 hover:underline">{u.nome}</a>
                             : u.nome}
                         </span>
                       </div>
@@ -187,7 +187,7 @@ export default function AdminPage() {
                           <button
                             onClick={() => {
                               if (u.pending) {
-                                navigate(`/profile/${slugify(u.nome)}`);
+                                navigate(`/app/profile/${slugify(u.nome)}`);
                               } else {
                                 setEditingId(u.id); setEditRole(u.role); setEditIsAdmin(u.is_admin ?? false);
                               }

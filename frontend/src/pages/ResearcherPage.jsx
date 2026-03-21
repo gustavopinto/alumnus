@@ -213,7 +213,7 @@ function NotesSection({ researcherId, canAdd, isProfessor, currentUserId }) {
                   <span className="text-xs text-gray-400">{formatDate(note.created_at)}</span>
                   {note.created_by_name && (
                     <span className="ml-1.5 text-xs text-gray-500">
-                      por <Link to={`/profile/${slugify(note.created_by_name)}`} className="hover:underline hover:text-gray-700">{note.created_by_name}</Link>
+                      por <Link to={`/app/profile/${slugify(note.created_by_name)}`} className="hover:underline hover:text-gray-700">{note.created_by_name}</Link>
                     </span>
                   )}
                 </div>

@@ -45,13 +45,13 @@ export default function ProtectedRoute({ children, professorOnly = false, adminO
 
       const path = location.pathname;
       const allowedStudent =
-        path === '/' ||
-        path === `/profile/${slug}` ||
-        path === '/manual' ||
-        path === '/board' ||
-        path === '/reminders' ||
-        path === '/deadlines' ||
-        path.startsWith('/profile/');
+        path === '/app' ||
+        path === `/app/profile/${slug}` ||
+        path === '/app/manual' ||
+        path === '/app/board' ||
+        path === '/app/reminders' ||
+        path === '/app/deadlines' ||
+        path.startsWith('/app/profile/');
 
       if (allowedStudent) {
         setState('ok');
@@ -65,7 +65,7 @@ export default function ProtectedRoute({ children, professorOnly = false, adminO
 
   if (state === 'loading')          return <div className="flex items-center justify-center h-screen text-gray-400 text-sm">Verificando acesso...</div>;
   if (state === 'redirect_login')   return <Navigate to="/login" replace state={{ from: location }} />;
-  if (state === 'redirect_profile') return <Navigate to={`/profile/${profileSlug}`} replace />;
+  if (state === 'redirect_profile') return <Navigate to={`/app/profile/${profileSlug}`} replace />;
   if (state === 'forbidden')        return <div className="flex items-center justify-center h-screen text-red-500 text-sm">Acesso não permitido.</div>;
   return children;
 }

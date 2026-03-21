@@ -230,16 +230,16 @@ export default function AppLayout() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    if (!pathname.startsWith('/profile/')) setProfileTopbar(null);
+    if (!pathname.startsWith('/app/profile/')) setProfileTopbar(null);
   }, [pathname]);
   const pageHeading = useMemo(() => {
     const p = pathname || '/';
-    if (p === '/' || p === '') return { title: 'Grupo', icon: 'grupo' };
-    if (p === '/manual') return { title: 'Manual de Sobrevivência', icon: 'manual' };
-    if (p === '/reminders') return { title: 'Lembretes', icon: 'reminders' };
-    if (p === '/deadlines') return { title: 'Deadlines', icon: 'deadlines' };
-    if (p === '/board') return { title: 'Mural', icon: 'board' };
-    if (p === '/admin') return { title: 'Dashboard Admin', icon: 'admin' };
+    if (p === '/app' || p === '/app/') return { title: 'Grupo', icon: 'grupo' };
+    if (p === '/app/manual') return { title: 'Manual de Sobrevivência', icon: 'manual' };
+    if (p === '/app/reminders') return { title: 'Lembretes', icon: 'reminders' };
+    if (p === '/app/deadlines') return { title: 'Deadlines', icon: 'deadlines' };
+    if (p === '/app/board') return { title: 'Mural', icon: 'board' };
+    if (p === '/app/admin') return { title: 'Dashboard Admin', icon: 'admin' };
     return null;
   }, [pathname]);
 
@@ -254,7 +254,7 @@ export default function AppLayout() {
         {sidebarOpen ? (
           <>
             <div className="p-4 border-b bg-white flex items-center justify-between shrink-0">
-              <Link to="/" className="group">
+              <Link to="/app" className="group">
                 <h1 className="text-xl font-bold text-blue-700 group-hover:text-blue-800">Alumnus</h1>
                 <p className="text-xs text-gray-500">Rede de pesquisa</p>
               </Link>
@@ -351,7 +351,7 @@ export default function AppLayout() {
                     <>
                       <button
                         type="button"
-                        onClick={() => { setSettingsOpen(false); navigate('/admin'); }}
+                        onClick={() => { setSettingsOpen(false); navigate('/app/admin'); }}
                         className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-purple-700 hover:bg-purple-50"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-purple-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -365,7 +365,7 @@ export default function AppLayout() {
                   {profileSlug && (
                     <button
                       type="button"
-                      onClick={() => { setSettingsOpen(false); navigate(`/profile/${profileSlug}`); }}
+                      onClick={() => { setSettingsOpen(false); navigate(`/app/profile/${profileSlug}`); }}
                       className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">

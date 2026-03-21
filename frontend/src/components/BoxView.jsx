@@ -70,7 +70,7 @@ export default function BoxView({ researchers, hiddenStatuses }) {
               {items.map(r => (
                 <Link
                   key={r.id}
-                  to={`/profile/${slugify(r.nome)}`}
+                  to={`/app/profile/${slugify(r.nome)}`}
                   className="bg-white rounded-xl border shadow-sm p-4 flex items-start gap-3 hover:shadow-md hover:border-gray-300 transition-all group"
                   style={{ borderLeftColor: color, borderLeftWidth: 4 }}
                 >

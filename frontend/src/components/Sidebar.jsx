@@ -164,7 +164,7 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, r
         <button
           type="button"
           title="Lembretes"
-          onClick={() => navigate('/reminders')}
+          onClick={() => navigate('/app/reminders')}
           className="relative w-11 h-11 flex items-center justify-center bg-white border rounded-lg text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors"
         >
           {bellIcon}
@@ -177,7 +177,7 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, r
       ) : (
         <div className="w-full flex items-center bg-white border rounded-lg text-sm text-gray-700 shadow-sm overflow-hidden">
           <Link
-            to="/reminders"
+            to="/app/reminders"
             className="flex items-center gap-2 flex-1 px-3 py-2 hover:bg-blue-50 hover:text-blue-700 transition-colors min-w-0"
           >
             {bellIcon}
@@ -497,7 +497,7 @@ export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshK
 
         {isAdmin && (
           <Link
-            to="/admin"
+            to="/app/admin"
             title="Dashboard Admin"
             className="w-11 h-11 flex items-center justify-center rounded-lg border border-purple-200 bg-purple-50 text-purple-600 shadow-sm hover:bg-purple-100 hover:border-purple-300 transition-colors shrink-0"
           >
@@ -508,7 +508,7 @@ export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshK
         )}
 
         <Link
-          to="/"
+          to="/app"
           title="Grupo — ir para o grafo"
           className="relative w-11 h-11 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors shrink-0"
         >
@@ -523,7 +523,7 @@ export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshK
         <RemindersDropdown rail refreshKey={remindersRefreshKey} currentUser={currentUser} />
 
         <Link
-          to="/deadlines"
+          to="/app/deadlines"
           title="Deadlines"
           className="relative w-11 h-11 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors shrink-0"
         >
@@ -536,7 +536,7 @@ export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshK
         </Link>
 
         <Link
-          to="/manual"
+          to="/app/manual"
           title="Manual de Sobrevivência"
           className="w-11 h-11 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors shrink-0"
         >
@@ -591,7 +591,7 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
       {/* Dashboard Admin */}
       {isAdmin && (
         <Link
-          to="/admin"
+          to="/app/admin"
           className="w-full flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 text-sm text-purple-700 shadow-sm hover:bg-purple-100 hover:border-purple-300 transition-colors"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -611,7 +611,7 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
         <ul className="space-y-1">
           {researchers.map((s) => (
             <li key={s.id} className="flex items-center justify-between rounded px-1 py-1 text-sm hover:bg-gray-50">
-              <Link to={`/profile/${slugify(s.nome)}`} className="flex-1 truncate hover:text-blue-600">{s.nome}</Link>
+              <Link to={`/app/profile/${slugify(s.nome)}`} className="flex-1 truncate hover:text-blue-600">{s.nome}</Link>
               {(role === 'professor' || isAdmin) && (
                 <span className="flex gap-1 shrink-0 ml-1">
                   <button onClick={() => handleEdit(s)} title="Editar" className="text-blue-500 hover:text-blue-700 p-0.5">
@@ -665,7 +665,7 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
 
       {/* Manual de Sobrevivência */}
       <Link
-        to="/manual"
+        to="/app/manual"
         className="w-full flex items-center gap-2 bg-white border rounded-lg px-3 py-2 text-sm text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors"
       >
         {BOOK_ICON}

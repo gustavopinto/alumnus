@@ -4,7 +4,7 @@ import { Handle, Position } from '@xyflow/react';
 export default function ResearcherNode({ data }) {
   function handleClick(e) {
     e.stopPropagation();
-    window.location.href = `/profile/${data.slug}`;
+    window.location.href = `/app/profile/${data.slug}`;
   }
 
   return (
