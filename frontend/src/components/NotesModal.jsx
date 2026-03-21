@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { updateResearcher } from '../api';
+import { modKey, isModEnter } from '../platform';
 
 export default function NotesModal({ student, onClose }) {
   const [text, setText] = useState('');
@@ -30,12 +31,13 @@ export default function NotesModal({ student, onClose }) {
           placeholder="Trabalhos, publicações, observações..."
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onKeyDown={e => isModEnter(e) && handleSave()}
           autoFocus
         />
         <div className="flex justify-end gap-2 mt-4">
           <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg bg-gray-100 hover:bg-gray-200">Cancelar</button>
           <button onClick={handleSave} disabled={saving} className="px-4 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50">
-            {saving ? 'Salvando...' : 'Salvar'}
+            {saving ? 'Salvando...' : <><span>Salvar</span> <span className="opacity-50 text-xs">{modKey}+Enter</span></>}
           </button>
         </div>
       </div>

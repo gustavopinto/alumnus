@@ -3,7 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import AppLayout from './components/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import GraphPage from './pages/GraphPage';
-import ResearcherPage from './pages/StudentPage';
+import ResearcherPage from './pages/ResearcherPage';
 import RemindersPage from './pages/RemindersPage';
 import BoardPage from './pages/BoardPage';
 import ManualPage from './pages/ManualPage';

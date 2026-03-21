@@ -9,7 +9,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import ResearcherNode from './StudentNode';
+import ResearcherNode from './ResearcherNode';
 import { updateLayout } from '../api';
 
 const nodeTypes = { researcher: ResearcherNode };

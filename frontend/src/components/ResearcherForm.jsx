@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createResearcher, updateResearcher, uploadPhoto } from '../api';
 import Toast from './Toast';
+import { modKey, isModEnter } from '../platform';
 
 const EMPTY = { nome: '', status: 'graduacao', email: '', observacoes: '', photo_url: '', orientador_id: '', matricula: '', curso: '', enrollment_date: '' };
 
@@ -96,7 +97,7 @@ export default function ResearcherForm({ researcher, researchers, onSaved, onCan
         />
       </div>
 
-      <textarea className="w-full border rounded px-3 py-2 text-sm" placeholder="Observações" rows={2} value={form.observacoes} onChange={set('observacoes')} />
+      <textarea className="w-full border rounded px-3 py-2 text-sm" placeholder="Observações" rows={2} value={form.observacoes} onChange={set('observacoes')} onKeyDown={e => isModEnter(e) && handleSubmit(e)} />
 
       <div>
         <label className="text-sm text-gray-600">Foto</label>
@@ -107,7 +108,7 @@ export default function ResearcherForm({ researcher, researchers, onSaved, onCan
 
       <div className="flex gap-2">
         <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">
-          {researcher ? 'Salvar' : 'Criar'}
+          {researcher ? <><span>Salvar</span> <span className="opacity-50 text-xs">{modKey}+Enter</span></> : <><span>Criar</span> <span className="opacity-50 text-xs">{modKey}+Enter</span></>}
         </button>
         <button type="button" onClick={onCancel} className="bg-gray-200 px-4 py-2 rounded text-sm hover:bg-gray-300">
           Cancelar

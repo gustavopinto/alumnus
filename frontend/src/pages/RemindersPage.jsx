@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppLayout } from '../components/AppLayout';
 import { getReminders, createReminder, deleteReminder, markReminderNotificationRead } from '../api';
 import { canDeleteReminder, creatorDisplayName, isReminderFromSomeoneElse } from '../reminderAccess';
+import { invalidMentions, renderWithMentions } from '../mentionUtils.jsx';
 
 function slugify(nome) {
   return (nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -33,6 +34,7 @@ export default function RemindersPage() {
   const [dueDate, setDueDate] = useState(todayIso);
   const [saving, setSaving] = useState(false);
   const [mentionSearch, setMentionSearch] = useState(null); // {start, query} | null
+  const [mentionIndex, setMentionIndex] = useState(0);
   const textareaRef = useRef();
 
   const load = useCallback(async () => {
@@ -70,6 +72,21 @@ export default function RemindersPage() {
     return () => window.removeEventListener('focus', syncMinDate);
   }, []);
 
+  function wrapFormat(prefix, suffix) {
+    const el = textareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = text.slice(start, end);
+    if (!selected) return;
+    const newText = text.slice(0, start) + prefix + selected + suffix + text.slice(end);
+    setText(newText);
+    setTimeout(() => {
+      el.setSelectionRange(start + prefix.length, end + prefix.length);
+      el.focus();
+    }, 0);
+  }
+
   function handleTextChange(e) {
     const val = e.target.value;
     setText(val);
@@ -78,6 +95,7 @@ export default function RemindersPage() {
     const match = before.match(/@([\w-]*)$/);
     if (match) {
       setMentionSearch({ start: match.index, query: match[1].toLowerCase() });
+      setMentionIndex(0);
     } else {
       setMentionSearch(null);
     }
@@ -92,6 +110,7 @@ export default function RemindersPage() {
     const newText = before + '@' + slug + ' ' + after;
     setText(newText);
     setMentionSearch(null);
+    setMentionIndex(0);
     requestAnimationFrame(() => {
       const newPos = before.length + slug.length + 2;
       el.setSelectionRange(newPos, newPos);
@@ -106,9 +125,17 @@ export default function RemindersPage() {
       ).slice(0, 6)
     : [];
 
+  const [mentionError, setMentionError] = useState('');
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (!text.trim()) return;
+    const bad = invalidMentions(text.trim(), researchers);
+    if (bad.length > 0) {
+      setMentionError(`Menção não encontrada: ${bad.join(', ')}`);
+      return;
+    }
+    setMentionError('');
     setSaving(true);
     await createReminder({ text, due_date: dueDate || null });
     setText('');
@@ -145,23 +172,40 @@ export default function RemindersPage() {
       <main className="max-w-2xl mx-auto py-8 px-4 space-y-6">
         <section className="bg-white rounded-xl shadow-sm border p-6">
           <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="relative">
+            <div className={`relative border rounded-lg transition-colors focus-within:ring-2 ${mentionError ? 'border-red-400 focus-within:ring-red-300' : mentionSuggestions.length > 0 ? 'border-blue-400 ring-2 ring-blue-200 focus-within:ring-blue-400' : 'focus-within:ring-blue-400'}`}>
+              <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 border-b">
+                <button type="button" onClick={() => wrapFormat('**', '**')}
+                  className="w-6 h-6 flex items-center justify-center rounded text-sm font-bold text-gray-700 hover:bg-gray-200 transition-colors" title="Negrito">B</button>
+                <button type="button" onClick={() => wrapFormat('*', '*')}
+                  className="w-6 h-6 flex items-center justify-center rounded text-sm italic text-gray-700 hover:bg-gray-200 transition-colors" title="Itálico">I</button>
+                <button type="button" onClick={() => wrapFormat('_', '_')}
+                  className="w-6 h-6 flex items-center justify-center rounded text-sm underline text-gray-700 hover:bg-gray-200 transition-colors" title="Sublinhado">S</button>
+                <span className="text-xs text-gray-400 ml-1">Selecione o texto e clique no estilo</span>
+              </div>
               <textarea
                 ref={textareaRef}
-                className="w-full border rounded-lg px-3 py-2 text-sm h-20 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-full px-3 py-2 text-sm h-20 resize-none focus:outline-none"
                 placeholder="Novo lembrete... (@ para mencionar alguém)"
                 value={text}
-                onChange={handleTextChange}
-                onKeyDown={e => { if (e.key === 'Escape') setMentionSearch(null); }}
+                onChange={e => { handleTextChange(e); setMentionError(''); }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleSubmit(e); return; }
+                  if (!mentionSuggestions.length) return;
+                  if (e.key === 'Escape') { e.preventDefault(); setMentionSearch(null); }
+                  else if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIndex(i => (i + 1) % mentionSuggestions.length); }
+                  else if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIndex(i => (i - 1 + mentionSuggestions.length) % mentionSuggestions.length); }
+                  else if (e.key === 'Enter') { e.preventDefault(); insertMention(slugify(mentionSuggestions[mentionIndex].nome)); }
+                }}
               />
               {mentionSuggestions.length > 0 && (
                 <div className="absolute left-0 right-0 top-full mt-0.5 bg-white border rounded-lg shadow-lg z-50 py-1">
-                  {mentionSuggestions.map(r => (
+                  {mentionSuggestions.map((r, i) => (
                     <button
                       key={r.id}
                       type="button"
                       onMouseDown={e => { e.preventDefault(); insertMention(slugify(r.nome)); }}
-                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2"
+                      onMouseEnter={() => setMentionIndex(i)}
+                      className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 ${i === mentionIndex ? 'bg-blue-50 text-blue-700' : 'hover:bg-blue-50 hover:text-blue-700'}`}
                     >
                       <span className="font-medium">{r.nome}</span>
                       <span className="text-xs text-gray-400">@{slugify(r.nome)}</span>
@@ -170,6 +214,7 @@ export default function RemindersPage() {
                 </div>
               )}
             </div>
+            {mentionError && <p className="text-xs text-red-500">{mentionError}</p>}
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <label className="text-xs text-gray-500">Data limite</label>
@@ -190,7 +235,7 @@ export default function RemindersPage() {
                 disabled={saving || !text.trim()}
                 className="ml-auto bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
               >
-                {saving ? 'Salvando...' : 'Adicionar'}
+                {saving ? 'Salvando...' : <>Adicionar <span className="opacity-50 text-xs">{/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl'}+Enter</span></>}
               </button>
             </div>
           </form>
@@ -198,7 +243,7 @@ export default function RemindersPage() {
 
         {pending.length > 0 && (
           <section className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-bold text-gray-800 mb-4">Próximo</h2>
+            <h2 className="text-lg font-bold text-gray-800 mb-4">Fica ligado!</h2>
             <ul className="space-y-3">
               {pending.map(r => {
                 const days = daysLeft(r.due_date);
@@ -217,15 +262,15 @@ export default function RemindersPage() {
                     ].filter(Boolean).join(' ')}
                   >
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm whitespace-pre-wrap mb-2 ${receivedRead ? 'text-gray-500' : 'text-gray-800'}`}>{r.text}</p>
+                      <p className={`text-sm whitespace-pre-wrap mb-2 ${receivedRead ? 'text-gray-500' : 'text-gray-800'}`}>{renderWithMentions(r.text, researchers)}</p>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                         {r.due_date && (
                           <span className={`text-xs ${overdue ? 'text-red-500 font-semibold' : urgent ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
                             {overdue ? `Atrasado · ${formatDue(r.due_date)}` : days === 0 ? 'Hoje!' : `${days}d · ${formatDue(r.due_date)}`}
                           </span>
                         )}
-                        <span className="inline-flex shrink-0 items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-800 ring-1 ring-inset ring-blue-200/80">
-                          {creatorDisplayName(r, creatorOpts)}
+                        <span className="text-xs text-gray-400">
+                          Por <span className="font-semibold text-gray-600">{creatorDisplayName(r, creatorOpts)}</span>
                         </span>
                       </div>
                     </div>
@@ -270,15 +315,15 @@ export default function RemindersPage() {
                   ].filter(Boolean).join(' ')}
                 >
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm whitespace-pre-wrap mb-2 line-through ${receivedRead ? 'text-gray-400' : 'text-gray-500'}`}>{r.text}</p>
+                    <p className={`text-sm whitespace-pre-wrap mb-2 line-through ${receivedRead ? 'text-gray-400' : 'text-gray-500'}`}>{renderWithMentions(r.text, researchers)}</p>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       {r.due_date && (
                         <span className={`text-xs ${overdue ? 'text-red-500 font-semibold' : urgent ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
                           {overdue ? `Atrasado · ${formatDue(r.due_date)}` : days === 0 ? 'Hoje!' : `${days}d · ${formatDue(r.due_date)}`}
                         </span>
                       )}
-                      <span className="inline-flex shrink-0 items-center rounded-md bg-blue-50/80 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200/60">
-                        {creatorDisplayName(r, creatorOpts)}
+                      <span className="text-xs text-gray-400">
+                        Por <span className="font-semibold text-gray-500">{creatorDisplayName(r, creatorOpts)}</span>
                       </span>
                     </div>
                   </div>

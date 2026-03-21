@@ -135,9 +135,9 @@ alumnus/
 │   │   ├── api.js               # API client (injects Bearer token)
 │   │   ├── components/
 │   │   │   ├── GraphView.jsx
-│   │   │   ├── StudentNode.jsx  # Graph node component
+│   │   │   ├── ResearcherNode.jsx  # Graph node component
 │   │   │   ├── Sidebar.jsx      # Group, Reminders, Deadlines
-│   │   │   ├── StudentForm.jsx  # Add/edit researcher form
+│   │   │   ├── ResearcherForm.jsx  # Add/edit researcher form
 │   │   │   ├── Footer.jsx       # GitHub link footer
 │   │   │   ├── Legend.jsx
 │   │   │   ├── Toast.jsx
@@ -145,7 +145,7 @@ alumnus/
 │   │   └── pages/
 │   │       ├── LoginPage.jsx
 │   │       ├── RegisterPage.jsx
-│   │       ├── StudentPage.jsx  # Researcher profile page
+│   │       ├── ResearcherPage.jsx  # Researcher profile page
 │   │       ├── RemindersPage.jsx
 │   │       └── BoardPage.jsx    # Mural (post-its)
 │   └── Dockerfile

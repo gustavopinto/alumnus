@@ -4,6 +4,7 @@ import { getDeadlineInterests, toggleDeadlineInterest, extractDeadlineFromUrl } 
 import { getTokenPayload } from '../auth';
 import { DEADLINES, daysUntil, slugify } from '../deadlines';
 import { useAppLayout } from '../components/AppLayout';
+import { modKey, isModEnter } from '../platform';
 
 /** Slug do perfil: API ou derivado do nome (alinhado ao grafo / perfil). */
 function profileSlugForInterest(i) {
@@ -240,6 +241,7 @@ export default function DeadlinesPage() {
                   type="text"
                   value={extractUrl}
                   onChange={e => { setExtractUrl(e.target.value); setExtractError(''); }}
+                  onKeyDown={e => isModEnter(e) && isValidUrl && !extracting && handleExtract(e)}
                   placeholder="https://conf.example.org/2026"
                   className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${extractError ? 'border-red-400 focus:ring-red-300' : 'focus:ring-blue-400'}`}
                 />
@@ -252,7 +254,7 @@ export default function DeadlinesPage() {
                 disabled={extracting || !isValidUrl}
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40 shrink-0 self-start"
               >
-                Extrair
+                Extrair <span className="opacity-50 text-xs">{modKey}+Enter</span>
               </button>
             </div>
             </form>

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { formatApiDetail, readResponseJson } from '../apiErrors';
+import { modKey, isModEnter } from '../platform';
 
 export default function RegisterPage() {
   const navigate  = useNavigate();
@@ -63,10 +64,11 @@ export default function RegisterPage() {
             value={form.email} onChange={set('email')} />
           <input type="password" required placeholder="Senha (mín. 8 caracteres)"
             className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-            value={form.password} onChange={set('password')} />
+            value={form.password} onChange={set('password')}
+            onKeyDown={e => isModEnter(e) && handleSubmit(e)} />
           <button type="submit" disabled={loading}
             className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-            {loading ? 'Cadastrando...' : 'Criar conta'}
+            {loading ? 'Cadastrando...' : <><span>Criar conta</span> <span className="opacity-50 text-xs">{modKey}+Enter</span></>}
           </button>
         </form>
 

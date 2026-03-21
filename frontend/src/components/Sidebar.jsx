@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import ResearcherForm from './StudentForm';
+import ResearcherForm from './ResearcherForm';
 import { deleteResearcher, getReminders, createReminder, updateReminder, deleteReminder, markReminderNotificationRead } from '../api';
 import { canDeleteReminder, creatorDisplayName, isReminderFromSomeoneElse } from '../reminderAccess';
+import { invalidMentions, renderWithMentions } from '../mentionUtils.jsx';
+import { isModEnter } from '../platform';
 import { DEADLINES, daysUntil } from '../deadlines';
 
 function slugify(nome) {
@@ -23,6 +25,7 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, r
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [mentionSearch, setMentionSearch] = useState(null); // {start, query} | null
+  const [mentionIndex, setMentionIndex] = useState(0);
   const ref = useRef();
   const dateRef = useRef();
   const inputRef = useRef();
@@ -70,6 +73,7 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, r
     const match = before.match(/@([\w-]*)$/);
     if (match) {
       setMentionSearch({ start: match.index, query: match[1].toLowerCase() });
+      setMentionIndex(0);
     } else {
       setMentionSearch(null);
     }
@@ -84,6 +88,7 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, r
     const newText = (before + '@' + slug + ' ' + after).slice(0, 50);
     setText(newText);
     setMentionSearch(null);
+    setMentionIndex(0);
     requestAnimationFrame(() => {
       const newPos = before.length + slug.length + 2;
       input.setSelectionRange(newPos, newPos);
@@ -101,6 +106,11 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, r
   async function handleAdd(e) {
     e.preventDefault();
     if (!text.trim() || !date) return;
+    const bad = invalidMentions(text.trim(), researchers);
+    if (bad.length > 0) {
+      setError(`Menção não encontrada: ${bad.join(', ')}`);
+      return;
+    }
     setSaving(true);
     setError('');
     try {
@@ -203,21 +213,32 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, r
               <div className="relative">
                 <input
                   ref={inputRef}
-                  className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  className={`w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 bg-white transition-colors ${mentionSuggestions.length > 0 ? 'border-blue-400 ring-2 ring-blue-200 focus:ring-blue-400' : 'focus:ring-blue-400'}`}
                   placeholder="Novo lembrete... (@ para mencionar)"
                   value={text}
                   maxLength={50}
                   onChange={handleTextChange}
-                  onKeyDown={e => { if (e.key === 'Escape') setMentionSearch(null); }}
+                  onKeyDown={e => {
+                    if (mentionSuggestions.length) {
+                      if (e.key === 'Escape') { e.preventDefault(); setMentionSearch(null); }
+                      else if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIndex(i => (i + 1) % mentionSuggestions.length); }
+                      else if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIndex(i => (i - 1 + mentionSuggestions.length) % mentionSuggestions.length); }
+                      else if (e.key === 'Enter') { e.preventDefault(); insertMention(slugify(mentionSuggestions[mentionIndex].nome)); }
+                    } else if (isModEnter(e)) {
+                      e.preventDefault();
+                      handleAdd(e);
+                    }
+                  }}
                 />
                 {mentionSuggestions.length > 0 && (
                   <div className="absolute left-0 right-0 top-full mt-0.5 bg-white border rounded-lg shadow-lg z-[70] py-1">
-                    {mentionSuggestions.map(r => (
+                    {mentionSuggestions.map((r, i) => (
                       <button
                         key={r.id}
                         type="button"
                         onMouseDown={e => { e.preventDefault(); insertMention(slugify(r.nome)); }}
-                        className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 hover:text-blue-700 truncate"
+                        onMouseEnter={() => setMentionIndex(i)}
+                        className={`w-full text-left px-3 py-1.5 text-sm truncate ${i === mentionIndex ? 'bg-blue-50 text-blue-700' : 'hover:bg-blue-50 hover:text-blue-700'}`}
                       >
                         {r.nome}
                         <span className="ml-1.5 text-xs text-gray-400">@{slugify(r.nome)}</span>
@@ -279,7 +300,7 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, r
                         <span className="inline-flex max-w-[9rem] shrink-0 items-center truncate rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-800 ring-1 ring-inset ring-blue-200/70" title={creatorDisplayName(r, { viewerName: currentUser?.nome })}>
                           {creatorDisplayName(r, { viewerName: currentUser?.nome })}
                         </span>
-                        <span className={`min-w-0 flex-1 text-sm font-medium leading-snug break-words ${receivedRead ? 'text-gray-500' : 'text-gray-700'}`}>{r.text}</span>
+                        <span className={`min-w-0 flex-1 text-sm font-medium leading-snug break-words ${receivedRead ? 'text-gray-500' : 'text-gray-700'}`}>{renderWithMentions(r.text, researchers)}</span>
                       </div>
                       {canDeleteReminder(r) && (
                         <button type="button" onClick={() => handleDelete(r.id)} className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 shrink-0 mt-0.5" title="Remover" aria-label="Remover lembrete">
@@ -328,7 +349,7 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, r
                             <span className="inline-flex max-w-[9rem] shrink-0 items-center truncate rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-800 ring-1 ring-inset ring-blue-200/70" title={creatorDisplayName(r, { viewerName: currentUser?.nome })}>
                               {creatorDisplayName(r, { viewerName: currentUser?.nome })}
                             </span>
-                            <span className={`min-w-0 flex-1 text-sm font-medium leading-snug break-words ${receivedRead ? 'text-gray-400' : 'text-gray-600'}`}>{r.text}</span>
+                            <span className={`min-w-0 flex-1 text-sm font-medium leading-snug break-words ${receivedRead ? 'text-gray-400' : 'text-gray-600'}`}>{renderWithMentions(r.text, researchers)}</span>
                           </div>
                           {canDeleteReminder(r) && (
                             <button type="button" onClick={() => handleDelete(r.id)} className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 shrink-0 mt-0.5" title="Remover" aria-label="Remover lembrete">

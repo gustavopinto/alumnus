@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppLayout } from '../components/AppLayout';
+import { modKey, isModEnter } from '../platform';
 import {
   getManualEntries, createManualEntry, deleteManualEntry,
   toggleManualVote, addManualComment, deleteManualComment,
@@ -22,7 +23,7 @@ function renderFormatted(text) {
   });
 }
 
-function RichTextarea({ value, onChange, placeholder, rows = 4, id, required }) {
+function RichTextarea({ value, onChange, placeholder, rows = 4, id, required, onKeyDown }) {
   const ref = useRef();
 
   function wrap(prefix, suffix) {
@@ -61,6 +62,7 @@ function RichTextarea({ value, onChange, placeholder, rows = 4, id, required }) 
         placeholder={placeholder}
         value={value}
         onChange={e => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
         rows={rows}
       />
     </div>
@@ -221,6 +223,7 @@ function EntryCard({ entry, authUserId, onVote, onDelete, onCommentAdded, onComm
                     placeholder="Adicionar comentário..."
                     value={commentText}
                     onChange={e => setCommentText(e.target.value)}
+                    onKeyDown={e => isModEnter(e) && handleComment(e)}
                     maxLength={500}
                   />
                   <button
@@ -228,7 +231,7 @@ function EntryCard({ entry, authUserId, onVote, onDelete, onCommentAdded, onComm
                     disabled={submitting || !commentText.trim()}
                     className="bg-gray-100 hover:bg-gray-200 text-gray-600 px-2 py-1 rounded text-xs disabled:opacity-40"
                   >
-                    Enviar
+                    Enviar <span className="opacity-50">{modKey}+Enter</span>
                   </button>
                 </form>
               </div>
@@ -315,6 +318,7 @@ export default function ManualPage() {
                   onChange={setAnswer}
                   placeholder="Resposta... (selecione texto e clique B para negrito)"
                   rows={4}
+                  onKeyDown={e => isModEnter(e) && handleSubmit(e)}
                 />
               </div>
               <div className="flex justify-end">
