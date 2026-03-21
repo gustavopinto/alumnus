@@ -1,11 +1,13 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import GraphView from '../components/GraphView';
+import BoxView from '../components/BoxView';
 import Legend from '../components/Legend';
 import { useAppLayout } from '../components/AppLayout';
 
 export default function GraphPage() {
-  const { graphNodes, graphEdges } = useAppLayout();
+  const { graphNodes, graphEdges, researchers } = useAppLayout();
   const [hiddenStatuses, setHiddenStatuses] = useState(() => new Set());
+  const [viewMode, setViewMode] = useState('graph');
 
   const toggleStatus = useCallback((status) => {
     setHiddenStatuses((prev) => {
@@ -30,8 +32,12 @@ export default function GraphPage() {
 
   return (
     <div className="h-full min-h-[400px] relative bg-gray-50">
-      <GraphView initialNodes={visibleNodes} initialEdges={visibleEdges} />
-      <Legend hiddenStatuses={hiddenStatuses} onToggleStatus={toggleStatus} />
+      {viewMode === 'graph' ? (
+        <GraphView initialNodes={visibleNodes} initialEdges={visibleEdges} />
+      ) : (
+        <BoxView researchers={researchers} hiddenStatuses={hiddenStatuses} />
+      )}
+      <Legend hiddenStatuses={hiddenStatuses} onToggleStatus={toggleStatus} viewMode={viewMode} onToggleView={setViewMode} />
     </div>
   );
 }
