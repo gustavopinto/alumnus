@@ -3,7 +3,7 @@ import { createResearcher, updateResearcher, uploadPhoto } from '../api';
 import Toast from './Toast';
 import { modKey, isModEnter } from '../platform';
 
-const EMPTY = { nome: '', status: 'graduacao', email: '', observacoes: '', photo_url: '', orientador_id: '', matricula: '', curso: '', enrollment_date: '' };
+const EMPTY = { nome: '', status: 'graduacao', email: '', observacoes: '', photo_url: '', photo_thumb_url: '', orientador_id: '', matricula: '', curso: '', enrollment_date: '' };
 
 export default function ResearcherForm({ researcher, researchers, onSaved, onCancel }) {
   const [form, setForm] = useState(EMPTY);
@@ -18,6 +18,7 @@ export default function ResearcherForm({ researcher, researchers, onSaved, onCan
         email: researcher.email || '',
         observacoes: researcher.observacoes || '',
         photo_url: researcher.photo_url || '',
+        photo_thumb_url: researcher.photo_thumb_url || '',
         orientador_id: researcher.orientador_id || '',
         matricula: researcher.matricula || '',
         curso: researcher.curso || '',
@@ -35,7 +36,7 @@ export default function ResearcherForm({ researcher, researchers, onSaved, onCan
     if (!file) return;
     setUploading(true);
     const res = await uploadPhoto(file);
-    setForm({ ...form, photo_url: res.url });
+    setForm({ ...form, photo_url: res.url, photo_thumb_url: res.thumb_url || '' });
     setUploading(false);
   }
 

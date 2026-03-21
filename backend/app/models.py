@@ -12,6 +12,8 @@ class Researcher(Base):
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String(255), nullable=False)
     photo_url = Column(String(500), nullable=True)
+    # Miniatura quadrada (~64px) para deadlines; photo_url = retrato 3×4
+    photo_thumb_url = Column(String(500), nullable=True)
     status = Column(String(50), nullable=False)  # graduacao, mestrado, doutorado
     email = Column(String(255), nullable=True)
     orientador_id = Column(Integer, ForeignKey("researchers.id"), nullable=True)
@@ -87,7 +89,8 @@ class User(Base):
     email         = Column(String(255), unique=True, nullable=False, index=True)
     nome          = Column(String(255), nullable=False)
     password_hash = Column(String(255), nullable=False)
-    role          = Column(String(20), nullable=False)  # admin, professor, student
+    role          = Column(String(20), nullable=False)  # professor, student
+    is_admin      = Column(Boolean, nullable=False, default=False)
     researcher_id = Column(Integer, ForeignKey("researchers.id"), nullable=True)
     last_login    = Column(DateTime, nullable=True)
     created_at    = Column(DateTime, default=datetime.utcnow)

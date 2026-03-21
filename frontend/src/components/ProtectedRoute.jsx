@@ -24,11 +24,11 @@ export default function ProtectedRoute({ children, professorOnly = false, adminO
       }
 
       if (adminOnly) {
-        if (payload.role === 'admin') { setState('ok'); return; }
+        if (payload.is_admin) { setState('ok'); return; }
         setState('forbidden'); return;
       }
 
-      if (isPrivileged(payload.role)) { setState('ok'); return; }
+      if (payload.is_admin || isPrivileged(payload.role)) { setState('ok'); return; }
 
       // student
       if (professorOnly) { setState('forbidden'); return; }

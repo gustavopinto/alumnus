@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAppLayout } from '../components/AppLayout';
 import { getResearcherBySlug, updateResearcher, uploadPhoto, getNotes, createNote, deleteNote, getResearcherUser, getDeadlineInterests } from '../api';
 import { DEADLINES, slugify } from '../deadlines';
 import { getTokenPayload } from '../auth';
+import { modKey, isModEnter } from '../platform';
 import Toast from '../components/Toast';
 
 const STATUS_LABELS = { graduacao: 'Graduação', mestrado: 'Mestrado', doutorado: 'Doutorado', professor: 'Professor' };
@@ -173,6 +174,12 @@ function NotesSection({ researcherId, canAdd, isProfessor, currentUserId }) {
           placeholder="Nova anotação..."
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (isModEnter(e)) {
+              e.preventDefault();
+              handleSubmit(e);
+            }
+          }}
         />
         <div className="flex items-center gap-3">
           <label className="text-sm text-gray-500 cursor-pointer hover:text-blue-600 flex items-center gap-1">
@@ -188,7 +195,7 @@ function NotesSection({ researcherId, canAdd, isProfessor, currentUserId }) {
             </button>
           )}
           <button type="submit" disabled={saving || !text.trim()} className="ml-auto bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
-            {saving ? 'Salvando...' : 'Adicionar'}
+            {saving ? 'Salvando...' : <>Adicionar <span className="opacity-50 text-xs">{modKey}+Enter</span></>}
           </button>
         </div>
       </form>
@@ -244,6 +251,7 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoPreview, setPhotoPreview] = useState(researcher.photo_url || null);
   const [pendingPhotoUrl, setPendingPhotoUrl] = useState(null);
+  const [pendingPhotoThumbUrl, setPendingPhotoThumbUrl] = useState(null);
   const photoRef = useRef();
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
@@ -273,6 +281,7 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
     setUploadingPhoto(true);
     const res = await uploadPhoto(file);
     setPendingPhotoUrl(res.url);
+    setPendingPhotoThumbUrl(res.thumb_url || null);
     setPhotoPreview(res.url);
     setUploadingPhoto(false);
   }
@@ -296,11 +305,14 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
       twitter_url: form.twitter_url.trim() ? stripSocialUrlToHandle(form.twitter_url) : null,
       whatsapp: form.whatsapp || null,
       interesses: form.interesses || null,
-      ...(pendingPhotoUrl ? { photo_url: pendingPhotoUrl } : {}),
+      ...(pendingPhotoUrl
+        ? { photo_url: pendingPhotoUrl, photo_thumb_url: pendingPhotoThumbUrl || null }
+        : {}),
     });
     setSaving(false);
     setEditing(false);
     setPendingPhotoUrl(null);
+    setPendingPhotoThumbUrl(null);
     setToast('Perfil salvo com sucesso');
     onSaved();
   }
@@ -309,6 +321,7 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
     setEditing(false);
     setPhotoPreview(researcher.photo_url || null);
     setPendingPhotoUrl(null);
+    setPendingPhotoThumbUrl(null);
     setInstagramError('');
     setTwitterError('');
   }
@@ -561,8 +574,7 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
 
 export default function ResearcherPage() {
   const { slug } = useParams();
-  const { sidebarOpen } = useAppLayout();
-  const headerPad = sidebarOpen ? 'pl-14' : '';
+  const { setProfileTopbar } = useAppLayout();
   const [researcher, setResearcher] = useState(null);
   const [researcherUser, setResearcherUser] = useState(null);
   const [myDeadlines, setMyDeadlines] = useState([]);
@@ -587,12 +599,48 @@ export default function ResearcherPage() {
 
   useEffect(() => { load(); }, [slug]);
 
+  useEffect(() => {
+    setProfileTopbar(null);
+  }, [slug, setProfileTopbar]);
+
+  const handleAvatarClick = useCallback(() => {
+    photoInputRef.current?.click();
+  }, []);
+
+  useEffect(() => {
+    if (!researcher) return;
+    if (slugify(researcher.nome) !== slug) return;
+    const color = STATUS_COLORS[researcher.status] || '#6B7280';
+    setProfileTopbar({
+      nome: researcher.nome,
+      photoUrl: researcher.photo_url,
+      statusColor: color,
+      statusLabel: STATUS_LABELS[researcher.status] || researcher.status,
+      email: researcher.email,
+      lastLoginLine: isProfessor
+        ? (researcherUser?.last_login ? formatLastLogin(researcherUser.last_login) : 'Nunca acessou')
+        : null,
+      onAvatarClick: canEdit ? handleAvatarClick : null,
+      uploadingPhoto,
+    });
+    return () => setProfileTopbar(null);
+  }, [
+    researcher,
+    researcherUser,
+    isProfessor,
+    canEdit,
+    uploadingPhoto,
+    slug,
+    handleAvatarClick,
+    setProfileTopbar,
+  ]);
+
   async function handlePhotoChange(e) {
     const file = e.target.files[0];
     if (!file) return;
     setUploadingPhoto(true);
     const res = await uploadPhoto(file);
-    await updateResearcher(researcher.id, { photo_url: res.url });
+    await updateResearcher(researcher.id, { photo_url: res.url, photo_thumb_url: res.thumb_url || null });
     setUploadingPhoto(false);
     load();
   }
@@ -601,61 +649,11 @@ export default function ResearcherPage() {
     return <div className="flex items-center justify-center min-h-[50vh] text-gray-400">Carregando...</div>;
   }
 
-  const color = STATUS_COLORS[researcher.status] || '#6B7280';
-
   return (
     <div className="min-h-full bg-gray-50">
-      <header className={`bg-white border-b shadow-sm px-6 py-4 flex items-center gap-4 ${headerPad}`}>
-        <div className="relative group shrink-0">
-          {researcher.photo_url ? (
-            <img src={researcher.photo_url} alt={researcher.nome} className="w-12 h-12 rounded-full object-cover border-2" style={{ borderColor: color }} />
-          ) : (
-            <div className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold" style={{ backgroundColor: color }}>
-              {researcher.nome.charAt(0).toUpperCase()}
-            </div>
-          )}
-          {canEdit && (
-            <>
-              <button
-                type="button"
-                onClick={() => photoInputRef.current.click()}
-                disabled={uploadingPhoto}
-                className="absolute inset-0 rounded-full bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-100"
-                title="Alterar foto"
-              >
-                {uploadingPhoto ? (
-                  <svg className="w-4 h-4 text-white animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                  </svg>
-                ) : (
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                )}
-              </button>
-              <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
-            </>
-          )}
-        </div>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">{researcher.nome}</h1>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-xs px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: color }}>
-              {STATUS_LABELS[researcher.status] || researcher.status}
-            </span>
-            {researcher.email && <span className="text-xs text-gray-500">{researcher.email}</span>}
-          </div>
-          {isProfessor && (
-            <p className="text-xs text-gray-400 mt-1">
-              {researcherUser?.last_login
-                ? formatLastLogin(researcherUser.last_login)
-                : 'Nunca acessou'}
-            </p>
-          )}
-        </div>
-      </header>
+      {canEdit && (
+        <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+      )}
 
       <main className="max-w-3xl mx-auto py-8 px-4 space-y-6">
         <ProfileSection researcher={researcher} canEdit={canEdit} isProfessor={isProfessor} onSaved={load} />

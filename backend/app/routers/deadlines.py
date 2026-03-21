@@ -24,6 +24,7 @@ router = APIRouter(prefix="/deadlines", tags=["deadlines"])
 
 def _to_out(db: Session, interest: DeadlineInterest) -> DeadlineInterestOut:
     photo = None
+    thumb = None
     profile_slug = None
     u = interest.user
     if not u:
@@ -32,15 +33,18 @@ def _to_out(db: Session, interest: DeadlineInterest) -> DeadlineInterestOut:
             user_id=interest.user_id,
             user_name="",
             user_photo_url=None,
+            user_photo_thumb_url=None,
             profile_slug=None,
         )
     if u.researcher:
         photo = u.researcher.photo_url
+        thumb = u.researcher.photo_thumb_url or photo
         profile_slug = slugify(u.researcher.nome)
     elif u.researcher_id is not None:
         r = db.query(Researcher).filter(Researcher.id == u.researcher_id).first()
         if r:
             photo = r.photo_url
+            thumb = r.photo_thumb_url or photo
             profile_slug = slugify(r.nome)
     if profile_slug is None and u.nome:
         profile_slug = slugify(u.nome)
@@ -49,6 +53,7 @@ def _to_out(db: Session, interest: DeadlineInterest) -> DeadlineInterestOut:
         user_id=interest.user_id,
         user_name=u.nome,
         user_photo_url=photo,
+        user_photo_thumb_url=thumb,
         profile_slug=profile_slug,
     )
 

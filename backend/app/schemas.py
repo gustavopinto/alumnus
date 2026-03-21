@@ -13,6 +13,7 @@ _TWITTER_HANDLE = re.compile(r"^[A-Za-z0-9_]{1,15}$")
 class ResearcherCreate(BaseModel):
     nome: str
     photo_url: Optional[str] = None
+    photo_thumb_url: Optional[str] = None
     status: str
     email: Optional[str] = None
     orientador_id: Optional[int] = None
@@ -22,6 +23,7 @@ class ResearcherCreate(BaseModel):
 class ResearcherUpdate(BaseModel):
     nome: Optional[str] = None
     photo_url: Optional[str] = None
+    photo_thumb_url: Optional[str] = None
     status: Optional[str] = None
     email: Optional[str] = None
     orientador_id: Optional[int] = None
@@ -68,6 +70,7 @@ class ResearcherOut(BaseModel):
     id: int
     nome: str
     photo_url: Optional[str]
+    photo_thumb_url: Optional[str] = None
     status: str
     email: Optional[str]
     orientador_id: Optional[int]
@@ -323,6 +326,7 @@ class DeadlineInterestOut(BaseModel):
     user_id: int
     user_name: str
     user_photo_url: Optional[str] = None
+    user_photo_thumb_url: Optional[str] = None
     profile_slug: Optional[str] = None
 
     model_config = {"from_attributes": True}

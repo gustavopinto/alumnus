@@ -25,6 +25,7 @@ def make_token(user: User) -> str:
         "nome": user.nome,
         "email": user.email,
         "role": user.role,
+        "is_admin": user.is_admin,
         "researcher_id": user.researcher_id,
         "exp": datetime.utcnow() + timedelta(hours=EXPIRE_H),
     }

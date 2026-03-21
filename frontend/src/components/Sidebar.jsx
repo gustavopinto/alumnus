@@ -478,7 +478,7 @@ const BOOK_ICON = (
 );
 
 /** Barra estreita com ícones quando o menu principal está recolhido */
-export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshKey = 0, currentUser = null, role = null }) {
+export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshKey = 0, currentUser = null, role = null, isAdmin = false }) {
   const upcomingDeadlines = DEADLINES.filter(d => daysUntil(d.date) >= 0);
 
   return (
@@ -495,7 +495,7 @@ export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshK
           </svg>
         </button>
 
-        {role === 'admin' && (
+        {isAdmin && (
           <Link
             to="/admin"
             title="Dashboard Admin"
@@ -560,7 +560,7 @@ export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshK
   );
 }
 
-export default function Sidebar({ researchers, onRefresh, role, remindersRefreshKey = 0, currentUser = null }) {
+export default function Sidebar({ researchers, onRefresh, role, isAdmin = false, remindersRefreshKey = 0, currentUser = null }) {
   const [view, setView] = useState('list');
   const [editResearcher, setEditResearcher] = useState(null);
 
@@ -589,7 +589,7 @@ export default function Sidebar({ researchers, onRefresh, role, remindersRefresh
     <div className="p-4 space-y-2 overflow-y-auto h-full">
 
       {/* Dashboard Admin */}
-      {role === 'admin' && (
+      {isAdmin && (
         <Link
           to="/admin"
           className="w-full flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 text-sm text-purple-700 shadow-sm hover:bg-purple-100 hover:border-purple-300 transition-colors"
@@ -612,7 +612,7 @@ export default function Sidebar({ researchers, onRefresh, role, remindersRefresh
           {researchers.map((s) => (
             <li key={s.id} className="flex items-center justify-between rounded px-1 py-1 text-sm hover:bg-gray-50">
               <Link to={`/profile/${slugify(s.nome)}`} className="flex-1 truncate hover:text-blue-600">{s.nome}</Link>
-              {(role === 'professor' || role === 'admin') && (
+              {(role === 'professor' || isAdmin) && (
                 <span className="flex gap-1 shrink-0 ml-1">
                   <button onClick={() => handleEdit(s)} title="Editar" className="text-blue-500 hover:text-blue-700 p-0.5">
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

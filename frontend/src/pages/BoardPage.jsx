@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useAppLayout } from '../components/AppLayout';
 import { getBoardPosts, createBoardPost, deleteBoardPost } from '../api';
 import { getTokenPayload } from '../auth';
 import Toast from '../components/Toast';
@@ -9,8 +8,6 @@ function formatDate(iso) {
 }
 
 export default function BoardPage() {
-  const { sidebarOpen } = useAppLayout();
-  const headerPad = sidebarOpen ? 'pl-14' : '';
   const [posts, setPosts] = useState([]);
   const [text, setText] = useState('');
   const [saving, setSaving] = useState(false);
@@ -47,10 +44,6 @@ export default function BoardPage() {
   return (
     <div className="min-h-full bg-amber-50">
       <Toast message={toast} onClose={() => setToast('')} />
-      <header className={`bg-white border-b shadow-sm px-6 py-4 flex items-center gap-4 ${headerPad}`}>
-        <h1 className="text-xl font-bold text-gray-900">Mural</h1>
-      </header>
-
       <main className="max-w-5xl mx-auto py-8 px-4">
         {/* Add post form */}
         <form onSubmit={handleSubmit} className="mb-8 flex gap-3 items-start">

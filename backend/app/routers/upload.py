@@ -12,5 +12,5 @@ router = APIRouter(prefix="/upload", tags=["upload"])
 
 @router.post("/photo")
 async def upload_photo(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    url, _ = await upload_service.save_upload(file, db)
-    return {"url": url}
+    url, thumb_url = await upload_service.save_researcher_photo(file, db)
+    return {"url": url, "thumb_url": thumb_url}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Outlet, useOutletContext, useNavigate, Link } from 'react-router-dom';
+import { Outlet, useOutletContext, useNavigate, Link, useLocation } from 'react-router-dom';
 import Sidebar, { SidebarRail } from './Sidebar';
 import { getGraph, getResearchers } from '../api';
 import { removeToken, getTokenPayload, getMe } from '../auth';
@@ -15,6 +15,132 @@ function shortName(fullName) {
   return `${parts[0]} ${parts[parts.length - 1]}`;
 }
 
+function AppPageHeadingIcon({ name }) {
+  const cls = 'w-5 h-5 shrink-0 text-blue-600';
+  switch (name) {
+    case 'grupo':
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      );
+    case 'reminders':
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+      );
+    case 'deadlines':
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      );
+    case 'manual':
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+        </svg>
+      );
+    case 'board':
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+        </svg>
+      );
+    case 'admin': {
+      const adminCls = 'w-5 h-5 shrink-0 text-purple-600';
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" className={adminCls} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+      );
+    }
+    default:
+      return null;
+  }
+}
+
+/** Cabeçalho de perfil na topbar (dados via setProfileTopbar na ResearcherPage). */
+function ProfileTopbarBlock({ data }) {
+  const {
+    nome,
+    photoUrl,
+    statusColor,
+    statusLabel,
+    email,
+    lastLoginLine,
+    onAvatarClick,
+    uploadingPhoto,
+  } = data;
+
+  const avatarFace = photoUrl ? (
+    <img src={photoUrl} alt="" className="w-10 h-10 rounded-full object-cover border-2" style={{ borderColor: statusColor }} />
+  ) : (
+    <div
+      className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold border-2"
+      style={{ backgroundColor: statusColor, borderColor: statusColor }}
+    >
+      {(nome || '?').charAt(0).toUpperCase()}
+    </div>
+  );
+
+  const avatarOverlay = onAvatarClick ? (
+    <span
+      className={`absolute inset-0 rounded-full bg-black/40 flex items-center justify-center transition-opacity ${
+        uploadingPhoto ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+      }`}
+    >
+      {uploadingPhoto ? (
+        <svg className="w-4 h-4 text-white animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+        </svg>
+      ) : (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      )}
+    </span>
+  ) : null;
+
+  return (
+    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+      <div className="relative shrink-0">
+        {onAvatarClick ? (
+          <button
+            type="button"
+            onClick={onAvatarClick}
+            disabled={uploadingPhoto}
+            className="relative group rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 disabled:opacity-90"
+            title="Alterar foto"
+          >
+            {avatarFace}
+            {avatarOverlay}
+          </button>
+        ) : (
+          <div className="relative rounded-full">
+            {avatarFace}
+          </div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-base font-bold text-gray-900 truncate leading-tight">{nome}</p>
+        <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+          <span className="text-xs px-2 py-0.5 rounded-full text-white shrink-0" style={{ backgroundColor: statusColor }}>
+            {statusLabel}
+          </span>
+          {email ? <span className="text-xs text-gray-500 truncate">{email}</span> : null}
+        </div>
+        {lastLoginLine != null && lastLoginLine !== '' && (
+          <p className="text-xs text-gray-400 truncate mt-0.5">{lastLoginLine}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function useAppLayout() {
   return useOutletContext() ?? {};
 }
@@ -27,6 +153,7 @@ export default function AppLayout() {
   const [remindersRefreshKey, setRemindersRefreshKey] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [profileTopbar, setProfileTopbar] = useState(null);
   const settingsRef = useRef(null);
   const navigate = useNavigate();
 
@@ -95,9 +222,26 @@ export default function AppLayout() {
       graphEdges: edges,
       refreshSidebarReminders,
       currentUser,
+      setProfileTopbar,
     }),
     [sidebarOpen, setSidebarOpenPersist, researchers, loadData, nodes, edges, refreshSidebarReminders, currentUser],
   );
+
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    if (!pathname.startsWith('/profile/')) setProfileTopbar(null);
+  }, [pathname]);
+  const pageHeading = useMemo(() => {
+    const p = pathname || '/';
+    if (p === '/' || p === '') return { title: 'Grupo', icon: 'grupo' };
+    if (p === '/manual') return { title: 'Manual de Sobrevivência', icon: 'manual' };
+    if (p === '/reminders') return { title: 'Lembretes', icon: 'reminders' };
+    if (p === '/deadlines') return { title: 'Deadlines', icon: 'deadlines' };
+    if (p === '/board') return { title: 'Mural', icon: 'board' };
+    if (p === '/admin') return { title: 'Dashboard Admin', icon: 'admin' };
+    return null;
+  }, [pathname]);
 
   return (
     <div className="h-screen flex">
@@ -120,6 +264,7 @@ export default function AppLayout() {
                 researchers={researchers}
                 onRefresh={loadData}
                 role={payload?.role}
+                isAdmin={!!payload?.is_admin}
                 remindersRefreshKey={remindersRefreshKey}
                 currentUser={currentUser}
               />
@@ -145,6 +290,7 @@ export default function AppLayout() {
             remindersRefreshKey={remindersRefreshKey}
             currentUser={currentUser}
             role={payload?.role}
+            isAdmin={!!payload?.is_admin}
           />
         )}
       </aside>
@@ -152,22 +298,33 @@ export default function AppLayout() {
       {/* Conteúdo principal */}
       <div className="flex-1 min-h-0 min-w-0 flex flex-col">
         {/* Topbar */}
-        <header className="h-12 shrink-0 bg-white border-b flex items-center justify-between px-4 z-30">
-          {/* Esquerda: botão recolher */}
-          <div className="flex items-center">
+        <header
+          className={`shrink-0 bg-white border-b flex items-center justify-between px-4 gap-3 z-30 ${
+            profileTopbar ? 'min-h-[3.25rem] py-1.5' : 'h-12'
+          }`}
+        >
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             {sidebarOpen && (
               <button
                 type="button"
                 aria-label="Recolher menu"
                 title="Recolher menu"
                 onClick={() => setSidebarOpenPersist((o) => !o)}
-                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500"
+                className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 shrink-0"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7M18 19l-7-7 7-7" />
                 </svg>
               </button>
             )}
+            {profileTopbar ? (
+              <ProfileTopbarBlock data={profileTopbar} />
+            ) : pageHeading ? (
+              <div className="flex items-center gap-2 min-w-0">
+                <AppPageHeadingIcon name={pageHeading.icon} />
+                <h1 className="text-base font-bold text-gray-900 truncate">{pageHeading.title}</h1>
+              </div>
+            ) : null}
           </div>
 
           {/* Direita: configurações */}
@@ -190,6 +347,21 @@ export default function AppLayout() {
 
               {settingsOpen && (
                 <div className="absolute right-0 top-full mt-1 w-48 bg-white border rounded-xl shadow-lg z-50 py-1 overflow-hidden">
+                  {payload?.is_admin && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => { setSettingsOpen(false); navigate('/admin'); }}
+                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-purple-700 hover:bg-purple-50"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-purple-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                        Dashboard Admin
+                      </button>
+                      <div className="border-t mx-2 my-1" />
+                    </>
+                  )}
                   {profileSlug && (
                     <button
                       type="button"

@@ -54,17 +54,17 @@ def get_optional_user(
 
 
 def require_professor(user: User = Depends(get_current_user)) -> User:
-    if user.role not in ("professor", "admin"):
+    if user.role != "professor" and not user.is_admin:
         raise HTTPException(status_code=403, detail="Acesso restrito a professores")
     return user
 
 
 def require_admin(user: User = Depends(get_current_user)) -> User:
-    if user.role != "admin":
+    if not user.is_admin:
         raise HTTPException(status_code=403, detail="Acesso restrito a administradores")
     return user
 
 
 def is_privileged(user: User) -> bool:
-    """Retorna True para admin e professor."""
-    return user.role in ("professor", "admin")
+    """Retorna True para professor e admin."""
+    return user.role == "professor" or user.is_admin

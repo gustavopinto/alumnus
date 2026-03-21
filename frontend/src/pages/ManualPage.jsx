@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useAppLayout } from '../components/AppLayout';
 import { modKey, isModEnter } from '../platform';
 import {
   getManualEntries, createManualEntry, deleteManualEntry,
@@ -244,8 +243,6 @@ function EntryCard({ entry, authUserId, onVote, onDelete, onCommentAdded, onComm
 }
 
 export default function ManualPage() {
-  const { sidebarOpen } = useAppLayout();
-  const headerPad = sidebarOpen ? 'pl-14' : '';
   const [entries, setEntries] = useState([]);
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
@@ -280,15 +277,6 @@ export default function ManualPage() {
 
   return (
     <div className="min-h-full bg-gray-50">
-      <header className={`bg-white border-b shadow-sm px-6 py-4 flex items-center gap-4 ${headerPad}`}>
-        <div className="flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-          </svg>
-          <h1 className="text-xl font-bold text-gray-900">Manual de Sobrevivência</h1>
-        </div>
-      </header>
-
       <main className="max-w-2xl mx-auto py-8 px-4 space-y-6">
         <section className="bg-white rounded-xl shadow-sm border p-6">
             <h2 className="text-base font-semibold text-gray-800 mb-4">Nova entrada</h2>
@@ -303,6 +291,12 @@ export default function ManualPage() {
                   placeholder="Pergunta..."
                   value={question}
                   onChange={e => setQuestion(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (isModEnter(e)) {
+                      e.preventDefault();
+                      handleSubmit(e);
+                    }
+                  }}
                   required
                   aria-required="true"
                 />

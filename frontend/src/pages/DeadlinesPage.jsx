@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { getDeadlineInterests, toggleDeadlineInterest, extractDeadlineFromUrl } from '../api';
 import { getTokenPayload } from '../auth';
 import { DEADLINES, daysUntil, slugify } from '../deadlines';
-import { useAppLayout } from '../components/AppLayout';
 import { modKey, isModEnter } from '../platform';
 
 /** Slug do perfil: API ou derivado do nome (alinhado ao grafo / perfil). */
@@ -41,8 +40,6 @@ export default function DeadlinesPage() {
   const [interests, setInterests] = useState([]);
   const [showPast, setShowPast] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { sidebarOpen } = useAppLayout();
-  const headerPad = sidebarOpen ? 'pl-14' : '';
   const payload = getTokenPayload();
   const myUserId = payload?.sub != null ? Number(payload.sub) : null;
 
@@ -110,6 +107,9 @@ export default function DeadlinesPage() {
       (i) => i.deadline_key === d.label && myUserId != null && Number(i.user_id) === myUserId,
     );
     const interested = interests.filter(i => i.deadline_key === d.label);
+    const myEntry =
+      myUserId != null ? interested.find((i) => Number(i.user_id) === myUserId) : null;
+    const myPic = myEntry ? (myEntry.user_photo_thumb_url || myEntry.user_photo_url) : null;
 
     return (
       <div
@@ -121,6 +121,7 @@ export default function DeadlinesPage() {
           <div className="absolute top-3 right-3 flex -space-x-2">
             {interested.slice(0, 5).map(i => {
               const slug = profileSlugForInterest(i);
+              const pic = i.user_photo_thumb_url || i.user_photo_url;
               return slug ? (
                 <Link
                   key={i.user_id}
@@ -128,10 +129,10 @@ export default function DeadlinesPage() {
                   className="inline-block ring-2 ring-white rounded-full"
                   title={`Perfil de ${i.user_name}`}
                 >
-                  <Avatar name={i.user_name} photoUrl={i.user_photo_url} size={7} />
+                  <Avatar name={i.user_name} photoUrl={pic} size={7} />
                 </Link>
               ) : (
-                <Avatar key={i.user_id} name={i.user_name} photoUrl={i.user_photo_url} size={7} />
+                <Avatar key={i.user_id} name={i.user_name} photoUrl={pic} size={7} />
               );
             })}
             {interested.length > 5 && (
@@ -188,13 +189,20 @@ export default function DeadlinesPage() {
             type="button"
             disabled={loading}
             onClick={() => handleToggle(d.label)}
-            className={`self-start text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors disabled:opacity-50 ${
+            className={`self-start inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors disabled:opacity-50 ${
               myInterest
                 ? 'bg-green-50 border-green-300 text-green-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600'
                 : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700'
             }`}
           >
-            {myInterest ? '✓ Quero mandar' : 'Quero mandar'}
+            {myInterest && myPic && (
+              <img
+                src={myPic}
+                alt=""
+                className="w-5 h-5 rounded-full object-cover border border-green-200 shrink-0"
+              />
+            )}
+            <span>{myInterest ? '✓ Quero mandar' : 'Quero mandar'}</span>
           </button>
         )}
       </div>
@@ -203,15 +211,6 @@ export default function DeadlinesPage() {
 
   return (
     <div className="min-h-full bg-gray-50">
-      <header className={`bg-white border-b shadow-sm px-6 py-4 flex items-center gap-4 ${headerPad}`}>
-        <div className="flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          <h1 className="text-xl font-bold text-gray-900">Deadlines</h1>
-        </div>
-      </header>
-
       <div className="max-w-3xl mx-auto p-6 space-y-8">
 
       {/* Extrair deadline por URL */}
