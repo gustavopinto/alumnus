@@ -55,6 +55,13 @@ FRONTEND_DIST = Path(__file__).parent.parent.parent / "frontend" / "dist"
 if FRONTEND_DIST.exists():
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
 
+    _screenshots_dir = FRONTEND_DIST / "screenshots"
+    if _screenshots_dir.exists():
+        app.mount("/screenshots", StaticFiles(directory=_screenshots_dir), name="screenshots")
+
     @app.get("/{full_path:path}")
     def serve_spa(full_path: str):
+        static_file = FRONTEND_DIST / full_path
+        if static_file.is_file():
+            return FileResponse(static_file)
         return FileResponse(FRONTEND_DIST / "index.html")
