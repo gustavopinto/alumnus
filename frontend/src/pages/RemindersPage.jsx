@@ -152,14 +152,14 @@ export default function RemindersPage() {
                     <div className="flex-1 min-w-0">
                       <p className={`text-sm whitespace-pre-wrap mb-2 ${receivedRead ? 'text-gray-500' : 'text-gray-800'}`}>{r.text}</p>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <span className="inline-flex shrink-0 items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-800 ring-1 ring-inset ring-blue-200/80">
-                          {creatorDisplayName(r, creatorOpts)}
-                        </span>
                         {r.due_date && (
                           <span className={`text-xs ${overdue ? 'text-red-500 font-semibold' : urgent ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
                             {overdue ? `Atrasado · ${formatDue(r.due_date)}` : days === 0 ? 'Hoje!' : `${days}d · ${formatDue(r.due_date)}`}
                           </span>
                         )}
+                        <span className="inline-flex shrink-0 items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-800 ring-1 ring-inset ring-blue-200/80">
+                          {creatorDisplayName(r, creatorOpts)}
+                        </span>
                       </div>
                     </div>
                     {canDeleteReminder(r) && (
@@ -205,14 +205,14 @@ export default function RemindersPage() {
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm whitespace-pre-wrap mb-2 line-through ${receivedRead ? 'text-gray-400' : 'text-gray-500'}`}>{r.text}</p>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      <span className="inline-flex shrink-0 items-center rounded-md bg-blue-50/80 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200/60">
-                        {creatorDisplayName(r, creatorOpts)}
-                      </span>
                       {r.due_date && (
                         <span className={`text-xs ${overdue ? 'text-red-500 font-semibold' : urgent ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
                           {overdue ? `Atrasado · ${formatDue(r.due_date)}` : days === 0 ? 'Hoje!' : `${days}d · ${formatDue(r.due_date)}`}
                         </span>
                       )}
+                      <span className="inline-flex shrink-0 items-center rounded-md bg-blue-50/80 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200/60">
+                        {creatorDisplayName(r, creatorOpts)}
+                      </span>
                     </div>
                   </div>
                   {canDeleteReminder(r) && (
