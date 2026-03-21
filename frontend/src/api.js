@@ -65,9 +65,24 @@ export const deleteWork = (workId) => request(`/works/${workId}`, { method: 'DEL
 
 // Reminders
 export const getReminders = () => request('/reminders/');
+export const getReminderUnreadCount = () => request('/reminders/notifications/unread-count');
 export const createReminder = (data) => request('/reminders/', { method: 'POST', body: JSON.stringify(data) });
 export const updateReminder = (id, data) => request(`/reminders/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const deleteReminder = (id) => request(`/reminders/${id}`, { method: 'DELETE' });
+
+export async function markReminderNotificationRead(id) {
+  const token = getToken();
+  const res = await fetch(`${BASE}/reminders/${id}/mark-notification-read`, {
+    method: 'POST',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (res.status === 401) {
+    removeToken();
+    window.location.href = '/login';
+    return;
+  }
+  if (!res.ok) throw new Error('mark read failed');
+}
 
 // Board
 export const getBoardPosts = () => request('/board/');

@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useAppLayout } from '../components/AppLayout';
 import { getBoardPosts, createBoardPost, deleteBoardPost } from '../api';
 import { getTokenPayload } from '../auth';
 import Toast from '../components/Toast';
-import Footer from '../components/Footer';
 
 function formatDate(iso) {
   return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 export default function BoardPage() {
-  const navigate = useNavigate();
+  const { sidebarOpen } = useAppLayout();
+  const headerPad = sidebarOpen ? 'pl-14' : '';
   const [posts, setPosts] = useState([]);
   const [text, setText] = useState('');
   const [saving, setSaving] = useState(false);
@@ -45,16 +45,9 @@ export default function BoardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-amber-50">
+    <div className="min-h-full bg-amber-50">
       <Toast message={toast} onClose={() => setToast('')} />
-      <header className="bg-white border-b shadow-sm px-6 py-4 flex items-center gap-4">
-        <button onClick={() => navigate('/')} className="text-gray-500 hover:text-gray-800 text-sm flex items-center gap-1">
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Retornar
-        </button>
-        <div className="w-px h-6 bg-gray-200" />
+      <header className={`bg-white border-b shadow-sm px-6 py-4 flex items-center gap-4 ${headerPad}`}>
         <h1 className="text-xl font-bold text-gray-900">Mural</h1>
       </header>
 
@@ -112,7 +105,6 @@ export default function BoardPage() {
           })}
         </div>
       </main>
-      <Footer />
     </div>
   );
 }

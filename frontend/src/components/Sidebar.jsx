@@ -31,7 +31,7 @@ function today() {
   return new Date().toISOString().split('T')[0];
 }
 
-function RemindersDropdown() {
+function RemindersDropdown({ rail = false }) {
   const [open, setOpen] = useState(false);
   const [showOld, setShowOld] = useState(false);
   const [reminders, setReminders] = useState([]);
@@ -47,7 +47,7 @@ function RemindersDropdown() {
     setReminders(data || []);
   }
 
-  useEffect(() => { if (open) load(); }, [open]);
+  useEffect(() => { load(); }, []);
 
   useEffect(() => {
     function handler(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
@@ -94,26 +94,51 @@ function RemindersDropdown() {
     .filter(r => !r.done && r.due_date < todayStr)
     .sort((a, b) => b.due_date.localeCompare(a.due_date));
 
+  const bellIcon = (
+    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+    </svg>
+  );
+
   return (
     <div className="relative" ref={ref}>
       <button
-          onClick={() => setOpen(o => !o)}
-          className="w-full flex items-center gap-2 bg-white border rounded-lg px-3 py-2 text-sm text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-          </svg>
-          <span className="flex-1 text-left">Lembretes</span>
-          {upcoming.length > 0 && (
-            <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{upcoming.length}</span>
-          )}
-          <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-          </svg>
-        </button>
+        type="button"
+        title={rail ? 'Lembretes' : undefined}
+        onClick={() => setOpen(o => !o)}
+        className={
+          rail
+            ? 'relative w-11 h-11 flex items-center justify-center bg-white border rounded-lg text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors'
+            : 'w-full flex items-center gap-2 bg-white border rounded-lg px-3 py-2 text-sm text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors'
+        }
+      >
+        {bellIcon}
+        {!rail && (
+          <>
+            <span className="flex-1 text-left">Lembretes</span>
+            {upcoming.length > 0 && (
+              <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{upcoming.length}</span>
+            )}
+            <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </>
+        )}
+        {rail && upcoming.length > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] flex items-center justify-center bg-blue-600 text-white text-[10px] font-bold rounded-full px-0.5 leading-none">
+            {upcoming.length > 9 ? '9+' : upcoming.length}
+          </span>
+        )}
+      </button>
 
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-white border rounded-xl shadow-lg z-50 overflow-hidden">
+        <div
+          className={
+            rail
+              ? 'absolute left-full top-0 ml-1 w-80 max-h-[min(28rem,calc(100vh-6rem))] overflow-y-auto bg-white border rounded-xl shadow-lg z-[60] overflow-x-hidden'
+              : 'absolute left-0 right-0 top-full mt-1 bg-white border rounded-xl shadow-lg z-50 overflow-hidden'
+          }
+        >
           {/* Caixa de criação */}
           <div className="p-3 border-b bg-gray-50">
             <form onSubmit={handleAdd} className="space-y-2">
@@ -217,7 +242,7 @@ function RemindersDropdown() {
   );
 }
 
-function Dropdown({ label, icon, badge, children }) {
+function Dropdown({ label, icon, badge, children, rail = false }) {
   const [open, setOpen] = useState(false);
   const ref = useRef();
 
@@ -230,23 +255,144 @@ function Dropdown({ label, icon, badge, children }) {
   return (
     <div className="relative" ref={ref}>
       <button
+        type="button"
+        title={rail ? label : undefined}
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-2 bg-white border rounded-lg px-3 py-2 text-sm text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors"
+        className={
+          rail
+            ? 'relative w-11 h-11 flex items-center justify-center bg-white border rounded-lg text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors'
+            : 'w-full flex items-center gap-2 bg-white border rounded-lg px-3 py-2 text-sm text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors'
+        }
       >
         {icon}
-        <span className="flex-1 text-left">{label}</span>
-        {badge != null && badge > 0 && (
-          <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{badge}</span>
+        {!rail && (
+          <>
+            <span className="flex-1 text-left">{label}</span>
+            {badge != null && badge > 0 && (
+              <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{badge}</span>
+            )}
+            <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </>
         )}
-        <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-        </svg>
+        {rail && badge != null && badge > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] flex items-center justify-center bg-blue-600 text-white text-[10px] font-bold rounded-full px-0.5 leading-none">
+            {badge > 9 ? '9+' : badge}
+          </span>
+        )}
       </button>
       {open && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-white border rounded-xl shadow-lg z-50 p-3">
+        <div
+          className={
+            rail
+              ? 'absolute left-full top-0 ml-1 w-72 max-h-[min(24rem,calc(100vh-6rem))] overflow-y-auto bg-white border rounded-xl shadow-lg z-[60] p-3'
+              : 'absolute left-0 right-0 top-full mt-1 bg-white border rounded-xl shadow-lg z-50 p-3'
+          }
+        >
           {children}
         </div>
       )}
+    </div>
+  );
+}
+
+const GROUP_ICON = (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+  </svg>
+);
+
+const CALENDAR_ICON = (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+  </svg>
+);
+
+const BOOK_ICON = (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+  </svg>
+);
+
+/** Barra estreita com ícones quando o menu principal está recolhido */
+export function SidebarRail({ researchers, onExpand, onLogout }) {
+  const upcomingDeadlines = [...DEADLINES].filter(d => daysUntil(d.date) >= 0).sort((a, b) => new Date(a.date) - new Date(b.date));
+  const pastDeadlines = [...DEADLINES].filter(d => daysUntil(d.date) < 0).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0 h-full bg-gray-100">
+      <div className="flex flex-col items-center gap-2.5 py-3 px-1.5 flex-1 min-h-0 overflow-y-auto overscroll-contain">
+        <button
+          type="button"
+          onClick={onExpand}
+          className="w-11 h-11 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors shrink-0"
+          title="Expandir menu"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M6 5l7 7-7 7" />
+          </svg>
+        </button>
+
+        <Link
+          to="/"
+          title="Grupo — ir para o grafo"
+          className="relative w-11 h-11 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors shrink-0"
+        >
+          {GROUP_ICON}
+          {researchers.length > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] flex items-center justify-center bg-blue-600 text-white text-[10px] font-bold rounded-full px-0.5 leading-none">
+              {researchers.length > 9 ? '9+' : researchers.length}
+            </span>
+          )}
+        </Link>
+
+        <RemindersDropdown rail />
+
+        <Dropdown rail label="Deadlines" icon={CALENDAR_ICON} badge={upcomingDeadlines.length}>
+          <ul className="space-y-1.5">
+            {upcomingDeadlines.map((d) => {
+              const days = daysUntil(d.date);
+              return (
+                <li key={d.label} className="rounded px-1 py-1">
+                  <a href={d.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-600 hover:underline block truncate">{d.label}</a>
+                  <span className={`text-xs ${days <= 14 ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
+                    {days === 0 ? 'Hoje!' : `${days}d`} · {new Date(d.date).toLocaleDateString('pt-BR')}
+                  </span>
+                </li>
+              );
+            })}
+            {pastDeadlines.length > 0 && <li className="border-t my-1" />}
+            {pastDeadlines.map((d) => (
+              <li key={d.label} className="rounded px-1 py-1 opacity-40">
+                <a href={d.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-600 hover:underline block truncate">{d.label}</a>
+                <span className="text-xs text-gray-400">Encerrado · {new Date(d.date).toLocaleDateString('pt-BR')}</span>
+              </li>
+            ))}
+          </ul>
+        </Dropdown>
+
+        <Link
+          to="/manual"
+          title="Manual de Sobrevivência"
+          className="w-11 h-11 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors shrink-0"
+        >
+          {BOOK_ICON}
+        </Link>
+      </div>
+
+      <div className="shrink-0 py-2.5 flex justify-center border-t border-gray-200/80 bg-white">
+        <button
+          type="button"
+          onClick={onLogout}
+          className="w-11 h-11 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+          title="Sair"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }
@@ -283,7 +429,7 @@ export default function Sidebar({ researchers, onRefresh, role }) {
       {/* Grupo */}
       <Dropdown
         label="Grupo"
-        icon={<svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>}
+        icon={GROUP_ICON}
         badge={researchers.length}
       >
         <ul className="space-y-1">
@@ -315,7 +461,7 @@ export default function Sidebar({ researchers, onRefresh, role }) {
       {/* Deadlines */}
       <Dropdown
         label="Deadlines"
-        icon={<svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>}
+        icon={CALENDAR_ICON}
         badge={upcomingDeadlines.length}
       >
         <ul className="space-y-1.5">
@@ -345,9 +491,7 @@ export default function Sidebar({ researchers, onRefresh, role }) {
         to="/manual"
         className="w-full flex items-center gap-2 bg-white border rounded-lg px-3 py-2 text-sm text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-        </svg>
+        {BOOK_ICON}
         <span>Manual de Sobrevivência</span>
       </Link>
 

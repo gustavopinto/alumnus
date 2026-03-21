@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
+import { useAppLayout } from '../components/AppLayout';
 import { getResearcherBySlug, updateResearcher, uploadPhoto, getNotes, createNote, deleteNote, getResearcherUser } from '../api';
 import { getTokenPayload } from '../auth';
 import Toast from '../components/Toast';
-import Footer from '../components/Footer';
 
 const STATUS_LABELS = { graduacao: 'Graduação', mestrado: 'Mestrado', doutorado: 'Doutorado', professor: 'Professor' };
 const STATUS_COLORS = { graduacao: '#3B82F6', mestrado: '#F59E0B', doutorado: '#10B981', professor: '#7C3AED' };
@@ -213,12 +213,48 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
   }
 
   const links = [
-    { key: 'lattes_url', label: 'Lattes', value: researcher.lattes_url },
-    { key: 'scholar_url', label: 'Google Scholar', value: researcher.scholar_url },
-    { key: 'linkedin_url', label: 'LinkedIn', value: researcher.linkedin_url },
-    { key: 'github_url', label: 'GitHub', value: researcher.github_url },
-    { key: 'instagram_url', label: 'Instagram', value: researcher.instagram_url },
-    { key: 'twitter_url', label: 'Twitter / X', value: researcher.twitter_url },
+    { key: 'lattes_url', label: 'Lattes', value: researcher.lattes_url,
+      cls: 'text-teal-700 bg-teal-50 border-teal-200 hover:bg-teal-100',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
+        </svg>
+      )},
+    { key: 'scholar_url', label: 'Google Scholar', value: researcher.scholar_url,
+      cls: 'text-indigo-600 bg-indigo-50 border-indigo-200 hover:bg-indigo-100',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 3L1 9l4 2.18V17h2v-4.82L12 14l7-3.82V17h2v-5.82L23 9 12 3zm0 2.36L18.5 9 12 12.36 5.5 9 12 5.36zM5 19v2h14v-2H5z"/>
+        </svg>
+      )},
+    { key: 'linkedin_url', label: 'LinkedIn', value: researcher.linkedin_url,
+      cls: 'text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M19 3a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h14m-.5 15.5v-5.3a3.26 3.26 0 00-3.26-3.26c-.85 0-1.84.52-2.32 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 011.4 1.4v4.93h2.79M6.88 8.56a1.68 1.68 0 001.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 00-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/>
+        </svg>
+      )},
+    { key: 'github_url', label: 'GitHub', value: researcher.github_url,
+      cls: 'text-gray-800 bg-gray-100 border-gray-300 hover:bg-gray-200',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2A10 10 0 002 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0012 2z"/>
+        </svg>
+      )},
+    { key: 'instagram_url', label: 'Instagram', value: researcher.instagram_url,
+      cls: 'text-pink-600 bg-pink-50 border-pink-200 hover:bg-pink-100',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4a5.8 5.8 0 01-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8A5.8 5.8 0 017.8 2m-.2 2A3.6 3.6 0 004 7.6v8.8C4 18.39 5.61 20 7.6 20h8.8a3.6 3.6 0 003.6-3.6V7.6C20 5.61 18.39 4 16.4 4H7.6m9.65 1.5a1.25 1.25 0 011.25 1.25A1.25 1.25 0 0117.25 8 1.25 1.25 0 0116 6.75a1.25 1.25 0 011.25-1.25M12 7a5 5 0 015 5 5 5 0 01-5 5 5 5 0 01-5-5 5 5 0 015-5m0 2a3 3 0 00-3 3 3 3 0 003 3 3 3 0 003-3 3 3 0 00-3-3z"/>
+        </svg>
+      )},
+    { key: 'twitter_url', label: 'Twitter / X', value: researcher.twitter_url,
+      cls: 'text-sky-600 bg-sky-50 border-sky-200 hover:bg-sky-100',
+      icon: (
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622 5.91-5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+        </svg>
+      )},
   ];
 
   return (
@@ -228,7 +264,10 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-bold text-gray-800">Perfil</h2>
         {canEdit && !editing && (
-          <button onClick={() => setEditing(true)} className="text-sm text-blue-600 hover:underline">
+          <button onClick={() => setEditing(true)} className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
             Editar
           </button>
         )}
@@ -313,9 +352,10 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
       ) : (
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
-            {links.map(({ label, value }) => value ? (
+            {links.map(({ label, value, icon, cls }) => value ? (
               <a key={label} href={value} target="_blank" rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                className={`inline-flex items-center gap-1.5 text-sm px-3 py-1 rounded-full border transition-colors ${cls}`}>
+                {icon}
                 {label}
               </a>
             ) : null)}
@@ -363,6 +403,19 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
                   </p>
                 </div>
               )}
+              {researcher.enrollment_date && (researcher.status === 'mestrado' || researcher.status === 'doutorado') && (() => {
+                const years = researcher.status === 'mestrado' ? 2 : 4;
+                const d = new Date(researcher.enrollment_date + 'T00:00:00');
+                d.setFullYear(d.getFullYear() + years);
+                return (
+                  <div>
+                    <p className="text-xs font-medium text-gray-500">Possível Formatura</p>
+                    <p className="text-sm text-gray-700">
+                      {d.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' })}
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -374,7 +427,8 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
 
 export default function ResearcherPage() {
   const { slug } = useParams();
-  const navigate = useNavigate();
+  const { sidebarOpen } = useAppLayout();
+  const headerPad = sidebarOpen ? 'pl-14' : '';
   const [researcher, setResearcher] = useState(null);
   const [researcherUser, setResearcherUser] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -405,21 +459,14 @@ export default function ResearcherPage() {
   }
 
   if (!researcher) {
-    return <div className="flex items-center justify-center h-screen text-gray-400">Carregando...</div>;
+    return <div className="flex items-center justify-center min-h-[50vh] text-gray-400">Carregando...</div>;
   }
 
   const color = STATUS_COLORS[researcher.status] || '#6B7280';
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b shadow-sm px-6 py-4 flex items-center gap-4">
-        <button onClick={() => navigate('/')} className="text-gray-500 hover:text-gray-800 text-sm flex items-center gap-1">
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Retornar
-        </button>
-        <div className="w-px h-6 bg-gray-200" />
+    <div className="min-h-full bg-gray-50">
+      <header className={`bg-white border-b shadow-sm px-6 py-4 flex items-center gap-4 ${headerPad}`}>
         <div className="relative group shrink-0">
           {researcher.photo_url ? (
             <img src={researcher.photo_url} alt={researcher.nome} className="w-12 h-12 rounded-full object-cover border-2" style={{ borderColor: color }} />
@@ -475,7 +522,6 @@ export default function ResearcherPage() {
         <ProfileSection researcher={researcher} canEdit={canEdit} isProfessor={isProfessor} onSaved={load} />
         <NotesSection researcherId={researcher.id} />
       </main>
-      <Footer />
     </div>
   );
 }

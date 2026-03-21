@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { getReminders, createReminder, updateReminder, deleteReminder } from '../api';
+import { useAppLayout } from '../components/AppLayout';
+import { getReminders, createReminder, updateReminder, deleteReminder, markReminderNotificationRead } from '../api';
 
 function formatDue(dateStr) {
   if (!dateStr) return null;
@@ -15,15 +15,30 @@ function daysLeft(dateStr) {
 }
 
 export default function RemindersPage() {
-  const navigate = useNavigate();
+  const { sidebarOpen, refreshReminderNotifications } = useAppLayout();
+  const headerPad = sidebarOpen ? 'pl-14' : '';
   const [reminders, setReminders] = useState([]);
   const [text, setText] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [saving, setSaving] = useState(false);
+  const [markingReadId, setMarkingReadId] = useState(null);
 
   async function load() {
     const data = await getReminders();
     setReminders(data || []);
+    refreshReminderNotifications?.();
+  }
+
+  async function handleMarkNotificationRead(id) {
+    setMarkingReadId(id);
+    try {
+      await markReminderNotificationRead(id);
+      await load();
+    } catch {
+      /* ignore */
+    } finally {
+      setMarkingReadId(null);
+    }
   }
 
   useEffect(() => { load(); }, []);
@@ -54,15 +69,8 @@ export default function RemindersPage() {
   const done = reminders.filter(r => r.done);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b shadow-sm px-6 py-4 flex items-center gap-4">
-        <button onClick={() => navigate('/')} className="text-gray-500 hover:text-gray-800 text-sm flex items-center gap-1">
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-          </svg>
-          Retornar
-        </button>
-        <div className="w-px h-6 bg-gray-200" />
+    <div className="min-h-full bg-gray-50">
+      <header className={`bg-white border-b shadow-sm px-6 py-4 flex items-center gap-4 ${headerPad}`}>
         <h1 className="text-xl font-bold text-gray-900">Lembretes</h1>
       </header>
 
@@ -96,35 +104,54 @@ export default function RemindersPage() {
           </form>
         </section>
 
-        <section className="bg-white rounded-xl shadow-sm border p-6">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">Pendentes</h2>
-          {pending.length === 0 && <p className="text-sm text-gray-400 italic">Nenhum lembrete pendente.</p>}
-          <ul className="space-y-3">
-            {pending.map(r => {
-              const days = daysLeft(r.due_date);
-              const overdue = days !== null && days < 0;
-              const urgent = days !== null && days >= 0 && days <= 3;
-              return (
-                <li key={r.id} className="flex items-start gap-3 border-b pb-3 last:border-0 last:pb-0">
-                  <button
-                    onClick={() => toggleDone(r)}
-                    className="mt-0.5 w-4 h-4 rounded border-2 border-gray-300 hover:border-blue-500 shrink-0 flex items-center justify-center"
-                    title="Marcar como feito"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{r.text}</p>
-                    {r.due_date && (
-                      <span className={`text-xs mt-0.5 inline-block ${overdue ? 'text-red-500 font-semibold' : urgent ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
-                        {overdue ? `Atrasado · ${formatDue(r.due_date)}` : days === 0 ? 'Hoje!' : `${days}d · ${formatDue(r.due_date)}`}
-                      </span>
-                    )}
-                  </div>
-                  <button onClick={() => handleDelete(r.id)} className="text-xs text-red-400 hover:text-red-600 shrink-0">remover</button>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
+        {pending.length > 0 && (
+          <section className="bg-white rounded-xl shadow-sm border p-6">
+            <h2 className="text-lg font-bold text-gray-800 mb-4">Pendentes</h2>
+            <ul className="space-y-3">
+              {pending.map(r => {
+                const days = daysLeft(r.due_date);
+                const overdue = days !== null && days < 0;
+                const urgent = days !== null && days >= 0 && days <= 3;
+                return (
+                  <li key={r.id} className="flex items-start gap-3 border-b pb-3 last:border-0 last:pb-0">
+                    <button
+                      onClick={() => toggleDone(r)}
+                      className="mt-0.5 w-4 h-4 rounded border-2 border-gray-300 hover:border-blue-500 shrink-0 flex items-center justify-center"
+                      title="Marcar como feito"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-800 whitespace-pre-wrap">{r.text}</p>
+                      {r.created_by_name && (
+                        <p className="text-[10px] text-gray-400 mt-0.5">Adicionado por {r.created_by_name}</p>
+                      )}
+                      {r.due_date && (
+                        <span className={`text-xs mt-0.5 inline-block ${overdue ? 'text-red-500 font-semibold' : urgent ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
+                          {overdue ? `Atrasado · ${formatDue(r.due_date)}` : days === 0 ? 'Hoje!' : `${days}d · ${formatDue(r.due_date)}`}
+                        </span>
+                      )}
+                      {r.notification_unread && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                            Notificação nova
+                          </span>
+                          <button
+                            type="button"
+                            disabled={markingReadId === r.id}
+                            onClick={() => handleMarkNotificationRead(r.id)}
+                            className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+                          >
+                            {markingReadId === r.id ? 'Marcando…' : 'Marcar notificação como lida'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={() => handleDelete(r.id)} className="text-xs text-red-400 hover:text-red-600 shrink-0">remover</button>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
 
         {done.length > 0 && (
           <section className="bg-white rounded-xl shadow-sm border p-6">
@@ -141,7 +168,27 @@ export default function RemindersPage() {
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
                   </button>
-                  <p className="text-sm text-gray-500 line-through">{r.text}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-gray-500 line-through">{r.text}</p>
+                    {r.created_by_name && (
+                      <p className="text-[10px] text-gray-400 mt-0.5">Adicionado por {r.created_by_name}</p>
+                    )}
+                    {r.notification_unread && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
+                          Notificação nova
+                        </span>
+                        <button
+                          type="button"
+                          disabled={markingReadId === r.id}
+                          onClick={() => handleMarkNotificationRead(r.id)}
+                          className="text-xs text-blue-600 hover:underline disabled:opacity-50"
+                        >
+                          {markingReadId === r.id ? 'Marcando…' : 'Marcar notificação como lida'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
                   <button onClick={() => handleDelete(r.id)} className="text-xs text-red-400 hover:text-red-600 shrink-0 ml-auto">remover</button>
                 </li>
               ))}

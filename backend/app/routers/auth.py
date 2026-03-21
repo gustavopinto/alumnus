@@ -22,6 +22,8 @@ EXPIRE_H = int(os.getenv("TOKEN_EXPIRE_HOURS", "8"))
 def make_token(user: User) -> str:
     payload = {
         "sub": str(user.id),
+        "nome": user.nome,
+        "email": user.email,
         "role": user.role,
         "researcher_id": user.researcher_id,
         "exp": datetime.utcnow() + timedelta(hours=EXPIRE_H),

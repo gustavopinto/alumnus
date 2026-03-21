@@ -38,7 +38,14 @@ export default function ProtectedRoute({ children, professorOnly = false }) {
       const researcher = await res.json();
       const slug = slugify(researcher.nome);
 
-      if (location.pathname === `/profile/${slug}`) {
+      const path = location.pathname;
+      const allowedStudent =
+        path === `/profile/${slug}` ||
+        path === '/manual' ||
+        path === '/board' ||
+        path === '/reminders';
+
+      if (allowedStudent) {
         setState('ok');
       } else {
         setProfileSlug(slug);
