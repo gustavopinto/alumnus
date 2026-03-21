@@ -588,7 +588,7 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
   return (
     <div className="p-4 space-y-2 overflow-y-auto h-full">
 
-      {/* Dashboard Admin */}
+      {/* Dashboard */}
       {isAdmin && (
         <Link
           to="/app/admin"
@@ -597,7 +597,7 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
           </svg>
-          <span className="font-medium">Dashboard Admin</span>
+          <span className="font-medium">Dashboard</span>
         </Link>
       )}
 
@@ -606,7 +606,7 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
         label="Grupo"
         icon={GROUP_ICON}
         badge={researchers.length}
-        linkTo="/"
+        linkTo="/app"
       >
         <ul className="space-y-1">
           {researchers.map((s) => (
@@ -635,7 +635,7 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
       <RemindersDropdown refreshKey={remindersRefreshKey} currentUser={currentUser} researchers={researchers} />
 
       {/* Deadlines */}
-      <Dropdown label="Deadlines" icon={CALENDAR_ICON} badge={upcomingDeadlines.length} linkTo="/deadlines">
+      <Dropdown label="Deadlines" icon={CALENDAR_ICON} badge={upcomingDeadlines.length} linkTo="/app/deadlines">
         {(() => {
           const pastDeadlines = DEADLINES.filter(d => daysUntil(d.date) < 0).sort((a, b) => new Date(b.date) - new Date(a.date));
           return (

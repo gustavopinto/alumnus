@@ -15,6 +15,32 @@ function shortName(fullName) {
   return `${parts[0]} ${parts[parts.length - 1]}`;
 }
 
+/** Indicador de dias restantes do trial (canto esquerdo da topbar). */
+function TrialPlanBadge({ user }) {
+  if (!user || user.role !== 'professor' || user.plan_type !== 'trial') return null;
+  const expired =
+    user.plan_status === 'expired'
+    || (user.trial_days_remaining != null && user.trial_days_remaining <= 0);
+  if (expired) {
+    return (
+      <span className="text-xs font-medium text-red-700 bg-red-50 px-2 py-1 rounded-lg shrink-0 border border-red-100">
+        Trial encerrado
+      </span>
+    );
+  }
+  const n = user.trial_days_remaining;
+  if (n == null) return null;
+  const label = n === 1 ? '1 dia restante' : `${n} dias restantes`;
+  return (
+    <span
+      className="text-xs font-medium text-amber-900 bg-amber-100 px-2 py-1 rounded-lg shrink-0 border border-amber-200/80"
+      title="Período de avaliação: 30 dias a partir da ativação da conta"
+    >
+      {label}
+    </span>
+  );
+}
+
 function AppPageHeadingIcon({ name }) {
   const cls = 'w-5 h-5 shrink-0 text-blue-600';
   switch (name) {
@@ -198,7 +224,7 @@ export default function AppLayout() {
 
   function handleLogout() {
     removeToken();
-    window.location.href = '/login';
+    window.location.href = '/entrar';
   }
 
   const payload = getTokenPayload();
@@ -208,6 +234,14 @@ export default function AppLayout() {
     || currentUser?.email
     || payload?.email
     || 'Usuário';
+
+  function greeting() {
+    const h = new Date().getHours();
+    if (h < 12) return 'Bom dia';
+    if (h < 18) return 'Boa tarde';
+    return 'Boa noite';
+  }
+  const firstName = userName.split(' ')[0];
 
   const myResearcher = researchers.find(r => r.id === payload?.researcher_id);
   const profileSlug = myResearcher ? slugify(myResearcher.nome) : null;
@@ -239,7 +273,7 @@ export default function AppLayout() {
     if (p === '/app/reminders') return { title: 'Lembretes', icon: 'reminders' };
     if (p === '/app/deadlines') return { title: 'Deadlines', icon: 'deadlines' };
     if (p === '/app/board') return { title: 'Mural', icon: 'board' };
-    if (p === '/app/admin') return { title: 'Dashboard Admin', icon: 'admin' };
+    if (p === '/app/admin') return { title: 'Dashboard', icon: 'admin' };
     return null;
   }, [pathname]);
 
@@ -254,9 +288,17 @@ export default function AppLayout() {
         {sidebarOpen ? (
           <>
             <div className="p-4 border-b bg-white flex items-center justify-between shrink-0">
-              <Link to="/app" className="group">
-                <h1 className="text-xl font-bold text-blue-700 group-hover:text-blue-800">Alumnus</h1>
-                <p className="text-xs text-gray-500">Rede de pesquisa</p>
+              <Link to="/app" className="group flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
+                  <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
+                      d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h1 className="text-base font-bold text-blue-700 group-hover:text-blue-800 leading-tight">Alumnus</h1>
+                  <p className="text-xs text-gray-500 leading-tight">Rede de pesquisa</p>
+                </div>
               </Link>
             </div>
             <div className="flex-1 min-h-0 min-w-0 overflow-y-auto">
@@ -304,6 +346,7 @@ export default function AppLayout() {
           }`}
         >
           <div className="flex items-center gap-2 min-w-0 flex-1">
+            <TrialPlanBadge user={currentUser} />
             {sidebarOpen && (
               <button
                 type="button"
@@ -327,8 +370,11 @@ export default function AppLayout() {
             ) : null}
           </div>
 
-          {/* Direita: configurações */}
+          {/* Direita: saudação + configurações */}
           <div className="flex items-center gap-2">
+            <span className="hidden sm:block text-sm text-gray-400">
+              {greeting()}, <span className="font-medium text-gray-600">{firstName}</span>
+            </span>
             {/* Configurações */}
             <div className="relative" ref={settingsRef}>
               <button
@@ -357,7 +403,7 @@ export default function AppLayout() {
                         <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-purple-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                         </svg>
-                        Dashboard Admin
+                        Dashboard
                       </button>
                       <div className="border-t mx-2 my-1" />
                     </>

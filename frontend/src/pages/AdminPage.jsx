@@ -32,6 +32,16 @@ export default function AdminPage() {
   const [editRole, setEditRole] = useState('');
   const [editIsAdmin, setEditIsAdmin] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [copiedId, setCopiedId] = useState(null);
+
+  function copyInviteLink(u) {
+    const token = btoa(u.email);
+    const url = `${window.location.origin}/entrar?tab=cadastro&token=${token}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopiedId(u.researcher_id ?? u.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    });
+  }
 
   async function load() {
     const [s, u] = await Promise.all([getAdminStats(), getAdminUsers()]);
@@ -43,7 +53,7 @@ export default function AdminPage() {
 
   async function handleRoleChange(userId) {
     setSaving(true);
-    await updateUserRole(userId, editRole, editIsAdmin);
+    await updateUserRole(userId, editRole, editRole === 'admin');
     setEditingId(null);
     setSaving(false);
     load();
@@ -103,7 +113,7 @@ export default function AdminPage() {
                   <th className="px-4 py-3">Perfil</th>
                   <th className="px-4 py-3">WhatsApp</th>
                   <th className="px-4 py-3">Último acesso</th>
-                  <th className="px-4 py-3"></th>
+                  <th className="px-4 py-3">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -139,15 +149,6 @@ export default function AdminPage() {
                             <option value="professor">Professor</option>
                             <option value="student">Aluno</option>
                           </select>
-                          <label className="flex items-center gap-1 text-xs text-purple-700 cursor-pointer select-none">
-                            <input
-                              type="checkbox"
-                              checked={editIsAdmin}
-                              onChange={e => setEditIsAdmin(e.target.checked)}
-                              className="accent-purple-600"
-                            />
-                            Admin
-                          </label>
                           <button
                             onClick={() => handleRoleChange(u.id)}
                             disabled={saving}
@@ -183,6 +184,23 @@ export default function AdminPage() {
                     <td className="px-4 py-3 text-gray-400">{formatDate(u.last_login)}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1 justify-end">
+                        {u.pending && editingId !== u.id && (
+                          <button
+                            onClick={() => copyInviteLink(u)}
+                            className="p-1.5 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                            title="Copiar link de ativação"
+                          >
+                            {copiedId === (u.researcher_id ?? u.id) ? (
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            ) : (
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                              </svg>
+                            )}
+                          </button>
+                        )}
                         {editingId !== u.id && (
                           <button
                             onClick={() => {

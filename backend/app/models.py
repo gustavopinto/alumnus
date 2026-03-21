@@ -94,6 +94,11 @@ class User(Base):
     researcher_id = Column(Integer, ForeignKey("researchers.id"), nullable=True)
     last_login    = Column(DateTime, nullable=True)
     created_at    = Column(DateTime, default=datetime.utcnow)
+    # Apenas role=professor — ver app/plan.py
+    plan_type     = Column(String(20), nullable=True)
+    plan_status   = Column(String(20), nullable=True)  # active | expired
+    account_activated_at = Column(DateTime, nullable=True)
+    plan_period_ends_at  = Column(DateTime, nullable=True)
 
     researcher = relationship("Researcher", foreign_keys=[researcher_id])
 

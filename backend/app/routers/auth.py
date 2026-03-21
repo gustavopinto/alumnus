@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import User
 from ..schemas import RegisterRequest, LoginRequest, TokenOut, UserOut
+from ..plan import refresh_user_plan_status, user_to_out
 from ..deps import get_current_user, SECRET_KEY, ALGORITHM
 from ..services import auth_service
 
@@ -45,7 +46,7 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
         )
 
     user = auth_service.create_student_from_researcher(db, data, researcher, pwd_ctx)
-    return user
+    return user_to_out(user)
 
 
 @router.post("/login", response_model=TokenOut)
@@ -55,9 +56,12 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         logger.warning("Login falhou: email=%s", data.email)
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
     auth_service.record_login(db, user)
+    refresh_user_plan_status(db, user)
     return TokenOut(access_token=make_token(user))
 
 
 @router.get("/me", response_model=UserOut)
-def me(current: User = Depends(get_current_user)):
-    return current
+def me(current: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    refresh_user_plan_status(db, current)
+    db.refresh(current)
+    return user_to_out(current)

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import AppLayout from './components/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import GraphPage from './pages/GraphPage';
@@ -9,16 +9,17 @@ import BoardPage from './pages/BoardPage';
 import ManualPage from './pages/ManualPage';
 import DeadlinesPage from './pages/DeadlinesPage';
 import AdminPage from './pages/AdminPage';
-import LoginPage from './pages/LoginPage';
-import RegisterPage from './pages/RegisterPage';
+import AuthPage from './pages/AuthPage';
 import LandingPage from './pages/LandingPage';
+
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<LandingPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/entrar" element={<AuthPage />} />
+      <Route path="/login" element={<Navigate to="/entrar" replace />} />
+      <Route path="/register" element={<Navigate to="/entrar?tab=cadastro" replace />} />
       <Route path="/app" element={<AppLayout />}>
         <Route
           index

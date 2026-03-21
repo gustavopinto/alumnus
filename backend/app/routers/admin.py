@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import require_admin
 from ..models import User, Researcher, Reminder, BoardPost, ManualEntry, Note
+from ..plan import clear_plan, ensure_professor_plan_defaults
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -105,8 +106,13 @@ def update_user(
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     if data.role not in ("admin", "professor", "student"):
         raise HTTPException(status_code=400, detail="Perfil inválido")
+    old_role = user.role
     user.role = data.role
     user.is_admin = data.is_admin
+    if data.role != "professor":
+        clear_plan(user)
+    elif old_role != "professor":
+        ensure_professor_plan_defaults(user)
     db.commit()
     return {"id": user.id, "role": user.role, "is_admin": user.is_admin}
 

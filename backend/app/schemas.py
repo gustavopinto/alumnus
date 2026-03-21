@@ -207,6 +207,11 @@ class UserOut(BaseModel):
     researcher_id: Optional[int]
     last_login:    Optional[datetime]
     created_at:    datetime
+    plan_type:     Optional[str] = None  # trial, monthly, annual — só professor
+    plan_status:   Optional[str] = None  # active, expired
+    account_activated_at: Optional[datetime] = None
+    plan_period_ends_at: Optional[datetime] = None
+    trial_days_remaining: Optional[int] = None  # só professor em trial; 0 se vencido
 
     model_config = {"from_attributes": True}
 

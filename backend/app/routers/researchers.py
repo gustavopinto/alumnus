@@ -9,6 +9,7 @@ from ..database import get_db
 from ..models import User
 from ..schemas import ResearcherCreate, ResearcherUpdate, ResearcherOut, UserOut
 from ..deps import get_current_user
+from ..plan import refresh_user_plan_status, user_to_out
 from ..services import researcher_service
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,12 @@ def get_researcher(researcher_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{researcher_id}/user", response_model=Optional[UserOut])
 def get_researcher_user(researcher_id: int, db: Session = Depends(get_db)):
-    return researcher_service.get_linked_user(db, researcher_id)
+    u = researcher_service.get_linked_user(db, researcher_id)
+    if not u:
+        return None
+    refresh_user_plan_status(db, u)
+    db.refresh(u)
+    return user_to_out(u)
 
 
 @router.put("/{researcher_id}", response_model=ResearcherOut)

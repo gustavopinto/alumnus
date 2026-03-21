@@ -1,5 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { getTokenPayload, saveToken } from '../auth';
+import { formatApiDetail, readResponseJson } from '../apiErrors';
+
+/* ── Saudação por horário ──────────────────────────────────────────────── */
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return 'Bom dia';
+  if (h < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
 
 /* ── Fade-in on scroll ────────────────────────────────────────────────── */
 function FadeIn({ children, delay = 0, className = '' }) {
@@ -158,21 +168,201 @@ function FeatureBlock({ icon, title, items, delay }) {
   );
 }
 
-/* ── Code-style endpoint ──────────────────────────────────────────────── */
-function Endpoint({ method, path, desc }) {
-  const colors = {
-    GET:    'bg-emerald-100 text-emerald-700',
-    POST:   'bg-blue-100 text-blue-700',
-    PUT:    'bg-amber-100 text-amber-700',
-    DELETE: 'bg-red-100 text-red-700',
-  };
+/* ── Auth Modal ───────────────────────────────────────────────────────── */
+function slugify(nome) {
+  return (nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
+}
+
+function LoginForm({ onSuccess }) {
+  const navigate = useNavigate();
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const data = await readResponseJson(res, 'login');
+      if (data._invalidJson) { setError(res.ok ? 'Resposta inválida do servidor.' : `Erro ${res.status}.`); return; }
+      if (!res.ok) { setError(formatApiDetail(data) || 'Erro ao fazer login'); return; }
+      if (!data.access_token) { setError('Resposta inesperada do servidor.'); return; }
+      saveToken(data.access_token);
+      let payload;
+      try { payload = JSON.parse(atob(data.access_token.split('.')[1])); }
+      catch { setError('Sessão inválida.'); return; }
+      if (payload.role === 'student') {
+        if (!payload.researcher_id) {
+          navigate('/app/manual', { replace: true });
+        } else {
+          const r = await fetch(`/api/researchers/${payload.researcher_id}`, {
+            headers: { Authorization: `Bearer ${data.access_token}` },
+          });
+          const stu = await readResponseJson(r, 'login.profile');
+          if (!r.ok || stu._invalidJson) { setError('Login ok, mas não foi possível carregar seu perfil.'); return; }
+          navigate(`/app/profile/${slugify(stu.nome)}`, { replace: true });
+        }
+      } else {
+        navigate('/app', { replace: true });
+      }
+    } catch (err) {
+      const offline = err instanceof TypeError || err?.message?.includes('fetch');
+      setError(offline ? 'Não foi possível conectar ao servidor.' : 'Falha inesperada. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <div className="flex items-start gap-3 py-2.5 border-b border-slate-700/40 last:border-0">
-      <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded font-mono ${colors[method]}`}>
-        {method}
-      </span>
-      <code className="text-slate-300 text-xs font-mono flex-1 min-w-0 truncate">{path}</code>
-      <span className="text-slate-500 text-xs shrink-0 hidden sm:block">{desc}</span>
+    <>
+      {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <input type="email" required placeholder="Email"
+          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          value={form.email} onChange={set('email')} />
+        <input type="password" required placeholder="Senha"
+          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          value={form.password} onChange={set('password')} />
+        <button type="submit" disabled={loading}
+          className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+          {loading ? 'Entrando...' : 'Entrar'}
+        </button>
+      </form>
+    </>
+  );
+}
+
+function RegisterForm({ onSwitchToLogin }) {
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const data = await readResponseJson(res, 'register');
+      if (data._invalidJson) { setError(`Erro ${res.status}. Tente novamente.`); return; }
+      if (!res.ok) { setError(formatApiDetail(data) || 'Erro ao cadastrar'); return; }
+      setSuccess(true);
+      setTimeout(() => onSwitchToLogin?.(), 1500);
+    } catch (err) {
+      const offline = err instanceof TypeError || err?.message?.includes('fetch');
+      setError(offline ? 'Não foi possível conectar ao servidor.' : 'Falha inesperada. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (success) {
+    return (
+      <div className="text-center py-4">
+        <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-3">
+          <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <p className="text-sm font-medium text-gray-800">Conta criada!</p>
+        <p className="text-xs text-gray-500 mt-1">Redirecionando para o login…</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <input type="email" required placeholder="Email institucional"
+          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          value={form.email} onChange={set('email')} />
+        <input type="password" required placeholder="Senha (mín. 8 caracteres)"
+          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          value={form.password} onChange={set('password')} />
+        <button type="submit" disabled={loading}
+          className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+          {loading ? 'Cadastrando...' : 'Criar conta'}
+        </button>
+      </form>
+    </>
+  );
+}
+
+function AuthModal({ tab, onClose, onTabChange }) {
+  const overlayRef = useRef(null);
+
+  useEffect(() => {
+    function onKey(e) { if (e.key === 'Escape') onClose(); }
+    document.addEventListener('keydown', onKey);
+    document.body.style.overflow = 'hidden';
+    return () => { document.removeEventListener('keydown', onKey); document.body.style.overflow = ''; };
+  }, [onClose]);
+
+  return (
+    <div
+      ref={overlayRef}
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
+      onClick={e => { if (e.target === overlayRef.current) onClose(); }}
+    >
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 relative">
+        {/* Close */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-4 right-4 p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+
+        {/* Logo */}
+        <div className="flex items-center gap-2 mb-6">
+          <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
+            <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
+                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </div>
+          <span className="text-2xl font-bold text-blue-700">Alumnus</span>
+        </div>
+
+        {/* Toggle */}
+        <div className="flex rounded-lg border border-gray-200 p-1 mb-6 bg-gray-50">
+          <button type="button" onClick={() => onTabChange('entrar')}
+            className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              tab === 'entrar' ? 'bg-white text-blue-700 shadow-sm border border-gray-200' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            Entrar
+          </button>
+          <button type="button" onClick={() => onTabChange('cadastro')}
+            className={`flex-1 py-1.5 text-sm font-medium rounded-md transition-colors ${
+              tab === 'cadastro' ? 'bg-white text-blue-700 shadow-sm border border-gray-200' : 'text-gray-500 hover:text-gray-700'
+            }`}>
+            Cadastrar
+          </button>
+        </div>
+
+        {tab === 'entrar'
+          ? <LoginForm />
+          : <RegisterForm onSwitchToLogin={() => onTabChange('entrar')} />
+        }
+      </div>
     </div>
   );
 }
@@ -180,9 +370,19 @@ function Endpoint({ method, path, desc }) {
 /* ── Main component ───────────────────────────────────────────────────── */
 export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [modal, setModal] = useState(null); // null | 'entrar' | 'cadastro'
+
+  const payload = getTokenPayload();
+  const isLoggedIn = !!payload;
+  const firstName = payload?.nome?.split?.(' ')?.[0] || payload?.email?.split?.('@')?.[0] || '';
+
+  function openModal(tab) { setModal(tab); }
+  function closeModal() { setModal(null); }
 
   return (
     <div className="min-h-screen bg-white font-sans antialiased">
+
+      {modal && <AuthModal tab={modal} onClose={closeModal} onTabChange={setModal} />}
 
       {/* ════════════════════════════════════════════
           NAVBAR
@@ -205,15 +405,30 @@ export default function LandingPage() {
             <a href="#funcionalidades" className="hover:text-blue-600 transition-colors">Funcionalidades</a>
             <a href="#pricing"        className="hover:text-blue-600 transition-colors">Preços</a>
           </div>
+          {/* CTA / Greeting */}
           <div className="hidden md:flex items-center gap-2">
-            <Link to="/login"
-              className="text-sm text-gray-600 hover:text-blue-600 px-3 py-1.5 rounded-lg transition-colors">
-              Entrar
-            </Link>
-            <Link to="/register"
-              className="text-sm bg-blue-600 text-white px-4 py-1.5 rounded-lg hover:bg-blue-700 transition-colors font-medium">
-              Começar agora
-            </Link>
+            {isLoggedIn ? (
+              <>
+                <span className="text-sm text-gray-500">
+                  {greeting()}, <span className="font-medium text-gray-700">{firstName}</span>
+                </span>
+                <Link to="/app"
+                  className="text-sm bg-blue-600 text-white px-4 py-1.5 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                  Acessar plataforma
+                </Link>
+              </>
+            ) : (
+              <>
+                <button type="button" onClick={() => openModal('entrar')}
+                  className="text-sm text-gray-600 hover:text-blue-600 px-3 py-1.5 rounded-lg transition-colors">
+                  Entrar
+                </button>
+                <button type="button" onClick={() => openModal('cadastro')}
+                  className="text-sm bg-blue-600 text-white px-4 py-1.5 rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                  Começar agora
+                </button>
+              </>
+            )}
           </div>
           {/* Mobile toggle */}
           <button className="md:hidden p-2 rounded-lg hover:bg-gray-100"
@@ -231,12 +446,25 @@ export default function LandingPage() {
               <a key={s} href={`#${s}`}
                 className="block py-2 px-2 rounded-lg text-gray-600 hover:bg-gray-50 capitalize"
                 onClick={() => setMenuOpen(false)}>
-                {s.charAt(0).toUpperCase() + s.slice(1)}
+                {s === 'pricing' ? 'Preços' : s.charAt(0).toUpperCase() + s.slice(1)}
               </a>
             ))}
             <div className="pt-2 border-t flex flex-col gap-2 mt-2">
-              <Link to="/login" className="block text-center py-2 border rounded-lg text-gray-700">Entrar</Link>
-              <Link to="/register" className="block text-center py-2 bg-blue-600 text-white rounded-lg font-medium">Começar agora</Link>
+              {isLoggedIn ? (
+                <>
+                  <span className="text-center text-sm text-gray-500 py-1">{greeting()}, {firstName}</span>
+                  <Link to="/app" className="block text-center py-2 bg-blue-600 text-white rounded-lg font-medium">
+                    Acessar plataforma
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <button type="button" onClick={() => { setMenuOpen(false); openModal('entrar'); }}
+                    className="block w-full text-center py-2 border rounded-lg text-gray-700">Entrar</button>
+                  <button type="button" onClick={() => { setMenuOpen(false); openModal('cadastro'); }}
+                    className="block w-full text-center py-2 bg-blue-600 text-white rounded-lg font-medium">Começar agora</button>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -285,14 +513,23 @@ export default function LandingPage() {
                 </ul>
                 {/* CTAs */}
                 <div className="flex flex-wrap gap-3">
-                  <Link to="/register"
-                    className="bg-blue-500 hover:bg-blue-400 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-lg shadow-blue-500/20">
-                    Começar agora
-                  </Link>
-                  <a href="#funcionalidades"
-                    className="text-slate-400 hover:text-slate-200 px-4 py-2.5 text-sm transition-colors">
-                    Ver funcionalidades ↓
-                  </a>
+                  {isLoggedIn ? (
+                    <Link to="/app"
+                      className="bg-blue-500 hover:bg-blue-400 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-lg shadow-blue-500/20">
+                      Acessar plataforma
+                    </Link>
+                  ) : (
+                    <>
+                      <button type="button" onClick={() => openModal('cadastro')}
+                        className="bg-blue-500 hover:bg-blue-400 text-white px-6 py-2.5 rounded-xl font-semibold text-sm transition-colors shadow-lg shadow-blue-500/20">
+                        Começar agora
+                      </button>
+                      <a href="#funcionalidades"
+                        className="text-slate-400 hover:text-slate-200 px-4 py-2.5 text-sm transition-colors">
+                        Ver funcionalidades ↓
+                      </a>
+                    </>
+                  )}
                 </div>
               </FadeIn>
             </div>
@@ -343,9 +580,9 @@ export default function LandingPage() {
               { icon: '👁️', title: 'Sem visão do grupo', desc: 'Impossível enxergar de um só lugar quem está em qual estágio e o que está produzindo.' },
             ].map(({ icon, title, desc }, i) => (
               <FadeIn key={i} delay={i * 60}
-                className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition-shadow">
-                <span className="text-2xl mb-3 block">{icon}</span>
-                <h3 className="font-bold text-gray-900 mb-1.5 text-sm">{title}</h3>
+                className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                <div className="text-2xl mb-3">{icon}</div>
+                <h3 className="font-bold text-gray-800 text-sm mb-1.5">{title}</h3>
                 <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
               </FadeIn>
             ))}
@@ -360,57 +597,28 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto px-4">
           <SectionHeading
             eyebrow="A solução"
-            title="Uma visão estruturada do seu grupo de pesquisa"
+            title="Um grafo que conta a história do seu grupo"
+            subtitle="Visualize todos os pesquisadores, suas relações e produções em uma interface interativa."
           />
           <div className="grid md:grid-cols-2 gap-10 items-center">
-            {/* Graph preview */}
-            <FadeIn delay={0}>
-              <div className="bg-slate-50 border border-gray-200 rounded-2xl overflow-hidden h-64 md:h-72 shadow-sm">
-                <GraphDemo />
-              </div>
-              {/* Legend */}
-              <div className="mt-4 flex flex-wrap gap-2 justify-center">
-                {[
-                  { label: 'Professor',  color: '#7c3aed' },
-                  { label: 'Doutorado',  color: '#16a34a' },
-                  { label: 'Mestrado',   color: '#d97706' },
-                  { label: 'Graduação',  color: '#2563eb' },
-                ].map(({ label, color }) => (
-                  <div key={label} className="flex items-center gap-1.5 text-xs text-gray-600">
-                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                    {label}
+            <div className="bg-slate-50 rounded-2xl border border-gray-200 overflow-hidden h-64">
+              <GraphDemo />
+            </div>
+            <div className="space-y-4">
+              {[
+                ['🧩', 'Cada nó é um pesquisador', 'Com status, nível e informações de contato acessíveis em um clique.'],
+                ['🔗', 'Arestas mostram relações', 'Orientações, co-autorias e colaborações ficam visíveis no grafo.'],
+                ['📋', 'Perfil completo ao clicar', 'Reuniões, publicações, interesses e notas pessoais centralizadas.'],
+              ].map(([icon, title, desc]) => (
+                <div key={title} className="flex gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-lg shrink-0">{icon}</div>
+                  <div>
+                    <p className="font-bold text-gray-800 text-sm">{title}</p>
+                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{desc}</p>
                   </div>
-                ))}
-              </div>
-            </FadeIn>
-            {/* Text */}
-            <FadeIn delay={100}>
-              <p className="text-gray-600 leading-relaxed mb-6">
-                O Alumnus reúne em um único ambiente o mapa do grupo, os perfis dos pesquisadores,
-                notas de reuniões, histórico de trabalhos, lembretes e prazos.
-              </p>
-              <p className="text-gray-600 leading-relaxed mb-8">
-                Professores acessam a visão completa do grupo e gerenciam todos os pesquisadores.
-                Pesquisadores acessam seu próprio perfil com notas, trabalhos e lembretes associados.
-              </p>
-              <ul className="space-y-3">
-                {[
-                  'Cada pesquisador é um nó no grafo',
-                  'Relações entre pesquisadores são arestas visuais',
-                  'Clicar em um nó abre o perfil completo',
-                  'Layout do grafo persiste entre sessões',
-                ].map((item, i) => (
-                  <li key={i} className="flex items-center gap-2.5 text-sm text-gray-700">
-                    <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                      <svg className="w-3 h-3 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </FadeIn>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -419,33 +627,14 @@ export default function LandingPage() {
           COMO FUNCIONA
       ════════════════════════════════════════════ */}
       <section className="py-20 bg-blue-600">
-        <div className="max-w-4xl mx-auto px-4">
-          <SectionHeading
-            eyebrow="Fluxo de uso"
-            title="Três passos para organizar seu grupo"
-            light
-          />
+        <div className="max-w-5xl mx-auto px-4">
+          <SectionHeading eyebrow="Processo" title="Como funciona" light />
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              {
-                step: '01',
-                title: 'Cadastre o grupo',
-                desc: 'Adicione pesquisadores com nome, status, links e interesses. Defina conexões entre eles.',
-                icon: '👥',
-              },
-              {
-                step: '02',
-                title: 'Navegue pelo grafo',
-                desc: 'Arraste nós, reorganize o layout e explore as relações do grupo de forma visual.',
-                icon: '🗺️',
-              },
-              {
-                step: '03',
-                title: 'Acompanhe o trabalho',
-                desc: 'Abra perfis, registre reuniões com anexos, gerencie trabalhos e consulte lembretes.',
-                icon: '📊',
-              },
-            ].map(({ step, title, desc, icon }, i) => (
+              { step: '01', icon: '🔐', title: 'Cadastre seu grupo', desc: 'O orientador cria a conta, adiciona pesquisadores e define os papéis de acesso.' },
+              { step: '02', icon: '🗺️', title: 'Explore o grafo', desc: 'Visualize o grupo como rede interativa. Arraste, aproxime e clique nos nós.' },
+              { step: '03', icon: '📋', title: 'Gerencie os perfis', desc: 'Registre reuniões, acompanhe produções e organize lembretes e prazos.' },
+            ].map(({ step, icon, title, desc }, i) => (
               <FadeIn key={i} delay={i * 100}>
                 <div className="relative bg-blue-500/30 border border-blue-400/30 rounded-2xl p-6">
                   <div className="text-3xl mb-3">{icon}</div>
@@ -579,9 +768,10 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link to="/register" className="text-center py-2.5 px-4 rounded-xl text-sm font-semibold border border-gray-300 text-gray-700 hover:bg-white hover:border-gray-400 transition-colors">
-                Começar trial
-              </Link>
+              {isLoggedIn
+                ? <Link to="/app" className="text-center py-2.5 px-4 rounded-xl text-sm font-semibold border border-gray-300 text-gray-700 hover:bg-white hover:border-gray-400 transition-colors">Acessar plataforma</Link>
+                : <button type="button" onClick={() => openModal('cadastro')} className="text-center py-2.5 px-4 rounded-xl text-sm font-semibold border border-gray-300 text-gray-700 hover:bg-white hover:border-gray-400 transition-colors">Começar trial</button>
+              }
             </FadeIn>
 
             {/* Mensal */}
@@ -603,9 +793,10 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link to="/register" className="text-center py-2.5 px-4 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors">
-                Assinar mensalmente
-              </Link>
+              {isLoggedIn
+                ? <Link to="/app" className="text-center py-2.5 px-4 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors">Acessar plataforma</Link>
+                : <button type="button" onClick={() => openModal('cadastro')} className="text-center py-2.5 px-4 rounded-xl text-sm font-semibold bg-blue-600 text-white hover:bg-blue-700 transition-colors">Assinar mensalmente</button>
+              }
             </FadeIn>
 
             {/* Anual — destaque */}
@@ -630,9 +821,10 @@ export default function LandingPage() {
                   </li>
                 ))}
               </ul>
-              <Link to="/register" className="text-center py-2.5 px-4 rounded-xl text-sm font-semibold bg-white text-blue-600 hover:bg-blue-50 transition-colors">
-                Assinar anualmente
-              </Link>
+              {isLoggedIn
+                ? <Link to="/app" className="text-center py-2.5 px-4 rounded-xl text-sm font-semibold bg-white text-blue-600 hover:bg-blue-50 transition-colors">Acessar plataforma</Link>
+                : <button type="button" onClick={() => openModal('cadastro')} className="text-center py-2.5 px-4 rounded-xl text-sm font-semibold bg-white text-blue-600 hover:bg-blue-50 transition-colors">Assinar anualmente</button>
+              }
             </FadeIn>
 
           </div>
@@ -652,14 +844,23 @@ export default function LandingPage() {
               Visualize pessoas, acompanhe relações e concentre o histórico do grupo em uma única plataforma.
             </p>
             <div className="flex flex-wrap justify-center gap-3">
-              <Link to="/register"
-                className="bg-white text-blue-600 hover:bg-blue-50 px-7 py-3 rounded-xl font-semibold text-sm transition-colors shadow-md">
-                Começar agora
-              </Link>
-              <Link to="/login"
-                className="border border-blue-400/50 hover:border-white/60 text-white px-6 py-3 rounded-xl text-sm transition-colors">
-                Fazer login
-              </Link>
+              {isLoggedIn ? (
+                <Link to="/app"
+                  className="bg-white text-blue-600 hover:bg-blue-50 px-7 py-3 rounded-xl font-semibold text-sm transition-colors shadow-md">
+                  Acessar plataforma
+                </Link>
+              ) : (
+                <>
+                  <button type="button" onClick={() => openModal('cadastro')}
+                    className="bg-white text-blue-600 hover:bg-blue-50 px-7 py-3 rounded-xl font-semibold text-sm transition-colors shadow-md">
+                    Começar agora
+                  </button>
+                  <button type="button" onClick={() => openModal('entrar')}
+                    className="border border-blue-400/50 hover:border-white/60 text-white px-6 py-3 rounded-xl text-sm transition-colors">
+                    Fazer login
+                  </button>
+                </>
+              )}
             </div>
           </FadeIn>
         </div>
@@ -682,12 +883,20 @@ export default function LandingPage() {
               <span className="text-slate-600 text-xs ml-2">© {new Date().getFullYear()}</span>
             </div>
             <div className="flex items-center gap-5 text-sm">
-              <Link to="/login" className="text-slate-500 hover:text-slate-300 transition-colors">
-                Entrar
-              </Link>
-              <Link to="/register" className="text-slate-500 hover:text-slate-300 transition-colors">
-                Cadastrar
-              </Link>
+              {isLoggedIn ? (
+                <Link to="/app" className="text-slate-500 hover:text-slate-300 transition-colors">
+                  Acessar plataforma
+                </Link>
+              ) : (
+                <>
+                  <button type="button" onClick={() => openModal('entrar')} className="text-slate-500 hover:text-slate-300 transition-colors">
+                    Entrar
+                  </button>
+                  <button type="button" onClick={() => openModal('cadastro')} className="text-slate-500 hover:text-slate-300 transition-colors">
+                    Cadastrar
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

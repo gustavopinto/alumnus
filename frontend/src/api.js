@@ -14,7 +14,7 @@ async function request(path, options = {}) {
   });
   if (res.status === 401) {
     removeToken();
-    window.location.href = '/login';
+    window.location.href = '/entrar';
     return;
   }
   if (res.status === 204 || res.status === 205) return null;
@@ -77,7 +77,7 @@ export async function deleteReminder(id) {
   });
   if (res.status === 401) {
     removeToken();
-    window.location.href = '/login';
+    window.location.href = '/entrar';
     return;
   }
   if (!res.ok) {
@@ -100,7 +100,7 @@ export async function markReminderNotificationRead(id) {
   });
   if (res.status === 401) {
     removeToken();
-    window.location.href = '/login';
+    window.location.href = '/entrar';
     return;
   }
   if (!res.ok) throw new Error('mark read failed');

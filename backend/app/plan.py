@@ -1,0 +1,114 @@
+"""Regras de plano (trial 30 dias, mensal, anual) e mapeamento para API."""
+
+from __future__ import annotations
+
+from datetime import date, datetime, timedelta, timezone
+from sqlalchemy.orm import Session
+
+from .models import User
+
+TRIAL_DAYS = 30
+
+PLAN_TRIAL = "trial"
+PLAN_MONTHLY = "monthly"
+PLAN_ANNUAL = "annual"
+
+STATUS_ACTIVE = "active"
+STATUS_EXPIRED = "expired"
+
+
+def trial_period_end(activated_at: datetime) -> datetime:
+    return activated_at + timedelta(days=TRIAL_DAYS)
+
+
+def _to_naive_utc(dt: datetime) -> datetime:
+    if dt.tzinfo is None:
+        return dt
+    return dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def now_naive_utc() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def is_plan_user(user: User) -> bool:
+    """Plano (trial/mensal/anual) aplica-se apenas a contas de professor."""
+    return user.role == "professor"
+
+
+def clear_plan(user: User) -> None:
+    user.plan_type = None
+    user.plan_status = None
+    user.account_activated_at = None
+    user.plan_period_ends_at = None
+
+
+def ensure_professor_plan_defaults(user: User) -> None:
+    """Garante trial padrão ao promover alguém a professor (sem sobrescrever plano existente)."""
+    if not is_plan_user(user):
+        return
+    if user.plan_type is not None:
+        return
+    now = datetime.utcnow()
+    user.plan_type = PLAN_TRIAL
+    user.plan_status = STATUS_ACTIVE
+    user.account_activated_at = now
+    user.plan_period_ends_at = trial_period_end(now)
+
+
+def refresh_user_plan_status(db: Session, user: User) -> None:
+    """Atualiza plan_status conforme plan_period_ends_at (quando definido)."""
+    if not is_plan_user(user) or user.plan_period_ends_at is None:
+        return
+    now = now_naive_utc()
+    end = _to_naive_utc(user.plan_period_ends_at)
+    want = STATUS_EXPIRED if now >= end else STATUS_ACTIVE
+    if user.plan_status != want:
+        user.plan_status = want
+        db.commit()
+
+
+def compute_trial_days_remaining(user: User) -> int | None:
+    """Dias restantes do trial (0 se vencido); None se não for professor em trial."""
+    if not is_plan_user(user) or user.plan_type != PLAN_TRIAL:
+        return None
+    if user.plan_period_ends_at is None:
+        return None
+    today = date.today()
+    end_d = _to_naive_utc(user.plan_period_ends_at).date()
+    return max(0, (end_d - today).days)
+
+
+def user_to_out(user: User) -> "UserOut":
+    from .schemas import UserOut
+
+    if not is_plan_user(user):
+        return UserOut(
+            id=user.id,
+            email=user.email,
+            nome=user.nome,
+            role=user.role,
+            researcher_id=user.researcher_id,
+            last_login=user.last_login,
+            created_at=user.created_at,
+            plan_type=None,
+            plan_status=None,
+            account_activated_at=None,
+            plan_period_ends_at=None,
+            trial_days_remaining=None,
+        )
+
+    return UserOut(
+        id=user.id,
+        email=user.email,
+        nome=user.nome,
+        role=user.role,
+        researcher_id=user.researcher_id,
+        last_login=user.last_login,
+        created_at=user.created_at,
+        plan_type=user.plan_type,
+        plan_status=user.plan_status,
+        account_activated_at=user.account_activated_at,
+        plan_period_ends_at=user.plan_period_ends_at,
+        trial_days_remaining=compute_trial_days_remaining(user),
+    )

@@ -64,7 +64,7 @@ export default function ProtectedRoute({ children, professorOnly = false, adminO
   }, [location.pathname]);
 
   if (state === 'loading')          return <div className="flex items-center justify-center h-screen text-gray-400 text-sm">Verificando acesso...</div>;
-  if (state === 'redirect_login')   return <Navigate to="/login" replace state={{ from: location }} />;
+  if (state === 'redirect_login')   return <Navigate to="/entrar" replace state={{ from: location }} />;
   if (state === 'redirect_profile') return <Navigate to={`/app/profile/${profileSlug}`} replace />;
   if (state === 'forbidden')        return <div className="flex items-center justify-center h-screen text-red-500 text-sm">Acesso não permitido.</div>;
   return children;
