@@ -138,7 +138,13 @@ export default function AdminPage() {
               <StatCard label="Admins"       value={stats?.users_by_role?.admin      ?? 0} color="text-purple-600" />
             ) : null}
             <StatCard label="Professores"  value={stats?.users_by_role?.professor  ?? 0} color="text-blue-600" />
-            <StatCard label="Alunos"       value={stats?.users_by_role?.student    ?? 0} color="text-green-600" />
+            <div className="bg-white rounded-xl border shadow-sm p-5 flex flex-col gap-1">
+              <span className="text-3xl font-bold text-green-600">{stats?.users_by_role?.student ?? 0}</span>
+              <span className="text-sm text-gray-500">Alunos</span>
+              {(stats?.total_pending ?? 0) > 0 && (
+                <span className="text-xs text-yellow-600 mt-0.5">{stats.total_pending} sem acesso validado</span>
+              )}
+            </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
             <StatCard label="Lembretes"    value={stats?.total_reminders}           color="text-amber-600" />
@@ -147,9 +153,6 @@ export default function AdminPage() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
             <StatCard label="Anotações"   value={stats?.total_notes}               color="text-rose-600" />
-            {(stats?.total_pending ?? 0) > 0 && (
-              <StatCard label="Sem acesso validado" value={stats?.total_pending} color="text-yellow-600" />
-            )}
           </div>
         </section>
 

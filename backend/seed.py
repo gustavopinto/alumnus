@@ -1,78 +1,85 @@
-"""Seed script — run with: docker compose exec backend python seed.py"""
+#!/usr/bin/env python3
+"""
+Cria usuários iniciais no banco (superadmin + professor).
 
+Uso:
+  python seed.py
+  python seed.py postgresql://...   # URL explícita
+
+Variáveis de ambiente (opcional — senão usa os defaults abaixo):
+  SEED_SUPERADMIN_EMAIL
+  SEED_SUPERADMIN_PASSWORD
+  SEED_SUPERADMIN_NOME
+  SEED_PROFESSOR_EMAIL
+  SEED_PROFESSOR_PASSWORD
+  SEED_PROFESSOR_NOME
+"""
+
+import os
 import sys
-sys.path.insert(0, "/app")
 
-from app.database import SessionLocal, engine
-from app.models import Base, Researcher, Relationship, GraphLayout
+import psycopg2
+from passlib.context import CryptContext
 
-Base.metadata.create_all(bind=engine)
-db = SessionLocal()
+pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Clear existing data
-db.query(Relationship).delete()
-db.query(GraphLayout).delete()
-db.query(Researcher).delete()
-db.commit()
+# ── Defaults — altere aqui ou passe via env ──────────────────────────────────
+SUPERADMIN_EMAIL    = os.getenv("SEED_SUPERADMIN_EMAIL",    "admin@alumnus.app")
+SUPERADMIN_PASSWORD = os.getenv("SEED_SUPERADMIN_PASSWORD", "changeme123")
+SUPERADMIN_NOME     = os.getenv("SEED_SUPERADMIN_NOME",     "Superadmin")
 
-# --- Professor (orientador) ---
-professor = Researcher(
-    nome="Gustavo Pinto",
-    status="professor",
-    ativo=True,
-)
-db.add(professor)
-db.flush()
+PROFESSOR_EMAIL    = os.getenv("SEED_PROFESSOR_EMAIL",    "professor@alumnus.app")
+PROFESSOR_PASSWORD = os.getenv("SEED_PROFESSOR_PASSWORD", "changeme123")
+PROFESSOR_NOME     = os.getenv("SEED_PROFESSOR_NOME",     "Professor")
+# ────────────────────────────────────────────────────────────────────────────
 
-# --- Alunos ---
-researchers_data = [
-    {"nome": "Emmanuel Dias Pereira", "status": "doutorado"},
-    {"nome": "Leandro Veloso Dos Santos", "status": "mestrado"},
-    {"nome": "Dannilo Cabral Rabelo", "status": "mestrado"},
-    {"nome": "Ronivaldo Ferreira Silva Junior", "status": "mestrado"},
-    {"nome": "Pedro Lucas Almeida Andre", "status": "graduacao"},
-    {"nome": "Christian de Jesus da Costa Marinho", "status": "graduacao"},
-    {"nome": "Daniel Naiff Da Costa", "status": "graduacao"},
-]
 
-researcher_objs = []
-for s in researchers_data:
-    obj = Researcher(nome=s["nome"], status=s["status"], orientador_id=professor.id, ativo=True)
-    db.add(obj)
-    researcher_objs.append(obj)
+def get_url():
+    if len(sys.argv) > 1 and not sys.argv[1].startswith("--"):
+        return sys.argv[1]
+    url = os.getenv("DATABASE_URL", "")
+    if not url:
+        sys.exit("Erro: DATABASE_URL não definida.")
+    return url.replace("postgres://", "postgresql://", 1)
 
-db.flush()
 
-# --- Relações de orientação ---
-for obj in researcher_objs:
-    db.add(Relationship(
-        source_researcher_id=professor.id,
-        target_researcher_id=obj.id,
-        relation_type="orienta",
-    ))
+def upsert_user(cur, email, nome, password, role, is_admin):
+    cur.execute("SELECT id FROM users WHERE email = %s", (email,))
+    row = cur.fetchone()
+    if row:
+        print(f"  Já existe: {email} (id={row[0]}) — sem alteração.")
+        return
+    h = pwd_ctx.hash(password)
+    cur.execute(
+        """
+        INSERT INTO users (email, nome, password_hash, role, is_admin)
+        VALUES (%s, %s, %s, %s, %s)
+        RETURNING id
+        """,
+        (email, nome, h, role, is_admin),
+    )
+    uid = cur.fetchone()[0]
+    print(f"  Criado: {email}  role={role}  id={uid}")
 
-# --- Layout inicial (2 fileiras abaixo do professor, sem sobreposição) ---
-positions = {}
-cx, cy = 600, 50
-positions[str(professor.id)] = {"x": cx, "y": cy}
 
-node_w, node_h = 200, 130  # largura e altura estimada dos nós com margem
-row1 = researcher_objs[:4]  # primeira fileira: 4 pesquisadores
-row2 = researcher_objs[4:]  # segunda fileira: 3 pesquisadores
+def main():
+    url = get_url()
+    conn = psycopg2.connect(url)
+    conn.autocommit = False
+    cur = conn.cursor()
 
-for i, obj in enumerate(row1):
-    x = cx - ((len(row1) - 1) * node_w / 2) + i * node_w
-    y = cy + 200
-    positions[str(obj.id)] = {"x": round(x), "y": round(y)}
+    print("Criando superadmin...")
+    upsert_user(cur, SUPERADMIN_EMAIL, SUPERADMIN_NOME, SUPERADMIN_PASSWORD,
+                role="superadmin", is_admin=True)
 
-for i, obj in enumerate(row2):
-    x = cx - ((len(row2) - 1) * node_w / 2) + i * node_w
-    y = cy + 400
-    positions[str(obj.id)] = {"x": round(x), "y": round(y)}
+    print("Criando professor...")
+    upsert_user(cur, PROFESSOR_EMAIL, PROFESSOR_NOME, PROFESSOR_PASSWORD,
+                role="professor", is_admin=False)
 
-db.add(GraphLayout(name="default", layout_jsonb=positions))
+    conn.commit()
+    conn.close()
+    print("\nSeed concluído.")
 
-db.commit()
-db.close()
 
-print(f"Seed complete: 1 professor + {len(researcher_objs)} researchers + {len(researcher_objs)} relationships")
+if __name__ == "__main__":
+    main()

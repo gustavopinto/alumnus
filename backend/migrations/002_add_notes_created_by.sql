@@ -1,1 +1,0 @@
-ALTER TABLE notes ADD COLUMN IF NOT EXISTS created_by_id INTEGER REFERENCES users(id);

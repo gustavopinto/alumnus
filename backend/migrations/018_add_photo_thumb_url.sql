@@ -1,1 +1,0 @@
-ALTER TABLE researchers ADD COLUMN IF NOT EXISTS photo_thumb_url VARCHAR(500);
