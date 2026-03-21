@@ -25,18 +25,18 @@ export default function ProtectedRoute({ children, professorOnly = false }) {
 
       if (payload.role === 'professor') { setState('ok'); return; }
 
-      // student
+      // student/researcher
       if (professorOnly) { setState('forbidden'); return; }
 
       const me = await getMe();
-      if (!me || !me.student_id) { setState('redirect_login'); return; }
+      if (!me || !me.researcher_id) { setState('redirect_login'); return; }
 
-      const stuRes = await fetch(`/api/students/${me.student_id}`, {
+      const res = await fetch(`/api/researchers/${me.researcher_id}`, {
         headers: { Authorization: `Bearer ${getToken()}` },
       });
-      if (!stuRes.ok) { setState('redirect_login'); return; }
-      const stu  = await stuRes.json();
-      const slug = slugify(stu.nome);
+      if (!res.ok) { setState('redirect_login'); return; }
+      const researcher = await res.json();
+      const slug = slugify(researcher.nome);
 
       if (location.pathname === `/profile/${slug}`) {
         setState('ok');

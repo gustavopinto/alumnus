@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
 from .database import engine, Base
-from .routers import students, relationships, graph, upload, works, notes, auth, files
+from .routers import researchers, relationships, graph, upload, works, notes, auth, files, reminders, board, manual
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -22,7 +22,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(students.router,      prefix="/api")
+app.include_router(researchers.router,   prefix="/api")
 app.include_router(relationships.router, prefix="/api")
 app.include_router(graph.router,         prefix="/api")
 app.include_router(upload.router,        prefix="/api")
@@ -30,6 +30,9 @@ app.include_router(works.router,         prefix="/api")
 app.include_router(notes.router,         prefix="/api")
 app.include_router(auth.router,          prefix="/api")
 app.include_router(files.router,         prefix="/api")
+app.include_router(reminders.router,     prefix="/api")
+app.include_router(board.router,         prefix="/api")
+app.include_router(manual.router,        prefix="/api")
 
 
 @app.on_event("startup")

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { createStudent, updateStudent, uploadPhoto } from '../api';
+import { createResearcher, updateResearcher, uploadPhoto } from '../api';
+import Toast from './Toast';
 
-const EMPTY = { nome: '', status: 'graduacao', email: '', observacoes: '', photo_url: '', orientador_id: '' };
+const EMPTY = { nome: '', status: 'graduacao', email: '', observacoes: '', photo_url: '', orientador_id: '', matricula: '', curso: '', enrollment_date: '' };
 
 export default function StudentForm({ student, students, onSaved, onCancel }) {
   const [form, setForm] = useState(EMPTY);
   const [uploading, setUploading] = useState(false);
+  const [toast, setToast] = useState('');
 
   useEffect(() => {
     if (student) {
@@ -16,6 +18,9 @@ export default function StudentForm({ student, students, onSaved, onCancel }) {
         observacoes: student.observacoes || '',
         photo_url: student.photo_url || '',
         orientador_id: student.orientador_id || '',
+        matricula: student.matricula || '',
+        curso: student.curso || '',
+        enrollment_date: student.enrollment_date || '',
       });
     } else {
       setForm(EMPTY);
@@ -40,16 +45,20 @@ export default function StudentForm({ student, students, onSaved, onCancel }) {
       orientador_id: form.orientador_id ? Number(form.orientador_id) : null,
     };
     if (student) {
-      await updateStudent(student.id, payload);
+      await updateResearcher(student.id, payload);
+      setToast('Pesquisador atualizado com sucesso');
     } else {
-      await createStudent(payload);
+      await createResearcher(payload);
+      setToast('Pesquisador criado com sucesso');
     }
-    onSaved();
+    setTimeout(onSaved, 1200);
   }
 
   return (
+    <>
+    <Toast message={toast} onClose={() => setToast('')} />
     <form onSubmit={handleSubmit} className="space-y-3">
-      <h3 className="font-bold text-lg">{student ? 'Editar Aluno' : 'Novo Aluno'}</h3>
+      <h3 className="font-bold text-lg">{student ? 'Editar Pesquisador' : 'Novo Pesquisador'}</h3>
 
       <input className="w-full border rounded px-3 py-2 text-sm" placeholder="Nome *" required value={form.nome} onChange={set('nome')} />
 
@@ -69,6 +78,24 @@ export default function StudentForm({ student, students, onSaved, onCancel }) {
         ))}
       </select>
 
+      <div className="flex gap-2">
+        <input className="flex-1 border rounded px-3 py-2 text-sm" placeholder="Matrícula" value={form.matricula} onChange={set('matricula')} />
+        <input className="flex-1 border rounded px-3 py-2 text-sm" placeholder="Curso" value={form.curso} onChange={set('curso')} />
+      </div>
+
+      <div>
+        <label className="text-xs text-gray-500">
+          Data de ingresso {(form.status === 'mestrado' || form.status === 'doutorado') ? '*' : ''}
+        </label>
+        <input
+          type="date"
+          className="w-full border rounded px-3 py-2 text-sm mt-1"
+          value={form.enrollment_date}
+          required={form.status === 'mestrado' || form.status === 'doutorado'}
+          onChange={set('enrollment_date')}
+        />
+      </div>
+
       <textarea className="w-full border rounded px-3 py-2 text-sm" placeholder="Observações" rows={2} value={form.observacoes} onChange={set('observacoes')} />
 
       <div>
@@ -87,5 +114,6 @@ export default function StudentForm({ student, students, onSaved, onCancel }) {
         </button>
       </div>
     </form>
+    </>
   );
 }

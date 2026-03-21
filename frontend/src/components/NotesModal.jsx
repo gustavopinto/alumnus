@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { updateStudent } from '../api';
+import { updateResearcher } from '../api';
 
 export default function NotesModal({ student, onClose }) {
   const [text, setText] = useState('');
@@ -13,7 +13,7 @@ export default function NotesModal({ student, onClose }) {
 
   async function handleSave() {
     setSaving(true);
-    await updateStudent(student.id, { observacoes: text });
+    await updateResearcher(student.id, { observacoes: text });
     setSaving(false);
     onClose();
   }

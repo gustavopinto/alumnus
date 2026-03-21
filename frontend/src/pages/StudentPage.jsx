@@ -1,44 +1,53 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getStudentBySlug, updateStudent, uploadPhoto, getWorks, createWork, updateWork, deleteWork, getNotes, createNote, deleteNote } from '../api';
+import { getResearcherBySlug, updateResearcher, uploadPhoto, getNotes, createNote, deleteNote, getResearcherUser } from '../api';
 import { getTokenPayload } from '../auth';
+import Toast from '../components/Toast';
+import Footer from '../components/Footer';
 
 const STATUS_LABELS = { graduacao: 'Graduação', mestrado: 'Mestrado', doutorado: 'Doutorado', professor: 'Professor' };
 const STATUS_COLORS = { graduacao: '#3B82F6', mestrado: '#F59E0B', doutorado: '#10B981', professor: '#7C3AED' };
-
-const WORK_TYPES = [
-  { type: 'projeto',    label: 'Projetos' },
-  { type: 'artigo',     label: 'Artigos em andamento' },
-  { type: 'publicacao', label: 'Publicações' },
-];
 
 function formatDate(iso) {
   return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function NotesSection({ studentId }) {
+function formatLastLogin(iso) {
+  const now = new Date();
+  const loginDate = new Date(iso);
+  const diffMs = now - loginDate;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'Último acesso: hoje';
+  if (diffDays === 1) return 'Último acesso: ontem';
+  if (diffDays <= 10) return `Último acesso: há ${diffDays} dias`;
+  return 'Último acesso: há mais de 10 dias';
+}
+
+function NotesSection({ researcherId }) {
   const [notes, setNotes] = useState([]);
   const [text, setText] = useState('');
   const [file, setFile] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState('');
   const fileRef = useRef();
 
   async function load() {
-    const data = await getNotes(studentId);
+    const data = await getNotes(researcherId);
     setNotes(data);
   }
 
-  useEffect(() => { load(); }, [studentId]);
+  useEffect(() => { load(); }, [researcherId]);
 
   async function handleSubmit(e) {
     e.preventDefault();
     if (!text.trim()) return;
     setSaving(true);
-    await createNote(studentId, text, file);
+    await createNote(researcherId, text, file);
     setText('');
     setFile(null);
     if (fileRef.current) fileRef.current.value = '';
     setSaving(false);
+    setToast('Anotação adicionada');
     load();
   }
 
@@ -48,10 +57,23 @@ function NotesSection({ studentId }) {
     load();
   }
 
+  const lastNote = notes.length > 0 ? notes[0] : null;
+
   return (
     <div className="space-y-4">
+    <Toast message={toast} onClose={() => setToast('')} />
     <section className="bg-white rounded-xl shadow-sm border p-6">
-      <h2 className="text-lg font-bold text-gray-800 mb-4">Anotações</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold text-gray-800">Anotações de reuniões</h2>
+        {lastNote && (
+          <span className="flex items-center gap-1 text-xs text-gray-400">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Última: {formatDate(lastNote.created_at)}
+          </span>
+        )}
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-2">
         <textarea
@@ -80,15 +102,20 @@ function NotesSection({ studentId }) {
       </form>
     </section>
 
+    {notes.length > 0 && (
     <section className="bg-white rounded-xl shadow-sm border p-6">
-      <h2 className="text-lg font-bold text-gray-800 mb-4">Histórico</h2>
+      <h2 className="text-lg font-bold text-gray-800 mb-4">Histórico de ações</h2>
       <div className="max-h-96 overflow-y-auto">
-        {notes.length === 0 && <p className="text-sm text-gray-400 italic">Nenhuma anotação ainda.</p>}
         <ul className="space-y-4">
           {notes.map(note => (
             <li key={note.id} className="border-l-2 border-blue-200 pl-4">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-gray-400">{formatDate(note.created_at)}</span>
+                <div>
+                  <span className="text-xs text-gray-400">{formatDate(note.created_at)}</span>
+                  {note.created_by_name && (
+                    <span className="ml-1.5 text-xs text-gray-500">por {note.created_by_name}</span>
+                  )}
+                </div>
                 <button onClick={() => handleDelete(note.id)} className="text-xs text-red-400 hover:text-red-600">remover</button>
               </div>
               <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.text}</p>
@@ -105,26 +132,46 @@ function NotesSection({ studentId }) {
         </ul>
       </div>
     </section>
+    )}
     </div>
   );
 }
 
-function ProfileSection({ student, canEdit, onSaved }) {
+function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
-    lattes_url: student.lattes_url || '',
-    scholar_url: student.scholar_url || '',
-    linkedin_url: student.linkedin_url || '',
-    github_url: student.github_url || '',
-    interesses: student.interesses || '',
+    lattes_url: researcher.lattes_url || '',
+    scholar_url: researcher.scholar_url || '',
+    linkedin_url: researcher.linkedin_url || '',
+    github_url: researcher.github_url || '',
+    instagram_url: researcher.instagram_url || '',
+    twitter_url: researcher.twitter_url || '',
+    whatsapp: researcher.whatsapp || '',
+    interesses: researcher.interesses || '',
   });
+  const [whatsappError, setWhatsappError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [photoPreview, setPhotoPreview] = useState(student.photo_url || null);
+  const [photoPreview, setPhotoPreview] = useState(researcher.photo_url || null);
   const [pendingPhotoUrl, setPendingPhotoUrl] = useState(null);
   const photoRef = useRef();
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+
+  function maskPhone(value) {
+    const digits = value.replace(/\D/g, '').slice(0, 11);
+    if (digits.length <= 10)
+      return digits.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3').replace(/-$/, '');
+    return digits.replace(/(\d{2})(\d{5})(\d{0,4})/, '($1) $2-$3').replace(/-$/, '');
+  }
+
+  function handleWhatsApp(e) {
+    const masked = maskPhone(e.target.value);
+    setForm({ ...form, whatsapp: masked });
+    const digits = masked.replace(/\D/g, '');
+    setWhatsappError(digits.length > 0 && digits.length < 10 ? 'Número inválido' : '');
+  }
 
   async function handlePhotoSelect(e) {
     const file = e.target.files[0];
@@ -138,35 +185,45 @@ function ProfileSection({ student, canEdit, onSaved }) {
 
   async function handleSave(e) {
     e.preventDefault();
+    const digits = form.whatsapp.replace(/\D/g, '');
+    if (form.whatsapp && digits.length < 10) { setWhatsappError('Número inválido'); return; }
     setSaving(true);
-    await updateStudent(student.id, {
+    await updateResearcher(researcher.id, {
       lattes_url: form.lattes_url || null,
       scholar_url: form.scholar_url || null,
       linkedin_url: form.linkedin_url || null,
       github_url: form.github_url || null,
+      instagram_url: form.instagram_url || null,
+      twitter_url: form.twitter_url || null,
+      whatsapp: form.whatsapp || null,
       interesses: form.interesses || null,
       ...(pendingPhotoUrl ? { photo_url: pendingPhotoUrl } : {}),
     });
     setSaving(false);
     setEditing(false);
     setPendingPhotoUrl(null);
+    setToast('Perfil salvo com sucesso');
     onSaved();
   }
 
   function handleCancel() {
     setEditing(false);
-    setPhotoPreview(student.photo_url || null);
+    setPhotoPreview(researcher.photo_url || null);
     setPendingPhotoUrl(null);
   }
 
   const links = [
-    { key: 'lattes_url', label: 'Lattes', value: student.lattes_url },
-    { key: 'scholar_url', label: 'Google Scholar', value: student.scholar_url },
-    { key: 'linkedin_url', label: 'LinkedIn', value: student.linkedin_url },
-    { key: 'github_url', label: 'GitHub', value: student.github_url },
+    { key: 'lattes_url', label: 'Lattes', value: researcher.lattes_url },
+    { key: 'scholar_url', label: 'Google Scholar', value: researcher.scholar_url },
+    { key: 'linkedin_url', label: 'LinkedIn', value: researcher.linkedin_url },
+    { key: 'github_url', label: 'GitHub', value: researcher.github_url },
+    { key: 'instagram_url', label: 'Instagram', value: researcher.instagram_url },
+    { key: 'twitter_url', label: 'Twitter / X', value: researcher.twitter_url },
   ];
 
   return (
+    <>
+    <Toast message={toast} onClose={() => setToast('')} />
     <section className="bg-white rounded-xl shadow-sm border p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-bold text-gray-800">Perfil</h2>
@@ -203,18 +260,33 @@ function ProfileSection({ student, canEdit, onSaved }) {
               </div>
             </div>
           </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">WhatsApp *</label>
+            <input
+              type="tel"
+              required
+              className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 ${whatsappError ? 'border-red-400' : ''}`}
+              placeholder="(XX) XXXXX-XXXX"
+              value={form.whatsapp}
+              onChange={handleWhatsApp}
+            />
+            {whatsappError && <p className="text-xs text-red-500 mt-0.5">{whatsappError}</p>}
+          </div>
           {[
             { key: 'lattes_url', label: 'Lattes', placeholder: 'http://lattes.cnpq.br/...' },
             { key: 'scholar_url', label: 'Google Scholar', placeholder: 'https://scholar.google.com/...' },
             { key: 'linkedin_url', label: 'LinkedIn', placeholder: 'https://linkedin.com/in/...' },
             { key: 'github_url', label: 'GitHub', placeholder: 'https://github.com/...' },
-          ].map(({ key, label, placeholder }) => (
+            { key: 'instagram_url', label: 'Instagram', placeholder: 'https://instagram.com/usuario', maxLength: 50 },
+            { key: 'twitter_url', label: 'Twitter / X', placeholder: 'https://x.com/usuario', maxLength: 50 },
+          ].map(({ key, label, placeholder, maxLength }) => (
             <div key={key}>
               <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
               <input
                 type="url"
                 className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                 placeholder={placeholder}
+                maxLength={maxLength}
                 value={form[key]}
                 onChange={set(key)}
               />
@@ -247,133 +319,77 @@ function ProfileSection({ student, canEdit, onSaved }) {
                 {label}
               </a>
             ) : null)}
-            {links.every(l => !l.value) && !student.interesses && (
+            {researcher.whatsapp && (
+              <a
+                href={`https://wa.me/55${researcher.whatsapp.replace(/\D/g, '')}`}
+                target="_blank" rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-green-600 hover:underline bg-green-50 px-3 py-1 rounded-full border border-green-100"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                </svg>
+                WhatsApp
+              </a>
+            )}
+            {links.every(l => !l.value) && !researcher.interesses && !researcher.whatsapp && (
               <p className="text-sm text-gray-400 italic">Nenhuma informação de perfil cadastrada.</p>
             )}
           </div>
-          {student.interesses && (
+          {researcher.interesses && (
             <div>
               <p className="text-xs font-medium text-gray-500 mb-1">Interesses de pesquisa</p>
-              <p className="text-sm text-gray-700">{student.interesses}</p>
+              <p className="text-sm text-gray-700">{researcher.interesses}</p>
+            </div>
+          )}
+          {isProfessor && (researcher.matricula || researcher.curso || researcher.enrollment_date) && (
+            <div className="border-t pt-3 mt-1 flex gap-6 flex-wrap">
+              {researcher.matricula && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Matrícula</p>
+                  <p className="text-sm text-gray-700">{researcher.matricula}</p>
+                </div>
+              )}
+              {researcher.curso && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Curso</p>
+                  <p className="text-sm text-gray-700">{researcher.curso}</p>
+                </div>
+              )}
+              {researcher.enrollment_date && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500">Ingresso</p>
+                  <p className="text-sm text-gray-700">
+                    {new Date(researcher.enrollment_date + 'T00:00:00').toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' })}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
       )}
     </section>
-  );
-}
-
-function WorkSection({ title, type, works, studentId, onRefresh }) {
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ title: '', description: '', year: '', url: '' });
-
-  const filtered = works.filter(w => w.type === type);
-  const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
-
-  function openNew() {
-    setEditing(null);
-    setForm({ title: '', description: '', year: '', url: '' });
-    setShowForm(true);
-  }
-
-  function openEdit(w) {
-    setEditing(w);
-    setForm({ title: w.title, description: w.description || '', year: w.year || '', url: w.url || '' });
-    setShowForm(true);
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    const payload = { ...form, type, year: form.year ? Number(form.year) : null };
-    if (editing) {
-      await updateWork(editing.id, payload);
-    } else {
-      await createWork(studentId, payload);
-    }
-    setShowForm(false);
-    onRefresh();
-  }
-
-  async function handleDelete(id) {
-    if (!confirm('Remover este item?')) return;
-    await deleteWork(id);
-    onRefresh();
-  }
-
-  return (
-    <section className="bg-white rounded-xl shadow-sm border p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-gray-800">{title}</h2>
-        <button onClick={openNew} className="text-sm bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700">
-          + Adicionar
-        </button>
-      </div>
-
-      {showForm && (
-        <form onSubmit={handleSubmit} className="mb-4 p-4 bg-gray-50 rounded-lg space-y-2 border">
-          <input className="w-full border rounded px-3 py-2 text-sm" placeholder="Título *" required value={form.title} onChange={set('title')} />
-          <textarea className="w-full border rounded px-3 py-2 text-sm" placeholder="Descrição" rows={2} value={form.description} onChange={set('description')} />
-          <div className="flex gap-2">
-            <input className="w-32 border rounded px-3 py-2 text-sm" placeholder="Ano" type="number" value={form.year} onChange={set('year')} />
-            <input className="flex-1 border rounded px-3 py-2 text-sm" placeholder="URL" value={form.url} onChange={set('url')} />
-          </div>
-          <div className="flex gap-2">
-            <button type="submit" className="bg-blue-600 text-white px-4 py-1.5 rounded text-sm hover:bg-blue-700">
-              {editing ? 'Salvar' : 'Criar'}
-            </button>
-            <button type="button" onClick={() => setShowForm(false)} className="bg-gray-200 px-4 py-1.5 rounded text-sm hover:bg-gray-300">
-              Cancelar
-            </button>
-          </div>
-        </form>
-      )}
-
-      {filtered.length === 0 && !showForm && (
-        <p className="text-sm text-gray-400 italic">Nenhum item cadastrado.</p>
-      )}
-
-      <ul className="space-y-3">
-        {filtered.map(w => (
-          <li key={w.id} className="flex items-start justify-between gap-4 border-b pb-3 last:border-0 last:pb-0">
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-gray-800 text-sm">
-                {w.url ? (
-                  <a href={w.url} target="_blank" rel="noreferrer" className="hover:text-blue-600 underline underline-offset-2">{w.title}</a>
-                ) : w.title}
-                {w.year && <span className="ml-2 text-gray-400 text-xs font-normal">({w.year})</span>}
-              </p>
-              {w.description && <p className="text-xs text-gray-500 mt-0.5">{w.description}</p>}
-            </div>
-            <div className="flex gap-2 shrink-0 text-xs">
-              <button onClick={() => openEdit(w)} className="text-blue-600 hover:underline">editar</button>
-              <button onClick={() => handleDelete(w.id)} className="text-red-500 hover:underline">remover</button>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </section>
+    </>
   );
 }
 
 export default function StudentPage() {
   const { slug } = useParams();
   const navigate = useNavigate();
-  const [student, setStudent] = useState(null);
-  const [works, setWorks] = useState([]);
+  const [researcher, setResearcher] = useState(null);
+  const [researcherUser, setResearcherUser] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoInputRef = useRef();
 
   const payload = getTokenPayload();
   const isProfessor = payload?.role === 'professor';
-  const isOwnProfile = payload?.student_id != null && student?.id === payload.student_id;
+  const isOwnProfile = payload?.researcher_id != null && researcher?.id === payload.researcher_id;
   const canEdit = isProfessor || isOwnProfile;
 
   async function load() {
-    const s = await getStudentBySlug(slug);
-    const w = await getWorks(s.id);
-    setStudent(s);
-    setWorks(w);
+    const r = await getResearcherBySlug(slug);
+    const u = await getResearcherUser(r.id);
+    setResearcher(r);
+    setResearcherUser(u);
   }
 
   useEffect(() => { load(); }, [slug]);
@@ -383,16 +399,16 @@ export default function StudentPage() {
     if (!file) return;
     setUploadingPhoto(true);
     const res = await uploadPhoto(file);
-    await updateStudent(student.id, { photo_url: res.url });
+    await updateResearcher(researcher.id, { photo_url: res.url });
     setUploadingPhoto(false);
     load();
   }
 
-  if (!student) {
+  if (!researcher) {
     return <div className="flex items-center justify-center h-screen text-gray-400">Carregando...</div>;
   }
 
-  const color = STATUS_COLORS[student.status] || '#6B7280';
+  const color = STATUS_COLORS[researcher.status] || '#6B7280';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -405,11 +421,11 @@ export default function StudentPage() {
         </button>
         <div className="w-px h-6 bg-gray-200" />
         <div className="relative group shrink-0">
-          {student.photo_url ? (
-            <img src={student.photo_url} alt={student.nome} className="w-12 h-12 rounded-full object-cover border-2" style={{ borderColor: color }} />
+          {researcher.photo_url ? (
+            <img src={researcher.photo_url} alt={researcher.nome} className="w-12 h-12 rounded-full object-cover border-2" style={{ borderColor: color }} />
           ) : (
             <div className="w-12 h-12 rounded-full flex items-center justify-center text-white text-lg font-bold" style={{ backgroundColor: color }}>
-              {student.nome.charAt(0).toUpperCase()}
+              {researcher.nome.charAt(0).toUpperCase()}
             </div>
           )}
           {canEdit && (
@@ -438,20 +454,28 @@ export default function StudentPage() {
           )}
         </div>
         <div>
-          <h1 className="text-xl font-bold text-gray-900">{student.nome}</h1>
+          <h1 className="text-xl font-bold text-gray-900">{researcher.nome}</h1>
           <div className="flex items-center gap-2 mt-0.5">
             <span className="text-xs px-2 py-0.5 rounded-full text-white" style={{ backgroundColor: color }}>
-              {STATUS_LABELS[student.status] || student.status}
+              {STATUS_LABELS[researcher.status] || researcher.status}
             </span>
-            {student.email && <span className="text-xs text-gray-500">{student.email}</span>}
+            {researcher.email && <span className="text-xs text-gray-500">{researcher.email}</span>}
           </div>
+          {isProfessor && (
+            <p className="text-xs text-gray-400 mt-1">
+              {researcherUser?.last_login
+                ? formatLastLogin(researcherUser.last_login)
+                : 'Nunca acessou'}
+            </p>
+          )}
         </div>
       </header>
 
       <main className="max-w-3xl mx-auto py-8 px-4 space-y-6">
-        <ProfileSection student={student} canEdit={canEdit} onSaved={load} />
-        <NotesSection studentId={student.id} />
+        <ProfileSection researcher={researcher} canEdit={canEdit} isProfessor={isProfessor} onSaved={load} />
+        <NotesSection researcherId={researcher.id} />
       </main>
+      <Footer />
     </div>
   );
 }

@@ -12,13 +12,12 @@ import '@xyflow/react/dist/style.css';
 import StudentNode from './StudentNode';
 import { updateLayout } from '../api';
 
-const nodeTypes = { student: StudentNode };
+const nodeTypes = { researcher: StudentNode };
 
 export default function GraphView({ initialNodes, initialEdges }) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-  // Sync when props change
   React.useEffect(() => {
     setNodes(initialNodes);
   }, [initialNodes, setNodes]);

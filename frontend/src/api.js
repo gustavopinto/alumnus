@@ -21,11 +21,11 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-// Students
-export const getStudents = () => request('/students/');
-export const createStudent = (data) => request('/students/', { method: 'POST', body: JSON.stringify(data) });
-export const updateStudent = (id, data) => request(`/students/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-export const deleteStudent = (id) => request(`/students/${id}`, { method: 'DELETE' });
+// Researchers
+export const getResearchers = () => request('/researchers/');
+export const createResearcher = (data) => request('/researchers/', { method: 'POST', body: JSON.stringify(data) });
+export const updateResearcher = (id, data) => request(`/researchers/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteResearcher = (id) => request(`/researchers/${id}`, { method: 'DELETE' });
 
 // Relationships
 export const getRelationships = () => request('/relationships/');
@@ -38,15 +38,15 @@ export const getGraph = () => request('/graph/');
 export const updateLayout = (positions) => request('/graph/layout', { method: 'PUT', body: JSON.stringify({ positions }) });
 
 // Notes
-export const getNotes = (studentId) => request(`/students/${studentId}/notes`);
+export const getNotes = (researcherId) => request(`/researchers/${researcherId}/notes`);
 export const deleteNote = (noteId) => request(`/notes/${noteId}`, { method: 'DELETE' });
 
-export async function createNote(studentId, text, file) {
+export async function createNote(researcherId, text, file) {
   const form = new FormData();
   form.append('text', text);
   if (file) form.append('file', file);
   const token = getToken();
-  const res = await fetch(`/api/students/${studentId}/notes`, {
+  const res = await fetch(`/api/researchers/${researcherId}/notes`, {
     method: 'POST',
     body: form,
     headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -55,12 +55,32 @@ export async function createNote(studentId, text, file) {
 }
 
 // Works
-export const getStudent = (id) => request(`/students/${id}`);
-export const getStudentBySlug = (slug) => request(`/students/by-slug/${slug}`);
-export const getWorks = (studentId) => request(`/students/${studentId}/works`);
-export const createWork = (studentId, data) => request(`/students/${studentId}/works`, { method: 'POST', body: JSON.stringify(data) });
+export const getResearcher = (id) => request(`/researchers/${id}`);
+export const getResearcherUser = (researcherId) => request(`/researchers/${researcherId}/user`);
+export const getResearcherBySlug = (slug) => request(`/researchers/by-slug/${slug}`);
+export const getWorks = (researcherId) => request(`/researchers/${researcherId}/works`);
+export const createWork = (researcherId, data) => request(`/researchers/${researcherId}/works`, { method: 'POST', body: JSON.stringify(data) });
 export const updateWork = (workId, data) => request(`/works/${workId}`, { method: 'PUT', body: JSON.stringify(data) });
 export const deleteWork = (workId) => request(`/works/${workId}`, { method: 'DELETE' });
+
+// Reminders
+export const getReminders = () => request('/reminders/');
+export const createReminder = (data) => request('/reminders/', { method: 'POST', body: JSON.stringify(data) });
+export const updateReminder = (id, data) => request(`/reminders/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteReminder = (id) => request(`/reminders/${id}`, { method: 'DELETE' });
+
+// Board
+export const getBoardPosts = () => request('/board/');
+export const createBoardPost = (data) => request('/board/', { method: 'POST', body: JSON.stringify(data) });
+export const deleteBoardPost = (id) => request(`/board/${id}`, { method: 'DELETE' });
+
+// Manual
+export const getManualEntries = () => request('/manual/');
+export const createManualEntry = (data) => request('/manual/', { method: 'POST', body: JSON.stringify(data) });
+export const deleteManualEntry = (id) => request(`/manual/${id}`, { method: 'DELETE' });
+export const toggleManualVote = (entryId) => request(`/manual/${entryId}/vote`, { method: 'POST' });
+export const addManualComment = (entryId, text) => request(`/manual/${entryId}/comments`, { method: 'POST', body: JSON.stringify({ text }) });
+export const deleteManualComment = (commentId) => request(`/manual/comments/${commentId}`, { method: 'DELETE' });
 
 // Upload
 export async function uploadPhoto(file) {

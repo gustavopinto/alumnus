@@ -1,13 +1,17 @@
 # Alumnus
 
-A web platform for professors to manage and visualize their academic network as an interactive graph. Each student is a node; relationships between students are edges. Clicking a node opens the student's profile page with notes and work history.
+A web platform for professors to manage and visualize their research group as an interactive graph. Each researcher is a node; relationships between researchers are edges. Clicking a node opens the researcher's profile page with notes, meeting history, and work records.
 
 ## Features
 
 - **Interactive graph** — drag nodes, zoom, pan; layout is persisted per session
-- **Student profiles** — notes with chronological history and file attachments (images/PDFs)
-- **Role-based access** — professors see the full graph and manage students; students are redirected to their own profile upon login
+- **Researcher profiles** — social links, WhatsApp, research interests, meeting notes with file attachments
+- **Work history** — projects, articles in progress, and publications per researcher
+- **Reminders** — sidebar dropdown with due dates, upcoming/overdue separation
+- **Deadlines** — conference deadlines listed in the sidebar
+- **Role-based access** — professors see the full graph and manage researchers; students are redirected to their own profile upon login
 - **Authentication** — JWT-based login and registration
+- **SQL migrations** — versioned `.sql` files applied automatically on startup
 
 ## Tech Stack
 
@@ -28,7 +32,7 @@ A web platform for professors to manage and visualize their academic network as 
 ### 1. Clone and configure
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/gustavopinto/alumnus
 cd alumnus
 cp .env.example .env
 ```
@@ -39,11 +43,17 @@ Edit `.env` and set a strong `SECRET_KEY`:
 SECRET_KEY=replace_with_a_long_random_string
 ```
 
-### 2. Start the stack
+### 2. Start the app
 
 ```bash
-docker compose up --build
+bash dev.sh
 ```
+
+This will:
+1. Stop any previously running containers
+2. Build and start all services (db, backend, frontend)
+3. Wait for PostgreSQL to be ready
+4. Apply any pending database migrations
 
 | Service | URL |
 |---|---|
@@ -51,18 +61,30 @@ docker compose up --build
 | Backend API | http://localhost:8000 |
 | API docs (Swagger) | http://localhost:8000/docs |
 
-### 3. Seed initial data (optional)
+### 3. Stop the app
 
-Populates the database with a professor node and 7 students:
+```bash
+bash dev.sh stop
+```
+
+### 4. View logs
+
+```bash
+docker compose logs -f
+```
+
+### 5. Seed initial data (optional)
+
+Populates the database with a professor node and sample researchers:
 
 ```bash
 docker compose cp backend/seed.py backend:/app/seed.py
 docker compose exec backend python seed.py
 ```
 
-### 4. Create your account
+### 6. Create your account
 
-Navigate to `http://localhost:5173/register` and sign up as **Professor** to access the graph, or as **Student** (linked to an existing student record) to access your own profile.
+Navigate to `http://localhost:5173/register` and sign up as **Professor** to access the full graph, or as a **researcher** (linked to an existing email) to access your own profile.
 
 ## Project Structure
 
@@ -70,39 +92,49 @@ Navigate to `http://localhost:5173/register` and sign up as **Professor** to acc
 alumnus/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py          # FastAPI app, startup
-│   │   ├── models.py        # SQLAlchemy models
-│   │   ├── schemas.py       # Pydantic schemas
-│   │   ├── deps.py          # Auth dependencies (JWT)
-│   │   ├── fileutils.py     # Upload validation and image compression
-│   │   ├── slug.py          # Name-to-slug utility
+│   │   ├── main.py              # FastAPI app and startup
+│   │   ├── models.py            # SQLAlchemy models
+│   │   ├── schemas.py           # Pydantic schemas
+│   │   ├── deps.py              # Auth dependencies (JWT)
+│   │   ├── fileutils.py         # Upload validation and image compression
+│   │   ├── slug.py              # Name-to-slug utility
 │   │   └── routers/
-│   │       ├── auth.py      # POST /auth/register, /auth/login, GET /auth/me
-│   │       ├── students.py  # CRUD /students
-│   │       ├── graph.py     # GET /graph, PUT /graph/layout
-│   │       ├── notes.py     # Notes with file attachments
-│   │       ├── works.py     # Projects, articles, publications
-│   │       └── upload.py    # POST /upload/photo
-│   ├── uploads/             # Uploaded files (mounted as Docker volume)
+│   │       ├── auth.py          # POST /auth/register, /auth/login, GET /auth/me
+│   │       ├── researchers.py   # CRUD /researchers
+│   │       ├── relationships.py # CRUD /relationships
+│   │       ├── graph.py         # GET /graph, PUT /graph/layout
+│   │       ├── notes.py         # Meeting notes with file attachments
+│   │       ├── works.py         # Projects, articles, publications
+│   │       ├── reminders.py     # CRUD /reminders
+│   │       ├── board.py         # CRUD /board (mural)
+│   │       └── upload.py        # POST /upload/photo
+│   ├── migrations/              # Versioned SQL migration files
+│   ├── migrate.py               # Migration runner
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx          # Routes
-│   │   ├── auth.js          # Token helpers
-│   │   ├── api.js           # API client (injects Bearer token)
+│   │   ├── App.jsx              # Routes
+│   │   ├── auth.js              # Token helpers
+│   │   ├── api.js               # API client (injects Bearer token)
 │   │   ├── components/
 │   │   │   ├── GraphView.jsx
-│   │   │   ├── StudentNode.jsx
-│   │   │   ├── Sidebar.jsx  # Student list + Deadlines
+│   │   │   ├── StudentNode.jsx  # Graph node component
+│   │   │   ├── Sidebar.jsx      # Group, Reminders, Deadlines
+│   │   │   ├── StudentForm.jsx  # Add/edit researcher form
+│   │   │   ├── Footer.jsx       # GitHub link footer
 │   │   │   ├── Legend.jsx
+│   │   │   ├── Toast.jsx
 │   │   │   └── ProtectedRoute.jsx
 │   │   └── pages/
 │   │       ├── LoginPage.jsx
 │   │       ├── RegisterPage.jsx
-│   │       └── StudentPage.jsx
+│   │       ├── StudentPage.jsx  # Researcher profile page
+│   │       ├── RemindersPage.jsx
+│   │       └── BoardPage.jsx    # Mural (post-its)
 │   └── Dockerfile
 ├── docker-compose.yml
+├── dev.sh                       # Start/stop helper
 ├── .env.example
 └── seed.py
 ```
@@ -111,26 +143,50 @@ alumnus/
 
 | Method | Endpoint | Description |
 |---|---|---|
-| POST | `/auth/register` | Create account |
-| POST | `/auth/login` | Get JWT token |
-| GET | `/auth/me` | Current user info |
-| GET | `/students/` | List students |
-| GET | `/graph/` | Graph nodes + edges |
-| PUT | `/graph/layout` | Save node positions |
-| GET | `/students/{id}/notes` | Notes history |
-| POST | `/students/{id}/notes` | Add note (+ optional file) |
+| POST | `/api/auth/register` | Create account |
+| POST | `/api/auth/login` | Get JWT token |
+| GET | `/api/auth/me` | Current user info |
+| GET | `/api/researchers/` | List researchers |
+| POST | `/api/researchers/` | Create researcher |
+| PUT | `/api/researchers/{id}` | Update researcher |
+| DELETE | `/api/researchers/{id}` | Deactivate researcher |
+| GET | `/api/researchers/{id}/user` | Get linked user account |
+| GET | `/api/graph/` | Graph nodes + edges |
+| PUT | `/api/graph/layout` | Save node positions |
+| GET | `/api/researchers/{id}/notes` | Meeting notes |
+| POST | `/api/researchers/{id}/notes` | Add note (+ optional file) |
+| GET | `/api/researchers/{id}/works` | Works list |
+| POST | `/api/researchers/{id}/works` | Add work |
+| GET | `/api/reminders/` | List reminders |
+| POST | `/api/reminders/` | Create reminder |
+| PUT | `/api/reminders/{id}` | Update reminder |
+| DELETE | `/api/reminders/{id}` | Delete reminder |
+| GET | `/api/relationships/` | List relationships |
+| POST | `/api/relationships/` | Create relationship |
 
-## Student Status Colors
+## Researcher Status Colors
 
 | Status | Color |
 |---|---|
 | Professor | Purple |
-| PhD | Green |
-| Master's | Amber |
-| Undergraduate | Blue |
+| PhD (Doutorado) | Green |
+| Master's (Mestrado) | Amber |
+| Undergraduate (Graduação) | Blue |
+
+## Database Migrations
+
+Migrations live in `backend/migrations/` as numbered `.sql` files. They are applied automatically when the app starts via `dev.sh`. To run them manually:
+
+```bash
+docker compose exec backend python3 /app/migrate.py
+```
 
 ## File Uploads
 
 - Accepted formats: JPEG, PNG, GIF, WebP, PDF
 - Maximum size: 5 MB
 - Images are automatically resized (max 1024 px) and compressed to JPEG quality 60
+
+---
+
+Want a feature? [Open an issue on GitHub](https://github.com/gustavopinto/alumnus)

@@ -1,0 +1,13 @@
+INFO:     Will watch for changes in these directories: ['/Users/ghlp/workspace/alumnus/backend']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [38621] using WatchFiles
+INFO:     Started server process [38624]
+INFO:     Waiting for application startup.
+2026-03-20 19:51:27,903 app.main INFO Creating database tables...
+2026-03-20 19:51:27,943 app.main INFO Alumnus API ready
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [38624]
+INFO:     Stopping reloader process [38621]

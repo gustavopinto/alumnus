@@ -5,9 +5,13 @@ import Sidebar from './components/Sidebar';
 import Legend from './components/Legend';
 import ProtectedRoute from './components/ProtectedRoute';
 import StudentPage from './pages/StudentPage';
+import RemindersPage from './pages/RemindersPage';
+import BoardPage from './pages/BoardPage';
+import ManualPage from './pages/ManualPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
-import { getGraph, getStudents, getRelationships } from './api';
+import { getGraph, getResearchers } from './api';
+import Footer from './components/Footer';
 import { removeToken, getTokenPayload } from './auth';
 
 function shortName(fullName) {
@@ -19,20 +23,20 @@ function shortName(fullName) {
 function GraphPage() {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
-  const [students, setStudents] = useState([]);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [researchers, setResearchers] = useState([]);
+  const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('sidebarOpen') !== 'false');
 
   const loadData = useCallback(async () => {
-    const [graphData, studentsData] = await Promise.all([
+    const [graphData, researchersData] = await Promise.all([
       getGraph(),
-      getStudents(),
+      getResearchers(),
     ]);
     setNodes((graphData.nodes || []).map(n => ({
       ...n,
-      data: { ...n.data, name: shortName(n.data.name), studentId: n.id },
+      data: { ...n.data, name: shortName(n.data.name), researcherId: n.id },
     })));
     setEdges(graphData.edges || []);
-    setStudents(studentsData || []);
+    setResearchers(researchersData || []);
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
@@ -44,19 +48,20 @@ function GraphPage() {
           <div className="p-4 border-b bg-white flex items-center justify-between">
             <div>
               <h1 className="text-xl font-bold text-blue-700">Alumnus</h1>
-              <p className="text-xs text-gray-500">Rede acadêmica em grafo</p>
+              <p className="text-xs text-gray-500">Rede de pesquisa</p>
             </div>
             <button onClick={() => { removeToken(); window.location.href = '/login'; }}
               className="text-xs text-gray-400 hover:text-red-500">
               Sair
             </button>
           </div>
-          <Sidebar students={students} onRefresh={loadData} role={getTokenPayload()?.role} />
+          <Sidebar students={researchers} onRefresh={loadData} role={getTokenPayload()?.role} />
+          <Footer />
         </aside>
       )}
       <main className="flex-1 h-full relative">
         <button
-          onClick={() => setSidebarOpen((o) => !o)}
+          onClick={() => setSidebarOpen((o) => { const next = !o; localStorage.setItem('sidebarOpen', next); return next; })}
           className="absolute top-4 left-4 z-10 bg-white border rounded-lg p-1.5 shadow-md hover:bg-gray-50"
           title={sidebarOpen ? 'Esconder menu' : 'Mostrar menu'}
         >
@@ -90,6 +95,21 @@ export default function App() {
       <Route path="/profile/:slug" element={
         <ProtectedRoute>
           <StudentPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/reminders" element={
+        <ProtectedRoute professorOnly>
+          <RemindersPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/board" element={
+        <ProtectedRoute>
+          <BoardPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/manual" element={
+        <ProtectedRoute>
+          <ManualPage />
         </ProtectedRoute>
       } />
     </Routes>

@@ -11,18 +11,18 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["works"])
 
 
-@router.get("/students/{student_id}/works", response_model=list[WorkOut])
-def list_works(student_id: int, db: Session = Depends(get_db)):
-    return db.query(Work).filter(Work.student_id == student_id).order_by(Work.year.desc(), Work.id.desc()).all()
+@router.get("/researchers/{researcher_id}/works", response_model=list[WorkOut])
+def list_works(researcher_id: int, db: Session = Depends(get_db)):
+    return db.query(Work).filter(Work.researcher_id == researcher_id).order_by(Work.year.desc(), Work.id.desc()).all()
 
 
-@router.post("/students/{student_id}/works", response_model=WorkOut, status_code=201)
-def create_work(student_id: int, data: WorkCreate, db: Session = Depends(get_db)):
-    work = Work(student_id=student_id, **data.model_dump())
+@router.post("/researchers/{researcher_id}/works", response_model=WorkOut, status_code=201)
+def create_work(researcher_id: int, data: WorkCreate, db: Session = Depends(get_db)):
+    work = Work(researcher_id=researcher_id, **data.model_dump())
     db.add(work)
     db.commit()
     db.refresh(work)
-    logger.info("Work created: %s (%s) for student %s", work.title, work.type, student_id)
+    logger.info("Work created: %s (%s) for researcher %s", work.title, work.type, researcher_id)
     return work
 
 

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Student, Relationship, GraphLayout
+from ..models import Researcher, Relationship, GraphLayout
 from ..schemas import LayoutUpdate
 from ..slug import slugify
 
@@ -21,37 +21,37 @@ STATUS_COLORS = {
 
 @router.get("/")
 def get_graph(db: Session = Depends(get_db)):
-    students = db.query(Student).filter(Student.ativo == True).all()
+    researchers = db.query(Researcher).filter(Researcher.ativo == True).all()
     relationships = db.query(Relationship).all()
 
     layout = db.query(GraphLayout).filter(GraphLayout.name == "default").first()
     positions = layout.layout_jsonb if layout else {}
 
-    active_ids = {s.id for s in students}
+    active_ids = {r.id for r in researchers}
 
     nodes = []
-    for s in students:
-        pos = positions.get(str(s.id), {"x": s.id * 100, "y": s.id * 80})
+    for r in researchers:
+        pos = positions.get(str(r.id), {"x": r.id * 100, "y": r.id * 80})
         nodes.append({
-            "id": str(s.id),
-            "type": "student",
+            "id": str(r.id),
+            "type": "researcher",
             "position": pos,
             "data": {
-                "name": s.nome,
-                "slug": slugify(s.nome),
-                "photoUrl": s.photo_url,
-                "status": s.status,
-                "color": STATUS_COLORS.get(s.status, "#6B7280"),
+                "name": r.nome,
+                "slug": slugify(r.nome),
+                "photoUrl": r.photo_url,
+                "status": r.status,
+                "color": STATUS_COLORS.get(r.status, "#6B7280"),
             },
         })
 
     edges = []
-    for r in relationships:
-        if r.source_student_id in active_ids and r.target_student_id in active_ids:
+    for rel in relationships:
+        if rel.source_researcher_id in active_ids and rel.target_researcher_id in active_ids:
             edges.append({
-                "id": f"e{r.id}",
-                "source": str(r.source_student_id),
-                "target": str(r.target_student_id),
+                "id": f"e{rel.id}",
+                "source": str(rel.source_researcher_id),
+                "target": str(rel.target_researcher_id),
             })
 
     return {"nodes": nodes, "edges": edges}
@@ -64,9 +64,8 @@ def update_layout(data: LayoutUpdate, db: Session = Depends(get_db)):
         layout = GraphLayout(name="default", layout_jsonb={})
         db.add(layout)
 
-    current = layout.layout_jsonb or {}
-    current.update(data.positions)
-    layout.layout_jsonb = current
+    current = dict(layout.layout_jsonb or {})
+    layout.layout_jsonb = {**current, **data.positions}
     db.commit()
     db.refresh(layout)
     logger.info("Layout updated")

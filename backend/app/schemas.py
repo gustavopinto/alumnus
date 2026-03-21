@@ -1,12 +1,12 @@
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
 
 from pydantic import BaseModel, field_validator
 
 
-# --- Student ---
+# --- Researcher ---
 
-class StudentCreate(BaseModel):
+class ResearcherCreate(BaseModel):
     nome: str
     photo_url: Optional[str] = None
     status: str
@@ -15,7 +15,7 @@ class StudentCreate(BaseModel):
     observacoes: Optional[str] = None
 
 
-class StudentUpdate(BaseModel):
+class ResearcherUpdate(BaseModel):
     nome: Optional[str] = None
     photo_url: Optional[str] = None
     status: Optional[str] = None
@@ -27,10 +27,16 @@ class StudentUpdate(BaseModel):
     scholar_url: Optional[str] = None
     linkedin_url: Optional[str] = None
     github_url: Optional[str] = None
+    instagram_url: Optional[str] = None
+    twitter_url: Optional[str] = None
+    whatsapp: Optional[str] = None
     interesses: Optional[str] = None
+    matricula: Optional[str] = None
+    curso: Optional[str] = None
+    enrollment_date: Optional[date] = None
 
 
-class StudentOut(BaseModel):
+class ResearcherOut(BaseModel):
     id: int
     nome: str
     photo_url: Optional[str]
@@ -44,7 +50,13 @@ class StudentOut(BaseModel):
     scholar_url: Optional[str]
     linkedin_url: Optional[str]
     github_url: Optional[str]
+    instagram_url: Optional[str]
+    twitter_url: Optional[str]
+    whatsapp: Optional[str]
     interesses: Optional[str]
+    matricula: Optional[str]
+    curso: Optional[str]
+    enrollment_date: Optional[date]
     created_at: datetime
     updated_at: datetime
 
@@ -54,21 +66,21 @@ class StudentOut(BaseModel):
 # --- Relationship ---
 
 class RelationshipCreate(BaseModel):
-    source_student_id: int
-    target_student_id: int
+    source_researcher_id: int
+    target_researcher_id: int
     relation_type: str
 
 
 class RelationshipUpdate(BaseModel):
-    source_student_id: Optional[int] = None
-    target_student_id: Optional[int] = None
+    source_researcher_id: Optional[int] = None
+    target_researcher_id: Optional[int] = None
     relation_type: Optional[str] = None
 
 
 class RelationshipOut(BaseModel):
     id: int
-    source_student_id: int
-    target_student_id: int
+    source_researcher_id: int
+    target_researcher_id: int
     relation_type: str
     created_at: datetime
 
@@ -83,13 +95,20 @@ class NoteCreate(BaseModel):
 
 class NoteOut(BaseModel):
     id: int
-    student_id: int
+    researcher_id: int
     text: str
     file_url: Optional[str]
     file_name: Optional[str]
+    created_by_name: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @classmethod
+    def from_orm_with_creator(cls, note):
+        obj = cls.model_validate(note)
+        obj.created_by_name = note.created_by.nome if note.created_by else None
+        return obj
 
 
 # --- Work ---
@@ -112,7 +131,7 @@ class WorkUpdate(BaseModel):
 
 class WorkOut(BaseModel):
     id: int
-    student_id: int
+    researcher_id: int
     title: str
     type: str
     description: Optional[str]
@@ -133,7 +152,7 @@ class RegisterRequest(BaseModel):
     @classmethod
     def password_length(cls, v):
         if len(v) < 8:
-            raise ValueError("Senha deve ter ao menos 8 caracteres")
+            raise ValueError("Password must be at least 8 characters")
         return v
 
 
@@ -148,11 +167,35 @@ class TokenOut(BaseModel):
 
 
 class UserOut(BaseModel):
-    id:         int
-    email:      str
-    nome:       str
-    role:       str
-    student_id: Optional[int]
+    id:            int
+    email:         str
+    nome:          str
+    role:          str
+    researcher_id: Optional[int]
+    last_login:    Optional[datetime]
+    created_at:    datetime
+
+    model_config = {"from_attributes": True}
+
+
+# --- Reminder ---
+
+class ReminderCreate(BaseModel):
+    text: str
+    due_date: Optional[date] = None
+
+
+class ReminderUpdate(BaseModel):
+    text: Optional[str] = None
+    due_date: Optional[date] = None
+    done: Optional[bool] = None
+
+
+class ReminderOut(BaseModel):
+    id: int
+    text: str
+    due_date: Optional[date]
+    done: bool
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -161,4 +204,79 @@ class UserOut(BaseModel):
 # --- Graph ---
 
 class LayoutUpdate(BaseModel):
-    positions: dict  # {student_id: {x, y}}
+    positions: dict  # {researcher_id: {x, y}}
+
+
+# --- Board ---
+
+class BoardPostCreate(BaseModel):
+    text: str
+
+
+class BoardPostOut(BaseModel):
+    id: int
+    text: str
+    author_id: Optional[int]
+    author_name: Optional[str] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+    @classmethod
+    def from_orm_with_author(cls, post):
+        obj = cls.model_validate(post)
+        obj.author_name = post.author.nome if post.author else None
+        return obj
+
+
+# --- Manual ---
+
+class ManualEntryCreate(BaseModel):
+    question: str
+    answer: str
+    position: Optional[int] = 0
+
+
+class ManualCommentOut(BaseModel):
+    id: int
+    entry_id: int
+    text: str
+    author_id: Optional[int]
+    author_name: Optional[str] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+    @classmethod
+    def from_orm_with_author(cls, comment):
+        obj = cls.model_validate(comment)
+        obj.author_name = comment.author.nome if comment.author else None
+        return obj
+
+
+class ManualEntryOut(BaseModel):
+    id: int
+    question: str
+    answer: str
+    author_id: Optional[int]
+    author_name: Optional[str] = None
+    position: int
+    vote_count: int = 0
+    user_voted: bool = False
+    comments: list[ManualCommentOut] = []
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+    @classmethod
+    def from_orm_with_context(cls, entry, current_user_id: Optional[int]):
+        obj = cls.model_validate(entry)
+        obj.author_name = entry.author.nome if entry.author else None
+        obj.vote_count = len(entry.votes)
+        obj.user_voted = any(v.user_id == current_user_id for v in entry.votes)
+        obj.comments = [ManualCommentOut.from_orm_with_author(c) for c in entry.comments]
+        return obj
+
+
+class ManualCommentCreate(BaseModel):
+    text: str

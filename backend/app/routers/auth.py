@@ -8,7 +8,7 @@ from jose import jwt
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import User, Student
+from ..models import User, Researcher
 from ..schemas import RegisterRequest, LoginRequest, TokenOut, UserOut
 from ..deps import get_current_user, SECRET_KEY, ALGORITHM
 
@@ -20,10 +20,10 @@ EXPIRE_H = int(os.getenv("TOKEN_EXPIRE_HOURS", "8"))
 
 def make_token(user: User) -> str:
     payload = {
-        "sub":        str(user.id),
-        "role":       user.role,
-        "student_id": user.student_id,
-        "exp":        datetime.utcnow() + timedelta(hours=EXPIRE_H),
+        "sub":           str(user.id),
+        "role":          user.role,
+        "researcher_id": user.researcher_id,
+        "exp":           datetime.utcnow() + timedelta(hours=EXPIRE_H),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -33,12 +33,12 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(status_code=409, detail="Email já cadastrado")
 
-    student = db.query(Student).filter(
-        Student.email == data.email,
-        Student.ativo == True,
+    researcher = db.query(Researcher).filter(
+        Researcher.email == data.email,
+        Researcher.ativo == True,
     ).first()
 
-    if not student:
+    if not researcher:
         raise HTTPException(
             status_code=404,
             detail="Email não encontrado. Entre em contato com seu orientador."
@@ -46,13 +46,13 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
 
     user = User(
         email=data.email,
-        nome=student.nome,
+        nome=researcher.nome,
         password_hash=pwd_ctx.hash(data.password),
         role="student",
-        student_id=student.id,
+        researcher_id=researcher.id,
     )
     db.add(user)
-    student.registered = True
+    researcher.registered = True
     db.commit()
     db.refresh(user)
     logger.info("User registered: %s (student)", user.email)
@@ -64,6 +64,8 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == data.email).first()
     if not user or not pwd_ctx.verify(data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
+    user.last_login = datetime.utcnow()
+    db.commit()
     return TokenOut(access_token=make_token(user))
 
 

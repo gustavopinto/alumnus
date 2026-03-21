@@ -34,7 +34,7 @@ export default function LoginPage() {
     const payload = JSON.parse(atob(data.access_token.split('.')[1]));
 
     if (payload.role === 'student') {
-      const stuRes = await fetch(`/api/students/${payload.student_id}`, {
+      const stuRes = await fetch(`/api/researchers/${payload.researcher_id}`, {
         headers: { Authorization: `Bearer ${data.access_token}` },
       });
       const stu = await stuRes.json();

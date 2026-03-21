@@ -22,7 +22,7 @@ def create_relationship(data: RelationshipCreate, db: Session = Depends(get_db))
     db.add(rel)
     db.commit()
     db.refresh(rel)
-    logger.info("Relationship created: %s -> %s (%s)", rel.source_student_id, rel.target_student_id, rel.relation_type)
+    logger.info("Relationship created: %s -> %s (%s)", rel.source_researcher_id, rel.target_researcher_id, rel.relation_type)
     return rel
 
 
