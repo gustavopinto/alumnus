@@ -22,7 +22,7 @@ function renderFormatted(text) {
   });
 }
 
-function RichTextarea({ value, onChange, placeholder, rows = 4 }) {
+function RichTextarea({ value, onChange, placeholder, rows = 4, id, required }) {
   const ref = useRef();
 
   function wrap(prefix, suffix) {
@@ -54,6 +54,9 @@ function RichTextarea({ value, onChange, placeholder, rows = 4 }) {
       </div>
       <textarea
         ref={ref}
+        id={id}
+        required={required}
+        aria-required={required ? true : undefined}
         className="w-full px-3 py-2 text-sm resize-none focus:outline-none"
         placeholder={placeholder}
         value={value}
@@ -101,8 +104,8 @@ function EntryCard({ entry, isProfessor, currentUserId, onVote, onDelete, onComm
   }
 
   return (
-    <div className="border-b last:border-b-0">
-      <div className="p-4">
+    <div>
+      <div className="px-4 py-5 sm:px-6">
         <div className="flex items-start gap-3">
           {/* Voto */}
           <div className="flex flex-col items-center gap-0.5 shrink-0 pt-0.5">
@@ -154,8 +157,16 @@ function EntryCard({ entry, isProfessor, currentUserId, onVote, onDelete, onComm
 
                 {isProfessor && (
                   <div className="flex justify-end">
-                    <button onClick={() => onDelete(entry.id)} className="text-xs text-red-400 hover:text-red-600">
-                      remover entrada
+                    <button
+                      type="button"
+                      onClick={() => onDelete(entry.id)}
+                      className="p-1.5 rounded-md text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                      title="Remover entrada"
+                      aria-label="Remover entrada"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
                     </button>
                   </div>
                 )}
@@ -266,19 +277,33 @@ export default function ManualPage() {
           <section className="bg-white rounded-xl shadow-sm border p-6">
             <h2 className="text-base font-semibold text-gray-800 mb-4">Nova entrada</h2>
             <form onSubmit={handleSubmit} className="space-y-3">
-              <input
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                placeholder="Pergunta..."
-                value={question}
-                onChange={e => setQuestion(e.target.value)}
-                required
-              />
-              <RichTextarea
-                value={answer}
-                onChange={setAnswer}
-                placeholder="Resposta... (selecione texto e clique B para negrito)"
-                rows={4}
-              />
+              <div>
+                <label htmlFor="manual-question" className="block text-xs font-medium text-gray-700 mb-1">
+                  Pergunta <span className="text-red-500" aria-hidden="true">*</span>
+                </label>
+                <input
+                  id="manual-question"
+                  className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  placeholder="Pergunta..."
+                  value={question}
+                  onChange={e => setQuestion(e.target.value)}
+                  required
+                  aria-required="true"
+                />
+              </div>
+              <div>
+                <label htmlFor="manual-answer" className="block text-xs font-medium text-gray-700 mb-1">
+                  Resposta <span className="text-red-500" aria-hidden="true">*</span>
+                </label>
+                <RichTextarea
+                  id="manual-answer"
+                  required
+                  value={answer}
+                  onChange={setAnswer}
+                  placeholder="Resposta... (selecione texto e clique B para negrito)"
+                  rows={4}
+                />
+              </div>
               <div className="flex justify-end">
                 <button
                   type="submit"
@@ -292,9 +317,9 @@ export default function ManualPage() {
           </section>
         )}
 
-        <section className="bg-white rounded-xl shadow-sm border divide-y">
+        <section className="bg-white rounded-xl shadow-sm border flex flex-col gap-12 py-8 px-2 sm:px-4">
           {entries.length === 0 && (
-            <p className="text-sm text-gray-400 italic p-6">Nenhuma entrada ainda.</p>
+            <p className="text-sm text-gray-400 italic px-4 py-2">Nenhuma entrada ainda.</p>
           )}
           {entries.map(entry => (
             <EntryCard

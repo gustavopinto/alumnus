@@ -95,19 +95,35 @@ alumnus/
 │   │   ├── main.py              # FastAPI app and startup
 │   │   ├── models.py            # SQLAlchemy models
 │   │   ├── schemas.py           # Pydantic schemas
-│   │   ├── deps.py              # Auth dependencies (JWT)
-│   │   ├── fileutils.py         # Upload validation and image compression
+│   │   ├── deps.py              # Auth dependencies (JWT, optional user)
+│   │   ├── database.py          # Engine and session
+│   │   ├── fileutils.py         # Upload validation, compression, DB blob store
 │   │   ├── slug.py              # Name-to-slug utility
-│   │   └── routers/
-│   │       ├── auth.py          # POST /auth/register, /auth/login, GET /auth/me
-│   │       ├── researchers.py   # CRUD /researchers
-│   │       ├── relationships.py # CRUD /relationships
-│   │       ├── graph.py         # GET /graph, PUT /graph/layout
-│   │       ├── notes.py         # Meeting notes with file attachments
-│   │       ├── works.py         # Projects, articles, publications
-│   │       ├── reminders.py     # CRUD /reminders
-│   │       ├── board.py         # CRUD /board (mural)
-│   │       └── upload.py        # POST /upload/photo
+│   │   ├── services/            # Persistence + domain logic (used by routers)
+│   │   │   ├── auth_service.py
+│   │   │   ├── user_service.py
+│   │   │   ├── researcher_service.py
+│   │   │   ├── manual_service.py
+│   │   │   ├── board_service.py
+│   │   │   ├── work_service.py
+│   │   │   ├── relationship_service.py
+│   │   │   ├── note_service.py
+│   │   │   ├── reminder_service.py
+│   │   │   ├── graph_service.py
+│   │   │   ├── file_service.py
+│   │   │   └── upload_service.py
+│   │   └── routers/             # HTTP only: Depends, status codes, response mapping
+│   │       ├── auth.py
+│   │       ├── researchers.py
+│   │       ├── relationships.py
+│   │       ├── graph.py
+│   │       ├── notes.py
+│   │       ├── works.py
+│   │       ├── reminders.py
+│   │       ├── board.py
+│   │       ├── manual.py
+│   │       ├── files.py         # GET stored uploads by id
+│   │       └── upload.py
 │   ├── migrations/              # Versioned SQL migration files
 │   ├── migrate.py               # Migration runner
 │   ├── requirements.txt

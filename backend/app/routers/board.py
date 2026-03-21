@@ -2,36 +2,21 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import BoardPost, User
+from ..models import User
 from ..schemas import BoardPostCreate, BoardPostOut
-from ..deps import decode_token
+from ..deps import get_optional_user
+from ..services import board_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/board", tags=["board"])
-bearer = HTTPBearer(auto_error=False)
-
-
-def _get_optional_user(
-    creds: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
-    db: Session = Depends(get_db),
-) -> Optional[User]:
-    if not creds:
-        return None
-    try:
-        payload = decode_token(creds.credentials)
-        user_id = payload.get("sub")
-        return db.query(User).get(int(user_id)) if user_id else None
-    except Exception:
-        return None
 
 
 @router.get("/", response_model=list[BoardPostOut])
 def list_posts(db: Session = Depends(get_db)):
-    posts = db.query(BoardPost).order_by(BoardPost.created_at.desc()).all()
+    posts = board_service.list_posts(db)
     return [BoardPostOut.from_orm_with_author(p) for p in posts]
 
 
@@ -39,16 +24,10 @@ def list_posts(db: Session = Depends(get_db)):
 def create_post(
     data: BoardPostCreate,
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(_get_optional_user),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
-    post = BoardPost(
-        text=data.text,
-        author_id=current_user.id if current_user else None,
-    )
-    db.add(post)
-    db.commit()
-    db.refresh(post)
-    logger.info("Board post created by user %s", current_user.id if current_user else "anonymous")
+    author_id = current_user.id if current_user else None
+    post = board_service.create_post(db, data.text, author_id)
     return BoardPostOut.from_orm_with_author(post)
 
 
@@ -56,9 +35,9 @@ def create_post(
 def delete_post(
     post_id: int,
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(_get_optional_user),
+    current_user: Optional[User] = Depends(get_optional_user),
 ):
-    post = db.query(BoardPost).get(post_id)
+    post = board_service.get_post(db, post_id)
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
     if not current_user:
@@ -67,6 +46,4 @@ def delete_post(
     is_author = post.author_id == current_user.id
     if not is_professor and not is_author:
         raise HTTPException(status_code=403, detail="Not allowed")
-    db.delete(post)
-    db.commit()
-    logger.info("Board post deleted: id=%s", post_id)
+    board_service.delete_post(db, post)
