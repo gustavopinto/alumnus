@@ -2,15 +2,23 @@
 
 A web platform for professors to manage and visualize their research group as an interactive graph. Each researcher is a node; relationships between researchers are edges. Clicking a node opens the researcher's profile page with notes, meeting history, and work records.
 
+**Live app:** [https://alumnus.up.railway.app/](https://alumnus.up.railway.app/)
+
 ## Features
 
-- **Interactive graph** — drag nodes, zoom, pan; layout is persisted per session
+- **Interactive graph** — drag nodes, zoom, pan; layout is persisted per session; researchers are clustered around their advisors
 - **Researcher profiles** — social links, WhatsApp, research interests, meeting notes with file attachments
+- **Rich text notes** — bold, italic, and underline formatting; @mentions rendered as links; markdown rendered inline
 - **Work history** — projects, articles in progress, and publications per researcher
-- **Reminders** — sidebar dropdown with due dates, upcoming/overdue separation
-- **Deadlines** — conference deadlines listed in the sidebar
-- **Role-based access** — professors see the full graph and manage researchers; students are redirected to their own profile upon login
-- **Authentication** — JWT-based login and registration
+- **Reminders** — create reminders with due dates; upcoming/overdue separation; @mentions supported
+- **Deadlines** — conference deadlines with proximity alerts; importable from URL
+- **Manual / Knowledge base** — shared entries with comments; author links to profile
+- **Admin dashboard** — user management, role assignment, pending account approval, metrics by role
+- **Board** — shared post-it board for the group
+- **Role-based access** — superadmin → professor/admin → student; each role has scoped permissions
+  - Professors and admins can delete any reminder or note; students can only manage their own
+  - Professors see group-wide metrics on the admin dashboard
+- **Authentication** — JWT-based login; account approval flow for new registrations
 - **SQL migrations** — versioned `.sql` files applied automatically on startup
 
 ## Tech Stack
@@ -21,7 +29,7 @@ A web platform for professors to manage and visualize their research group as an
 | Backend | Python 3.12, FastAPI, SQLAlchemy 2 |
 | Database | PostgreSQL 16 |
 | Auth | JWT (`python-jose`), bcrypt (`passlib`) |
-| Infra | Docker, Docker Compose |
+| Infra | Docker, Docker Compose, Railway |
 
 ## Getting Started
 
@@ -73,13 +81,13 @@ bash dev.sh stop
 docker compose logs -f
 ```
 
-### 5. Seed initial data (optional)
+### 5. Seed demo data (optional)
 
-Populates the database with a professor node and sample researchers:
+Populates the database with sample researchers, relationships, reminders, and deadlines:
 
 ```bash
-docker compose cp backend/seed.py backend:/app/seed.py
-docker compose exec backend python seed.py
+docker compose cp backend/seed_demo.py backend:/app/seed_demo.py
+docker compose exec backend python seed_demo.py
 ```
 
 ### 6. Create your account
@@ -122,37 +130,50 @@ alumnus/
 │   │       ├── reminders.py
 │   │       ├── board.py
 │   │       ├── manual.py
-│   │       ├── files.py         # GET stored uploads by id
+│   │       ├── deadlines.py
+│   │       ├── admin.py
+│   │       ├── files.py
 │   │       └── upload.py
 │   ├── migrations/              # Versioned SQL migration files
 │   ├── migrate.py               # Migration runner
 │   ├── requirements.txt
 │   └── Dockerfile
 ├── frontend/
+│   ├── public/
+│   │   ├── favicon.svg          # App icon
+│   │   └── screenshots/         # Landing page screenshots
 │   ├── src/
 │   │   ├── App.jsx              # Routes
 │   │   ├── auth.js              # Token helpers
 │   │   ├── api.js               # API client (injects Bearer token)
+│   │   ├── mentionUtils.jsx     # @mention + markdown rendering
+│   │   ├── reminderAccess.js    # Reminder permission helpers
 │   │   ├── components/
 │   │   │   ├── GraphView.jsx
-│   │   │   ├── ResearcherNode.jsx  # Graph node component
+│   │   │   ├── ResearcherNode.jsx
 │   │   │   ├── Sidebar.jsx      # Group, Reminders, Deadlines
-│   │   │   ├── ResearcherForm.jsx  # Add/edit researcher form
-│   │   │   ├── Footer.jsx       # GitHub link footer
+│   │   │   ├── ResearcherForm.jsx
+│   │   │   ├── AppLayout.jsx
+│   │   │   ├── Footer.jsx
 │   │   │   ├── Legend.jsx
 │   │   │   ├── Toast.jsx
 │   │   │   └── ProtectedRoute.jsx
 │   │   └── pages/
+│   │       ├── LandingPage.jsx
 │   │       ├── LoginPage.jsx
 │   │       ├── RegisterPage.jsx
-│   │       ├── ResearcherPage.jsx  # Researcher profile page
+│   │       ├── ResearcherPage.jsx
 │   │       ├── RemindersPage.jsx
-│   │       └── BoardPage.jsx    # Mural (post-its)
+│   │       ├── DeadlinesPage.jsx
+│   │       ├── ManualPage.jsx
+│   │       ├── AdminPage.jsx
+│   │       └── BoardPage.jsx
 │   └── Dockerfile
 ├── docker-compose.yml
 ├── dev.sh                       # Start/stop helper
 ├── .env.example
-└── seed.py
+├── LICENSE
+└── seed_demo.py
 ```
 
 ## API Overview
@@ -166,19 +187,27 @@ alumnus/
 | POST | `/api/researchers/` | Create researcher |
 | PUT | `/api/researchers/{id}` | Update researcher |
 | DELETE | `/api/researchers/{id}` | Deactivate researcher |
-| GET | `/api/researchers/{id}/user` | Get linked user account |
 | GET | `/api/graph/` | Graph nodes + edges |
 | PUT | `/api/graph/layout` | Save node positions |
-| GET | `/api/researchers/{id}/notes` | Meeting notes |
+| GET | `/api/researchers/{id}/notes` | Profile notes |
 | POST | `/api/researchers/{id}/notes` | Add note (+ optional file) |
+| DELETE | `/api/researchers/{id}/notes/{note_id}` | Delete note |
 | GET | `/api/researchers/{id}/works` | Works list |
 | POST | `/api/researchers/{id}/works` | Add work |
 | GET | `/api/reminders/` | List reminders |
 | POST | `/api/reminders/` | Create reminder |
 | PUT | `/api/reminders/{id}` | Update reminder |
 | DELETE | `/api/reminders/{id}` | Delete reminder |
+| GET | `/api/deadlines/` | List deadlines |
+| POST | `/api/deadlines/` | Create deadline |
+| GET | `/api/manual/` | List manual entries |
+| POST | `/api/manual/` | Create entry |
+| POST | `/api/manual/{id}/comments` | Add comment |
+| GET | `/api/admin/users` | List all users (admin+) |
+| PUT | `/api/admin/users/{id}/role` | Change user role |
 | GET | `/api/relationships/` | List relationships |
 | POST | `/api/relationships/` | Create relationship |
+| DELETE | `/api/relationships/{id}` | Delete relationship |
 
 ## Researcher Status Colors
 
@@ -202,6 +231,10 @@ docker compose exec backend python3 /app/migrate.py
 - Accepted formats: JPEG, PNG, GIF, WebP, PDF
 - Maximum size: 5 MB
 - Images are automatically resized (max 1024 px) and compressed to JPEG quality 60
+
+## License
+
+[MIT](LICENSE)
 
 ---
 
