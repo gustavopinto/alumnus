@@ -2,6 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getTokenPayload, saveToken } from '../auth';
 import { formatApiDetail, readResponseJson } from '../apiErrors';
+import {
+  INSTITUTIONAL_EMAIL_ERROR_PT,
+  REGISTER_PROFESSOR_ONLY_HINT_PT,
+  isPublicEmailDomain,
+} from '../institutionalEmail';
 
 /* ── Saudação por horário ──────────────────────────────────────────────── */
 function greeting() {
@@ -73,6 +78,11 @@ function RegisterForm({ onSwitchToLogin }) {
   async function handleSubmit(e) {
     e.preventDefault();
     setLoading(true); setError('');
+    if (isPublicEmailDomain(form.email)) {
+      setError(INSTITUTIONAL_EMAIL_ERROR_PT);
+      setLoading(false);
+      return;
+    }
     try {
       const res = await fetch('/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
       const data = await readResponseJson(res, 'register');
@@ -98,9 +108,10 @@ function RegisterForm({ onSwitchToLogin }) {
 
   return (
     <>
+      <p className="text-xs text-gray-600 mb-3 leading-relaxed">{REGISTER_PROFESSOR_ONLY_HINT_PT}</p>
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
       <form onSubmit={handleSubmit} className="space-y-4">
-        <input type="email" required placeholder="Email institucional" className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" value={form.email} onChange={set('email')} />
+        <input type="email" required placeholder="E-mail institucional (universidade)" className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" value={form.email} onChange={set('email')} />
         <input type="password" required placeholder="Senha (mín. 8 caracteres)" className="w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" value={form.password} onChange={set('password')} />
         <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-50">{loading ? 'Cadastrando...' : 'Criar conta'}</button>
       </form>

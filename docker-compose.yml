@@ -21,6 +21,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       SECRET_KEY: ${SECRET_KEY}
       TOKEN_EXPIRE_HOURS: ${TOKEN_EXPIRE_HOURS}
+      UVICORN_RELOAD: "1"
     ports:
       - "${BACKEND_PORT}:8000"
     volumes:

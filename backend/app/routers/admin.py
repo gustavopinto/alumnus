@@ -4,7 +4,7 @@ from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
-from ..deps import require_dashboard, require_superadmin
+from ..deps import require_dashboard, require_superadmin, require_professor
 from ..models import User, Researcher, Reminder, BoardPost, ManualEntry, Note
 from ..plan import clear_plan, ensure_professor_plan_defaults
 
@@ -23,6 +23,11 @@ _ADMIN_USER_LIST_ROLE_ORDER = {
 
 class UserRoleUpdate(BaseModel):
     role: str
+
+
+class BulkDeleteRequest(BaseModel):
+    user_ids: list[int] = []
+    researcher_ids: list[int] = []
 
 
 def _is_superadmin(user: User) -> bool:
@@ -187,14 +192,47 @@ def update_user(
 def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
-    current: User = Depends(require_superadmin),
+    current: User = Depends(require_dashboard),
 ):
     if user_id == current.id:
         raise HTTPException(status_code=400, detail="Você não pode remover a própria conta")
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    if user.role == "superadmin" and current.role != "superadmin":
+        raise HTTPException(status_code=403, detail="Apenas superadmin pode remover outro superadmin")
+    if user.researcher_id:
+        researcher = db.query(Researcher).filter(Researcher.id == user.researcher_id).first()
+        if researcher:
+            researcher.ativo = False
+            researcher.registered = False
     db.delete(user)
+    db.commit()
+
+
+# ── Bulk delete (superadmin only) ─────────────────────────────────────────────
+
+@router.post("/bulk-delete", status_code=204)
+def bulk_delete(
+    data: BulkDeleteRequest,
+    db: Session = Depends(get_db),
+    current: User = Depends(require_dashboard),
+):
+    for uid in data.user_ids:
+        if uid == current.id:
+            continue
+        user = db.query(User).filter(User.id == uid).first()
+        if user and not (user.role == "superadmin" and current.role != "superadmin"):
+            if user.researcher_id:
+                researcher = db.query(Researcher).filter(Researcher.id == user.researcher_id).first()
+                if researcher:
+                    researcher.ativo = False
+                    researcher.registered = False
+            db.delete(user)
+    for rid in data.researcher_ids:
+        researcher = db.query(Researcher).filter(Researcher.id == rid).first()
+        if researcher and not researcher.registered:
+            db.delete(researcher)
     db.commit()
 
 
@@ -204,7 +242,7 @@ def delete_user(
 def delete_pending_researcher(
     researcher_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_superadmin),
+    _: User = Depends(require_dashboard),
 ):
     researcher = db.query(Researcher).filter(Researcher.id == researcher_id).first()
     if not researcher:

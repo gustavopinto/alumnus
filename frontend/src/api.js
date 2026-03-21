@@ -144,3 +144,4 @@ export const getAdminUsers = () => request('/admin/users');
 export const updateUserRole = (id, role, is_admin = false) => request(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify({ role, is_admin }) });
 export const deleteUser = (id) => request(`/admin/users/${id}`, { method: 'DELETE' });
 export const deletePendingResearcher = (id) => request(`/admin/researchers/${id}`, { method: 'DELETE' });
+export const bulkDeleteUsers = (user_ids, researcher_ids) => request('/admin/bulk-delete', { method: 'POST', body: JSON.stringify({ user_ids, researcher_ids }) });

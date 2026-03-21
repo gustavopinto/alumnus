@@ -181,6 +181,11 @@ class RegisterRequest(BaseModel):
     email:    str
     password: str
 
+    @field_validator("email")
+    @classmethod
+    def email_normalize(cls, v: str) -> str:
+        return (v or "").strip().lower()
+
     @field_validator("password")
     @classmethod
     def password_length(cls, v):
@@ -237,8 +242,6 @@ class ReminderOut(BaseModel):
     created_at: datetime
     created_by_id: Optional[int] = None
     created_by_name: Optional[str] = None
-    # True quando outro usuário criou o lembrete e o usuário atual ainda não marcou a notificação como lida
-    notification_unread: bool = False
 
     model_config = {"from_attributes": True}
 

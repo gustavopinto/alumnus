@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ResearcherForm from './ResearcherForm';
-import { deleteResearcher, getReminders, createReminder, updateReminder, deleteReminder, markReminderNotificationRead } from '../api';
+import { deleteResearcher, getReminders, createReminder, updateReminder, deleteReminder } from '../api';
 import { canDeleteReminder, creatorDisplayName, isReminderFromSomeoneElse } from '../reminderAccess';
 import { invalidMentions, renderWithMentions } from '../mentionUtils.jsx';
 import { isModEnter } from '../platform';
@@ -38,26 +38,6 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, r
 
   useEffect(() => { load(); }, [refreshKey, load]);
 
-  const dropdownUnreadKey = useMemo(
-    () =>
-      reminders
-        .filter((r) => r.notification_unread)
-        .map((r) => r.id)
-        .sort((a, b) => a - b)
-        .join(','),
-    [reminders],
-  );
-
-  useEffect(() => {
-    if (rail || !open || !dropdownUnreadKey) return;
-    const ids = dropdownUnreadKey.split(',').map(Number);
-    let cancelled = false;
-    (async () => {
-      await Promise.all(ids.map((id) => markReminderNotificationRead(id).catch(() => {})));
-      if (!cancelled) await load();
-    })();
-    return () => { cancelled = true; };
-  }, [rail, open, dropdownUnreadKey, load]);
 
   useEffect(() => {
     function handler(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
@@ -275,54 +255,43 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, r
           </div>
 
           {/* Caixa de listagem */}
-          <div className="p-3 space-y-2">
+          <div className="py-1">
             {upcoming.length === 0 && old.length === 0 && (
-              <p className="text-xs text-gray-400 italic text-center py-1">Nenhum lembrete.</p>
+              <p className="text-xs text-gray-400 italic text-center py-3">Nenhum lembrete.</p>
             )}
-            <ul className="space-y-1.5 max-h-48 overflow-y-auto">
+            <ul className="divide-y divide-gray-100 max-h-56 overflow-y-auto">
               {upcoming.map(r => {
                 const days = daysUntil(r.due_date);
                 const urgent = days <= 3;
-                const fromOther = isReminderFromSomeoneElse(r);
-                const receivedRead = fromOther && !r.notification_unread;
-                const receivedUnreadHighlight = fromOther && r.notification_unread;
                 return (
-                  <li
-                    key={r.id}
-                    className={[
-                      'rounded px-1 py-1 group',
-                      receivedUnreadHighlight ? 'bg-blue-50/80' : '',
-                      receivedRead ? 'opacity-[0.72]' : '',
-                    ].filter(Boolean).join(' ')}
-                  >
-                    <div className="flex items-start gap-1.5 min-w-0">
-                      <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-1.5 gap-y-0.5">
-                        <span className="inline-flex max-w-[9rem] shrink-0 items-center truncate rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-800 ring-1 ring-inset ring-blue-200/70" title={creatorDisplayName(r, { viewerName: currentUser?.nome })}>
-                          {creatorDisplayName(r, { viewerName: currentUser?.nome })}
+                  <li key={r.id} className="group flex items-start gap-2 px-3 py-2.5 hover:bg-gray-50 transition-colors">
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      <p className="text-sm text-gray-800 leading-snug break-words">{renderWithMentions(r.text, researchers)}</p>
+                      <p className="text-xs text-gray-500">
+                        <span className="text-gray-800">{creatorDisplayName(r, { viewerName: currentUser?.nome })}</span>
+                        {' · '}
+                        <span className={urgent ? 'text-orange-500 font-medium' : ''}>
+                          {days === 0 ? 'Hoje!' : `${days}d`} · {new Date(r.due_date + 'T00:00:00').toLocaleDateString('pt-BR')}
                         </span>
-                        <span className={`min-w-0 flex-1 text-sm font-medium leading-snug break-words ${receivedRead ? 'text-gray-500' : 'text-gray-700'}`}>{renderWithMentions(r.text, researchers)}</span>
-                      </div>
-                      {canDeleteReminder(r) && (
-                        <button type="button" onClick={() => handleDelete(r.id)} className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 shrink-0 mt-0.5" title="Remover" aria-label="Remover lembrete">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                          </svg>
-                        </button>
-                      )}
+                      </p>
                     </div>
-                    <span className={`text-xs ${urgent ? 'text-orange-500 font-semibold' : 'text-gray-400'}`}>
-                      {days === 0 ? 'Hoje!' : `${days}d`} · {new Date(r.due_date + 'T00:00:00').toLocaleDateString('pt-BR')}
-                    </span>
+                    {canDeleteReminder(r) && (
+                      <button type="button" onClick={() => handleDelete(r.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 shrink-0 mt-0.5 transition-colors" title="Remover">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
                   </li>
                 );
               })}
             </ul>
 
             {old.length > 0 && (
-              <div className="border-t pt-2">
+              <div className="border-t">
                 <button
                   onClick={() => setShowOld(o => !o)}
-                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600"
+                  className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 w-full px-3 py-2"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -330,41 +299,26 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, r
                   {old.length} atrasado{old.length > 1 ? 's' : ''}
                 </button>
                 {showOld && (
-                  <ul className="mt-1.5 space-y-1.5 max-h-32 overflow-y-auto">
-                    {old.map(r => {
-                      const fromOther = isReminderFromSomeoneElse(r);
-                      const receivedRead = fromOther && !r.notification_unread;
-                      const receivedUnreadHighlight = fromOther && r.notification_unread;
-                      return (
-                      <li
-                        key={r.id}
-                        className={[
-                          'rounded px-1 py-1 group',
-                          receivedUnreadHighlight ? 'bg-blue-50/80 opacity-90' : '',
-                          receivedRead ? 'opacity-50' : !receivedUnreadHighlight ? 'opacity-60' : '',
-                        ].filter(Boolean).join(' ')}
-                      >
-                        <div className="flex items-start gap-1.5 min-w-0">
-                          <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-1.5 gap-y-0.5">
-                            <span className="inline-flex max-w-[9rem] shrink-0 items-center truncate rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-800 ring-1 ring-inset ring-blue-200/70" title={creatorDisplayName(r, { viewerName: currentUser?.nome })}>
-                              {creatorDisplayName(r, { viewerName: currentUser?.nome })}
-                            </span>
-                            <span className={`min-w-0 flex-1 text-sm font-medium leading-snug break-words ${receivedRead ? 'text-gray-400' : 'text-gray-600'}`}>{renderWithMentions(r.text, researchers)}</span>
-                          </div>
-                          {canDeleteReminder(r) && (
-                            <button type="button" onClick={() => handleDelete(r.id)} className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 shrink-0 mt-0.5" title="Remover" aria-label="Remover lembrete">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                              </svg>
-                            </button>
-                          )}
+                  <ul className="divide-y divide-gray-100 max-h-40 overflow-y-auto opacity-70">
+                    {old.map(r => (
+                      <li key={r.id} className="group flex items-start gap-2 px-3 py-2.5 hover:bg-gray-50 transition-colors">
+                        <div className="flex-1 min-w-0 space-y-0.5">
+                          <p className="text-sm text-gray-700 leading-snug break-words">{renderWithMentions(r.text, researchers)}</p>
+                          <p className="text-xs text-gray-500">
+                            <span className="text-gray-800">{creatorDisplayName(r, { viewerName: currentUser?.nome })}</span>
+                            {' · '}
+                            <span className="text-red-400">Atrasado · {new Date(r.due_date + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                          </p>
                         </div>
-                        <span className="text-xs text-red-400">
-                          Atrasado · {new Date(r.due_date + 'T00:00:00').toLocaleDateString('pt-BR')}
-                        </span>
+                        {canDeleteReminder(r) && (
+                          <button type="button" onClick={() => handleDelete(r.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 shrink-0 mt-0.5 transition-colors" title="Remover">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        )}
                       </li>
-                    );
-                    })}
+                    ))}
                   </ul>
                 )}
               </div>

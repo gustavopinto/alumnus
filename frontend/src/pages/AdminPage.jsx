@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAdminStats, getAdminUsers, updateUserRole, deleteUser, deletePendingResearcher } from '../api';
+import { getAdminStats, getAdminUsers, updateUserRole, deleteUser, deletePendingResearcher, bulkDeleteUsers } from '../api';
 import { getTokenPayload } from '../auth';
 
 const ROLE_LABELS = { superadmin: 'Superadmin', admin: 'Admin', professor: 'Professor', student: 'Aluno' };
@@ -34,8 +34,12 @@ export default function AdminPage() {
   const [editRole, setEditRole] = useState('');
   const [saving, setSaving] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
+  const [selected, setSelected] = useState(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
-  const isSuperadmin = getTokenPayload()?.role === 'superadmin';
+  const myRole = getTokenPayload()?.role;
+  const isSuperadmin = myRole === 'superadmin';
+  const canDelete = ['superadmin', 'professor', 'admin'].includes(myRole);
 
   function copyInviteLink(u) {
     const token = btoa(u.email);
@@ -62,6 +66,42 @@ export default function AdminPage() {
   }
 
   useEffect(() => { load(); }, []);
+
+  function rowKey(u) {
+    return u.pending ? `r-${u.researcher_id}` : `u-${u.id}`;
+  }
+
+  function toggleSelect(u) {
+    const k = rowKey(u);
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(k) ? next.delete(k) : next.add(k);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (selected.size === users.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(users.map(rowKey)));
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (!confirm(`Remover ${selected.size} usuário(s) selecionado(s)? Esta ação não pode ser desfeita.`)) return;
+    setBulkDeleting(true);
+    const user_ids = [];
+    const researcher_ids = [];
+    for (const k of selected) {
+      if (k.startsWith('u-')) user_ids.push(Number(k.slice(2)));
+      else researcher_ids.push(Number(k.slice(2)));
+    }
+    await bulkDeleteUsers(user_ids, researcher_ids);
+    setSelected(new Set());
+    setBulkDeleting(false);
+    load();
+  }
 
   async function handleRoleChange(userId) {
     setSaving(true);
@@ -107,19 +147,41 @@ export default function AdminPage() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
             <StatCard label="Anotações"   value={stats?.total_notes}               color="text-rose-600" />
+            {(stats?.total_pending ?? 0) > 0 && (
+              <StatCard label="Sem acesso validado" value={stats?.total_pending} color="text-yellow-600" />
+            )}
           </div>
         </section>
 
         {/* Users */}
         <section className="bg-white rounded-xl border shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b">
-            <h2 className="text-base font-semibold text-gray-800">Usuários</h2>
-            <p className="text-sm text-gray-500 mt-0.5">{users.length} usuário{users.length !== 1 ? 's' : ''} cadastrado{users.length !== 1 ? 's' : ''}</p>
+          <div className="px-6 py-4 border-b flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-base font-semibold text-gray-800">Usuários</h2>
+              <p className="text-sm text-gray-500 mt-0.5">{users.length} usuário{users.length !== 1 ? 's' : ''} cadastrado{users.length !== 1 ? 's' : ''}</p>
+            </div>
+            {canDelete && selected.size > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+                className="flex items-center gap-2 bg-red-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Remover {selected.size} selecionado{selected.size !== 1 ? 's' : ''}
+              </button>
+            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  {canDelete && (
+                    <th className="pl-4 py-3 w-8">
+                      <input type="checkbox" checked={users.length > 0 && selected.size === users.length} onChange={toggleAll} className="rounded border-gray-300" />
+                    </th>
+                  )}
                   <th className="px-4 py-3">Nome</th>
                   <th className="px-4 py-3">Email</th>
                   <th className="px-4 py-3">Perfil</th>
@@ -131,6 +193,11 @@ export default function AdminPage() {
               <tbody className="divide-y divide-gray-100">
                 {users.map((u, idx) => (
                   <tr key={u.id ?? `pending-${idx}`} className={`hover:bg-gray-50 transition-colors ${u.pending ? 'opacity-60' : ''}`}>
+                    {canDelete && (
+                      <td className="pl-4 py-3 w-8">
+                        <input type="checkbox" checked={selected.has(rowKey(u))} onChange={() => toggleSelect(u)} className="rounded border-gray-300" />
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {u.photo_url
@@ -226,7 +293,7 @@ export default function AdminPage() {
                             </svg>
                           </button>
                         )}
-                        {editingId !== u.id && isSuperadmin && (
+                        {editingId !== u.id && canDelete && (
                           <button
                             onClick={() => handleDelete(u)}
                             className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"

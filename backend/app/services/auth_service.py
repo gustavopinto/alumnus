@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 
 from passlib.context import CryptContext
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..models import Researcher, User
@@ -10,14 +11,22 @@ from ..schemas import RegisterRequest
 logger = logging.getLogger(__name__)
 
 
+def _norm_email(email: str) -> str:
+    return (email or "").strip().lower()
+
+
 def user_email_exists(db: Session, email: str) -> bool:
-    return db.query(User).filter(User.email == email).first() is not None
+    e = _norm_email(email)
+    return (
+        db.query(User).filter(func.lower(User.email) == e).first() is not None
+    )
 
 
 def get_active_researcher_for_email(db: Session, email: str) -> Researcher | None:
+    e = _norm_email(email)
     return (
         db.query(Researcher)
-        .filter(Researcher.email == email, Researcher.ativo == True)
+        .filter(func.lower(Researcher.email) == e, Researcher.ativo == True)
         .first()
     )
 
@@ -46,7 +55,8 @@ def create_student_from_researcher(
 def authenticate(
     db: Session, email: str, password: str, pwd_ctx: CryptContext
 ) -> User | None:
-    user = db.query(User).filter(User.email == email).first()
+    e = _norm_email(email)
+    user = db.query(User).filter(func.lower(User.email) == e).first()
     if not user or not pwd_ctx.verify(password, user.password_hash):
         return None
     return user

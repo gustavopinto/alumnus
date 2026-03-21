@@ -3,6 +3,11 @@ import { useNavigate, useSearchParams, Link, Navigate } from 'react-router-dom';
 import { saveToken, getToken } from '../auth';
 import { formatApiDetail, readResponseJson } from '../apiErrors';
 import { modKey, isModEnter } from '../platform';
+import {
+  INSTITUTIONAL_EMAIL_ERROR_PT,
+  REGISTER_PROFESSOR_ONLY_HINT_PT,
+  isPublicEmailDomain,
+} from '../institutionalEmail';
 
 function slugify(nome) {
   return (nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -115,6 +120,11 @@ function RegisterForm({ inviteEmail }) {
     e.preventDefault();
     setLoading(true);
     setError('');
+    if (!inviteEmail && isPublicEmailDomain(form.email)) {
+      setError(INSTITUTIONAL_EMAIL_ERROR_PT);
+      setLoading(false);
+      return;
+    }
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
@@ -141,6 +151,7 @@ function RegisterForm({ inviteEmail }) {
 
   return (
     <>
+      <p className="text-xs text-gray-600 mb-3 leading-relaxed">{REGISTER_PROFESSOR_ONLY_HINT_PT}</p>
       {inviteEmail && (
         <p className="text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 mb-4">
           Você foi convidado para ativar sua conta. Defina uma senha para continuar.
@@ -148,7 +159,7 @@ function RegisterForm({ inviteEmail }) {
       )}
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
       <form onSubmit={handleSubmit} className="space-y-4">
-        <input type="email" required placeholder="Email institucional"
+        <input type="email" required placeholder="E-mail institucional (universidade)"
           className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 ${inviteEmail ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
           value={form.email} onChange={set('email')} readOnly={!!inviteEmail} />
         <input type="password" required placeholder="Senha (mín. 8 caracteres)"

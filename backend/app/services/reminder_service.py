@@ -3,7 +3,7 @@ import re
 
 from sqlalchemy.orm import Session, joinedload
 
-from ..models import Reminder, ReminderRead, User, Researcher
+from ..models import Reminder, User, Researcher
 from ..schemas import ReminderCreate, ReminderOut, ReminderUpdate
 from ..slug import slugify
 
@@ -24,19 +24,10 @@ def _find_users_for_mentions(db: Session, slugs: set[str]) -> list[User]:
     return db.query(User).filter(User.researcher_id.in_(matched_ids)).all()
 
 
-def _read_ids_for_user(db: Session, user_id: int) -> set[int]:
-    return {
-        row.reminder_id
-        for row in db.query(ReminderRead.reminder_id)
-        .filter(ReminderRead.user_id == user_id)
-        .all()
-    }
-
 
 def reminder_to_out(
     r: Reminder,
     viewer_id: int | None,
-    read_ids: set[int] | None = None,
     creator_name_map: dict[int, str] | None = None,
 ) -> ReminderOut:
     created_by_name = None
@@ -45,14 +36,6 @@ def reminder_to_out(
             created_by_name = r.created_by.nome
         elif creator_name_map:
             created_by_name = creator_name_map.get(r.created_by_id)
-    notification_unread = False
-    if (
-        viewer_id is not None
-        and r.created_by_id is not None
-        and r.created_by_id != viewer_id
-        and read_ids is not None
-    ):
-        notification_unread = r.id not in read_ids
     return ReminderOut(
         id=r.id,
         text=r.text,
@@ -61,7 +44,6 @@ def reminder_to_out(
         created_at=r.created_at,
         created_by_id=r.created_by_id,
         created_by_name=created_by_name,
-        notification_unread=notification_unread,
     )
 
 
@@ -80,32 +62,12 @@ def list_ordered(db: Session) -> list[Reminder]:
 
 def list_reminders_out(db: Session, viewer_id: int | None) -> list[ReminderOut]:
     reminders = list_ordered(db)
-    read_ids: set[int] | None = None
-    if viewer_id is not None:
-        read_ids = _read_ids_for_user(db, viewer_id)
-    else:
-        read_ids = set()
     creator_ids = {r.created_by_id for r in reminders if r.created_by_id is not None}
     creator_name_map: dict[int, str] = {}
     if creator_ids:
         for uid, nome in db.query(User.id, User.nome).filter(User.id.in_(creator_ids)).all():
             creator_name_map[uid] = nome
-    return [reminder_to_out(r, viewer_id, read_ids, creator_name_map) for r in reminders]
-
-
-def count_unread_notifications(db: Session, user_id: int) -> int:
-    read_subq = (
-        db.query(ReminderRead.reminder_id).filter(ReminderRead.user_id == user_id)
-    )
-    return (
-        db.query(Reminder)
-        .filter(
-            Reminder.created_by_id.isnot(None),
-            Reminder.created_by_id != user_id,
-            ~Reminder.id.in_(read_subq),
-        )
-        .count()
-    )
+    return [reminder_to_out(r, viewer_id, creator_name_map) for r in reminders]
 
 
 def create(
@@ -174,36 +136,12 @@ def delete(db: Session, reminder: Reminder) -> None:
     logger.info("Reminder deleted: id=%s", reminder.id)
 
 
-def mark_notification_read(db: Session, user_id: int, reminder_id: int) -> bool:
-    reminder = get_by_id(db, reminder_id)
-    if not reminder:
-        return False
-    if reminder.created_by_id is None or reminder.created_by_id == user_id:
-        return True
-    existing = (
-        db.query(ReminderRead)
-        .filter(
-            ReminderRead.user_id == user_id,
-            ReminderRead.reminder_id == reminder_id,
-        )
-        .first()
-    )
-    if existing:
-        return True
-    db.add(ReminderRead(user_id=user_id, reminder_id=reminder_id))
-    db.commit()
-    return True
-
-
 def single_reminder_out(db: Session, reminder_id: int, viewer_id: int | None) -> ReminderOut | None:
     r = get_by_id(db, reminder_id)
     if not r:
         return None
-    read_ids: set[int] = set()
-    if viewer_id is not None:
-        read_ids = _read_ids_for_user(db, viewer_id)
     creator_name_map = None
     if r.created_by_id is not None and r.created_by is None:
         u = db.query(User).filter(User.id == r.created_by_id).first()
         creator_name_map = {u.id: u.nome} if u else {}
-    return reminder_to_out(r, viewer_id, read_ids, creator_name_map)
+    return reminder_to_out(r, viewer_id, creator_name_map)

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppLayout } from '../components/AppLayout';
-import { getReminders, createReminder, deleteReminder, markReminderNotificationRead } from '../api';
-import { canDeleteReminder, creatorDisplayName, isReminderFromSomeoneElse } from '../reminderAccess';
+import { getReminders, createReminder, deleteReminder } from '../api';
+import { canDeleteReminder, creatorDisplayName } from '../reminderAccess';
 import { invalidMentions, renderWithMentions } from '../mentionUtils.jsx';
 
 function slugify(nome) {
@@ -44,23 +44,6 @@ export default function RemindersPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const notificationUnreadKey = reminders
-    .filter((r) => r.notification_unread)
-    .map((r) => r.id)
-    .sort((a, b) => a - b)
-    .join(',');
-
-  /** Ao ver a lista, notificações recebidas marcam-se como lidas; o lembrete continua na lista, mais opaco. */
-  useEffect(() => {
-    if (!notificationUnreadKey) return;
-    const ids = notificationUnreadKey.split(',').map(Number);
-    let cancelled = false;
-    (async () => {
-      await Promise.all(ids.map((id) => markReminderNotificationRead(id).catch(() => {})));
-      if (!cancelled) await load();
-    })();
-    return () => { cancelled = true; };
-  }, [notificationUnreadKey, load]);
 
   useEffect(() => {
     function syncMinDate() {
@@ -239,20 +222,10 @@ export default function RemindersPage() {
                 const days = daysLeft(r.due_date);
                 const overdue = days !== null && days < 0;
                 const urgent = days !== null && days >= 0 && days <= 3;
-                const fromOther = isReminderFromSomeoneElse(r);
-                const receivedRead = fromOther && !r.notification_unread;
-                const receivedUnreadHighlight = fromOther && r.notification_unread;
                 return (
-                  <li
-                    key={r.id}
-                    className={[
-                      'flex items-start gap-3 border-b pb-3 last:border-0 last:pb-0',
-                      receivedUnreadHighlight ? 'bg-blue-50/70 rounded-lg -mx-1 px-1 py-1' : '',
-                      receivedRead ? 'opacity-[0.78]' : '',
-                    ].filter(Boolean).join(' ')}
-                  >
+                  <li key={r.id} className="flex items-start gap-3 border-b pb-3 last:border-0 last:pb-0">
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm whitespace-pre-wrap mb-2 ${receivedRead ? 'text-gray-500' : 'text-gray-800'}`}>{renderWithMentions(r.text, researchers)}</p>
+                      <p className="text-sm whitespace-pre-wrap mb-2 text-gray-800">{renderWithMentions(r.text, researchers)}</p>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                         {r.due_date && (
                           <span className={`text-xs ${overdue ? 'text-red-500 font-semibold' : urgent ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
@@ -296,20 +269,13 @@ export default function RemindersPage() {
                 const days = daysLeft(r.due_date);
                 const overdue = days !== null && days < 0;
                 const urgent = days !== null && days >= 0 && days <= 3;
-                const fromOther = isReminderFromSomeoneElse(r);
-                const receivedRead = fromOther && !r.notification_unread;
-                const receivedUnreadHighlight = fromOther && r.notification_unread;
                 return (
                 <li
                   key={r.id}
-                  className={[
-                    'flex items-start gap-3 border-b pb-3 last:border-0 last:pb-0',
-                    receivedUnreadHighlight ? 'bg-blue-50/70 rounded-lg -mx-1 px-1 py-1' : '',
-                    receivedRead ? 'opacity-[0.42]' : 'opacity-50',
-                  ].filter(Boolean).join(' ')}
+                  className="flex items-start gap-3 border-b pb-3 last:border-0 last:pb-0 opacity-50"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm whitespace-pre-wrap mb-2 line-through ${receivedRead ? 'text-gray-400' : 'text-gray-500'}`}>{renderWithMentions(r.text, researchers)}</p>
+                    <p className="text-sm whitespace-pre-wrap mb-2 line-through text-gray-500">{renderWithMentions(r.text, researchers)}</p>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       {r.due_date && (
                         <span className={`text-xs ${overdue ? 'text-red-500 font-semibold' : urgent ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>

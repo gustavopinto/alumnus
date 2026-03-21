@@ -135,13 +135,6 @@ class Reminder(Base):
     created_by = relationship("User", foreign_keys=[created_by_id])
 
 
-class ReminderRead(Base):
-    __tablename__ = "reminder_reads"
-
-    user_id     = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    reminder_id = Column(Integer, ForeignKey("reminders.id", ondelete="CASCADE"), primary_key=True)
-    read_at     = Column(DateTime, default=datetime.utcnow, nullable=False)
-
 
 class BoardPost(Base):
     __tablename__ = "board_posts"

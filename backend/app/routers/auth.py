@@ -13,6 +13,7 @@ from ..schemas import RegisterRequest, LoginRequest, TokenOut, UserOut
 from ..plan import ensure_professor_plan_defaults, refresh_user_plan_status, user_to_out
 from ..deps import get_current_user, SECRET_KEY, ALGORITHM
 from ..services import auth_service
+from ..institutional_email import INSTITUTIONAL_EMAIL_HELP_PT, is_public_email_domain
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -40,6 +41,8 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
 
     researcher = auth_service.get_active_researcher_for_email(db, data.email)
     if not researcher:
+        if is_public_email_domain(data.email):
+            raise HTTPException(status_code=400, detail=INSTITUTIONAL_EMAIL_HELP_PT)
         raise HTTPException(
             status_code=404,
             detail="Email não encontrado. Entre em contato com seu orientador.",
