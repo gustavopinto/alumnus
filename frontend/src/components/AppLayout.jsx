@@ -15,29 +15,35 @@ function shortName(fullName) {
   return `${parts[0]} ${parts[parts.length - 1]}`;
 }
 
-/** Indicador de dias restantes do trial (canto esquerdo da topbar). */
-function TrialPlanBadge({ user }) {
-  if (!user || user.role !== 'professor' || user.plan_type !== 'trial') return null;
+const PRICING_HASH = '/#pricing';
+
+/** Trial do professor: uma linha, fora do Link do logo (evita link aninhado). Clica → landing #pricing. */
+function SidebarTrialHint({ user }) {
+  const ownerPlanRole = user?.role === 'professor' || user?.role === 'superadmin';
+  if (!user || !ownerPlanRole || user.plan_type !== 'trial') return null;
   const expired =
     user.plan_status === 'expired'
     || (user.trial_days_remaining != null && user.trial_days_remaining <= 0);
+  const linkCls =
+    'block text-xs leading-snug rounded-md -mx-1 px-1 py-0.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400/80';
   if (expired) {
     return (
-      <span className="text-xs font-medium text-red-700 bg-red-50 px-2 py-1 rounded-lg shrink-0 border border-red-100">
+      <a href={PRICING_HASH} className={`${linkCls} font-medium text-red-700 hover:text-red-800 hover:underline`}>
         Trial encerrado
-      </span>
+      </a>
     );
   }
   const n = user.trial_days_remaining;
   if (n == null) return null;
-  const label = n === 1 ? '1 dia restante' : `${n} dias restantes`;
+  const label = n === 1 ? 'Falta 1 dia de trial' : `Faltam ${n} dias de trial`;
   return (
-    <span
-      className="text-xs font-medium text-amber-900 bg-amber-100 px-2 py-1 rounded-lg shrink-0 border border-amber-200/80"
-      title="Período de avaliação: 30 dias a partir da ativação da conta"
+    <a
+      href={PRICING_HASH}
+      className={`${linkCls} font-semibold text-amber-900 hover:text-amber-950 hover:underline`}
+      title="Ver planos e preços"
     >
       {label}
-    </span>
+    </a>
   );
 }
 
@@ -224,7 +230,7 @@ export default function AppLayout() {
 
   function handleLogout() {
     removeToken();
-    window.location.href = '/entrar';
+    window.location.href = '/';
   }
 
   const payload = getTokenPayload();
@@ -287,26 +293,29 @@ export default function AppLayout() {
       >
         {sidebarOpen ? (
           <>
-            <div className="p-4 border-b bg-white flex items-center justify-between shrink-0">
-              <Link to="/app" className="group flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shrink-0">
+            <div className="p-4 border-b bg-white shrink-0">
+              <Link to="/app" className="group flex items-start gap-2">
+                <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shrink-0 mt-0.5">
                   <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
                       d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <h1 className="text-base font-bold text-blue-700 group-hover:text-blue-800 leading-tight">Alumnus</h1>
                   <p className="text-xs text-gray-500 leading-tight">Rede de pesquisa</p>
                 </div>
               </Link>
+              <div className="mt-2 pl-9">
+                <SidebarTrialHint user={currentUser} />
+              </div>
             </div>
             <div className="flex-1 min-h-0 min-w-0 overflow-y-auto">
               <Sidebar
                 researchers={researchers}
                 onRefresh={loadData}
                 role={payload?.role}
-                isAdmin={!!payload?.is_admin}
+                isAdmin={['professor','admin','superadmin'].includes(payload?.role)}
                 remindersRefreshKey={remindersRefreshKey}
                 currentUser={currentUser}
               />
@@ -332,7 +341,7 @@ export default function AppLayout() {
             remindersRefreshKey={remindersRefreshKey}
             currentUser={currentUser}
             role={payload?.role}
-            isAdmin={!!payload?.is_admin}
+            isAdmin={['professor','admin','superadmin'].includes(payload?.role)}
           />
         )}
       </aside>
@@ -346,7 +355,6 @@ export default function AppLayout() {
           }`}
         >
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <TrialPlanBadge user={currentUser} />
             {sidebarOpen && (
               <button
                 type="button"
@@ -393,7 +401,7 @@ export default function AppLayout() {
 
               {settingsOpen && (
                 <div className="absolute right-0 top-full mt-1 w-48 bg-white border rounded-xl shadow-lg z-50 py-1 overflow-hidden">
-                  {payload?.is_admin && (
+                  {['professor','admin','superadmin'].includes(payload?.role) && (
                     <>
                       <button
                         type="button"

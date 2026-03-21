@@ -40,10 +40,11 @@ export function isReminderFromSomeoneElse(reminder) {
   return creatorId !== vid;
 }
 
-/** Criador remove o próprio; sem criador (legado), só professor. */
+/** Privilegiados removem qualquer lembrete; aluno só remove o próprio. */
 export function canDeleteReminder(reminder) {
   const viewerId = viewerUserId();
   if (viewerId == null) return false;
-  if (reminder.created_by_id == null) return getTokenPayload()?.role === 'professor';
+  const role = getTokenPayload()?.role;
+  if (['professor', 'admin', 'superadmin'].includes(role)) return true;
   return normalizeUserId(reminder.created_by_id) === viewerId;
 }

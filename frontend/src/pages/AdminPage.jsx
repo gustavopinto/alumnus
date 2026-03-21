@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAdminStats, getAdminUsers, updateUserRole, deleteUser, deletePendingResearcher } from '../api';
+import { getTokenPayload } from '../auth';
 
-const ROLE_LABELS = { admin: 'Admin', professor: 'Professor', student: 'Aluno' };
+const ROLE_LABELS = { superadmin: 'Superadmin', admin: 'Admin', professor: 'Professor', student: 'Aluno' };
 const ROLE_COLORS = {
-  admin:     'bg-purple-100 text-purple-700 border-purple-200',
-  professor: 'bg-blue-100 text-blue-700 border-blue-200',
-  student:   'bg-green-100 text-green-700 border-green-200',
-  pending:   'bg-gray-100 text-gray-500 border-gray-200',
+  superadmin: 'bg-red-100 text-red-700 border-red-200',
+  admin:      'bg-purple-100 text-purple-700 border-purple-200',
+  professor:  'bg-blue-100 text-blue-700 border-blue-200',
+  student:    'bg-green-100 text-green-700 border-green-200',
+  pending:    'bg-gray-100 text-gray-500 border-gray-200',
 };
 
 function StatCard({ label, value, color = 'text-blue-600' }) {
@@ -30,9 +32,10 @@ export default function AdminPage() {
   const [users, setUsers] = useState([]);
   const [editingId, setEditingId] = useState(undefined);
   const [editRole, setEditRole] = useState('');
-  const [editIsAdmin, setEditIsAdmin] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
+
+  const isSuperadmin = getTokenPayload()?.role === 'superadmin';
 
   function copyInviteLink(u) {
     const token = btoa(u.email);
@@ -43,17 +46,26 @@ export default function AdminPage() {
     });
   }
 
+  const ROLE_ORDER = { superadmin: 0, professor: 1, admin: 2, student: 3 };
+
   async function load() {
     const [s, u] = await Promise.all([getAdminStats(), getAdminUsers()]);
     setStats(s);
-    setUsers(u || []);
+    const sorted = (u || []).sort((a, b) => {
+      if (a.pending !== b.pending) return a.pending ? 1 : -1;
+      const ra = ROLE_ORDER[a.role] ?? 99;
+      const rb = ROLE_ORDER[b.role] ?? 99;
+      if (ra !== rb) return ra - rb;
+      return (a.nome || '').localeCompare(b.nome || '', 'pt-BR');
+    });
+    setUsers(sorted);
   }
 
   useEffect(() => { load(); }, []);
 
   async function handleRoleChange(userId) {
     setSaving(true);
-    await updateUserRole(userId, editRole, editRole === 'admin');
+    await updateUserRole(userId, editRole, ['admin','superadmin'].includes(editRole));
     setEditingId(null);
     setSaving(false);
     load();
@@ -81,14 +93,14 @@ export default function AdminPage() {
         {/* Stats */}
         <section>
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Visão geral</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <StatCard label="Admins"       value={stats?.users_by_role?.admin     ?? 0} color="text-purple-600" />
+          <div className={`grid grid-cols-2 gap-4 ${isSuperadmin ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+            {isSuperadmin && (stats?.users_by_role?.admin ?? 0) > 0 ? (
+              <StatCard label="Admins"       value={stats?.users_by_role?.admin      ?? 0} color="text-purple-600" />
+            ) : null}
             <StatCard label="Professores"  value={stats?.users_by_role?.professor  ?? 0} color="text-blue-600" />
             <StatCard label="Alunos"       value={stats?.users_by_role?.student    ?? 0} color="text-green-600" />
-            <StatCard label="Pendentes"    value={stats?.total_pending             ?? 0} color="text-gray-400" />
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
-            <StatCard label="Pesquisadores" value={stats?.total_researchers}         color="text-indigo-600" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
             <StatCard label="Lembretes"    value={stats?.total_reminders}           color="text-amber-600" />
             <StatCard label="Manual"       value={stats?.total_manual_entries}      color="text-teal-600" />
             <StatCard label="Posts mural"  value={stats?.total_board_posts}         color="text-orange-600" />
@@ -138,13 +150,14 @@ export default function AdminPage() {
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${ROLE_COLORS.pending}`}>
                           Pendente
                         </span>
-                      ) : editingId === u.id ? (
+                      ) : editingId === u.id && isSuperadmin ? (
                         <div className="flex items-center gap-2 flex-wrap">
                           <select
                             value={editRole}
                             onChange={e => setEditRole(e.target.value)}
                             className="border rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-purple-400"
                           >
+                            <option value="superadmin">Superadmin</option>
                             <option value="admin">Admin</option>
                             <option value="professor">Professor</option>
                             <option value="student">Aluno</option>
@@ -168,11 +181,6 @@ export default function AdminPage() {
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${ROLE_COLORS[u.role] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
                             {ROLE_LABELS[u.role] || u.role}
                           </span>
-                          {u.is_admin && u.role !== 'admin' && (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${ROLE_COLORS.admin}`}>
-                              Admin
-                            </span>
-                          )}
                         </div>
                       )}
                     </td>
@@ -201,13 +209,13 @@ export default function AdminPage() {
                             )}
                           </button>
                         )}
-                        {editingId !== u.id && (
+                        {editingId !== u.id && isSuperadmin && (
                           <button
                             onClick={() => {
                               if (u.pending) {
                                 navigate(`/app/profile/${slugify(u.nome)}`);
                               } else {
-                                setEditingId(u.id); setEditRole(u.role); setEditIsAdmin(u.is_admin ?? false);
+                                setEditingId(u.id); setEditRole(u.role);
                               }
                             }}
                             className="p-1.5 rounded text-gray-400 hover:text-purple-600 hover:bg-purple-50 transition-colors"
@@ -218,7 +226,7 @@ export default function AdminPage() {
                             </svg>
                           </button>
                         )}
-                        {editingId !== u.id && (
+                        {editingId !== u.id && isSuperadmin && (
                           <button
                             onClick={() => handleDelete(u)}
                             className="p-1.5 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition-colors"

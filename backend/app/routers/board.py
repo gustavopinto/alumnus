@@ -42,7 +42,7 @@ def delete_post(
         raise HTTPException(status_code=404, detail="Post not found")
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
-    is_professor = current_user.role in ("professor", "admin")
+    is_professor = current_user.role in ("professor", "admin", "superadmin")
     is_author = post.author_id == current_user.id
     if not is_professor and not is_author:
         raise HTTPException(status_code=403, detail="Not allowed")

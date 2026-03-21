@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 function slugify(nome) {
   return (nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -30,9 +31,10 @@ export function renderWithMentions(text, researchers) {
       return <u key={i}>{part.slice(1, -1)}</u>;
     if (part.startsWith('@') && valid.has(part.slice(1)))
       return (
-        <span key={i} className="inline-flex items-center rounded bg-blue-100 px-1 py-0.5 text-[11px] font-semibold text-blue-700 leading-tight">
+        <Link key={i} to={`/app/profile/${part.slice(1)}`}
+          className="inline-flex items-center rounded bg-blue-100 px-1 py-0.5 text-[11px] font-semibold text-blue-700 leading-tight hover:bg-blue-200">
           {part}
-        </span>
+        </Link>
       );
     if (URL_RE.test(part)) {
       URL_RE.lastIndex = 0;

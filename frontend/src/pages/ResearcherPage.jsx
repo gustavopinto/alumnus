@@ -6,6 +6,7 @@ import { DEADLINES, slugify } from '../deadlines';
 import { getTokenPayload } from '../auth';
 import { modKey, isModEnter } from '../platform';
 import Toast from '../components/Toast';
+import { renderWithMentions } from '../mentionUtils.jsx';
 
 const STATUS_LABELS = { graduacao: 'Graduação', mestrado: 'Mestrado', doutorado: 'Doutorado', professor: 'Professor' };
 const STATUS_COLORS = { graduacao: '#3B82F6', mestrado: '#F59E0B', doutorado: '#10B981', professor: '#7C3AED' };
@@ -116,13 +117,29 @@ function buildProfileForm(r) {
   };
 }
 
-function NotesSection({ researcherId, canAdd, isProfessor, currentUserId }) {
+function NotesSection({ researcherId, canAdd, isProfessor, currentUserId, researchers = [] }) {
   const [notes, setNotes] = useState([]);
   const [text, setText] = useState('');
   const [file, setFile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
   const fileRef = useRef();
+  const textareaRef = useRef();
+
+  function wrapFormat(prefix, suffix) {
+    const el = textareaRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const selected = text.slice(start, end);
+    if (!selected) return;
+    const newText = text.slice(0, start) + prefix + selected + suffix + text.slice(end);
+    setText(newText);
+    setTimeout(() => {
+      el.setSelectionRange(start + prefix.length, end + prefix.length);
+      el.focus();
+    }, 0);
+  }
 
   async function load() {
     const data = await getNotes(researcherId);
@@ -169,18 +186,30 @@ function NotesSection({ researcherId, canAdd, isProfessor, currentUserId }) {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-2">
-        <textarea
-          className="w-full border rounded-lg px-3 py-2 text-sm h-24 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
-          placeholder="Nova anotação..."
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (isModEnter(e)) {
-              e.preventDefault();
-              handleSubmit(e);
-            }
-          }}
-        />
+        <div className="border rounded-lg focus-within:ring-2 focus-within:ring-blue-400">
+          <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 border-b rounded-t-lg">
+            <button type="button" onClick={() => wrapFormat('**', '**')}
+              className="w-6 h-6 flex items-center justify-center rounded text-sm font-bold text-gray-700 hover:bg-gray-200 transition-colors" title="Negrito">B</button>
+            <button type="button" onClick={() => wrapFormat('*', '*')}
+              className="w-6 h-6 flex items-center justify-center rounded text-sm italic text-gray-700 hover:bg-gray-200 transition-colors" title="Itálico">I</button>
+            <button type="button" onClick={() => wrapFormat('_', '_')}
+              className="w-6 h-6 flex items-center justify-center rounded text-sm underline text-gray-700 hover:bg-gray-200 transition-colors" title="Sublinhado">S</button>
+            <span className="text-xs text-gray-400 ml-1">Selecione o texto e clique no estilo</span>
+          </div>
+          <textarea
+            ref={textareaRef}
+            className="w-full px-3 py-2 text-sm h-24 resize-none focus:outline-none rounded-b-lg"
+            placeholder="Nova anotação..."
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (isModEnter(e)) {
+                e.preventDefault();
+                handleSubmit(e);
+              }
+            }}
+          />
+        </div>
         <div className="flex items-center gap-3">
           <label className="text-sm text-gray-500 cursor-pointer hover:text-blue-600 flex items-center gap-1">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -205,23 +234,27 @@ function NotesSection({ researcherId, canAdd, isProfessor, currentUserId }) {
     <section className="bg-white rounded-xl shadow-sm border p-6">
       <h2 className="text-lg font-bold text-gray-800 mb-4">Histórico de anotações</h2>
       <div className="max-h-96 overflow-y-auto">
-        <ul className="space-y-4">
+        <ul className="divide-y divide-gray-100">
           {notes.map(note => (
-            <li key={note.id} className="border-l-2 border-blue-200 pl-4">
+            <li key={note.id} className="py-4 first:pt-0 last:pb-0">
               <div className="flex items-center justify-between mb-1">
                 <div>
                   <span className="text-xs text-gray-400">{formatDate(note.created_at)}</span>
                   {note.created_by_name && (
                     <span className="ml-1.5 text-xs text-gray-500">
-                      por <Link to={`/app/profile/${slugify(note.created_by_name)}`} className="hover:underline hover:text-gray-700">{note.created_by_name}</Link>
+                      por <Link to={`/app/profile/${slugify(note.created_by_name)}`} className="font-semibold text-gray-700 hover:underline hover:text-blue-600">{note.created_by_name}</Link>
                     </span>
                   )}
                 </div>
                 {(isProfessor || note.created_by_id === currentUserId) && (
-                  <button onClick={() => handleDelete(note.id)} className="text-xs text-red-400 hover:text-red-600">remover</button>
+                  <button onClick={() => handleDelete(note.id)} title="Remover anotação" className="p-1 rounded text-red-400 hover:text-red-600 hover:bg-red-50">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 )}
               </div>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.text}</p>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{renderWithMentions(note.text, researchers)}</p>
               {note.file_url && (
                 <a href={note.file_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 mt-1 text-xs text-blue-600 hover:underline">
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -574,7 +607,7 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
 
 export default function ResearcherPage() {
   const { slug } = useParams();
-  const { setProfileTopbar } = useAppLayout();
+  const { setProfileTopbar, researchers = [] } = useAppLayout();
   const [researcher, setResearcher] = useState(null);
   const [researcherUser, setResearcherUser] = useState(null);
   const [myDeadlines, setMyDeadlines] = useState([]);
@@ -678,7 +711,7 @@ export default function ResearcherPage() {
             </div>
           </section>
         )}
-        <NotesSection researcherId={researcher.id} canAdd={isProfessor || isOwnProfile} isProfessor={isProfessor} currentUserId={payload?.sub != null ? Number(payload.sub) : null} />
+        <NotesSection researcherId={researcher.id} canAdd={isProfessor || isOwnProfile} isProfessor={isProfessor} currentUserId={payload?.sub != null ? Number(payload.sub) : null} researchers={researchers} />
       </main>
     </div>
   );

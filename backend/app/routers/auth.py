@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import User
 from ..schemas import RegisterRequest, LoginRequest, TokenOut, UserOut
-from ..plan import refresh_user_plan_status, user_to_out
+from ..plan import ensure_professor_plan_defaults, refresh_user_plan_status, user_to_out
 from ..deps import get_current_user, SECRET_KEY, ALGORITHM
 from ..services import auth_service
 
@@ -26,7 +26,7 @@ def make_token(user: User) -> str:
         "nome": user.nome,
         "email": user.email,
         "role": user.role,
-        "is_admin": user.is_admin,
+        "is_admin": user.role in ("admin", "superadmin"),
         "researcher_id": user.researcher_id,
         "exp": datetime.utcnow() + timedelta(hours=EXPIRE_H),
     }
@@ -57,11 +57,15 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
     auth_service.record_login(db, user)
     refresh_user_plan_status(db, user)
+    if ensure_professor_plan_defaults(user):
+        db.commit()
     return TokenOut(access_token=make_token(user))
 
 
 @router.get("/me", response_model=UserOut)
 def me(current: User = Depends(get_current_user), db: Session = Depends(get_db)):
     refresh_user_plan_status(db, current)
+    if ensure_professor_plan_defaults(current):
+        db.commit()
     db.refresh(current)
     return user_to_out(current)

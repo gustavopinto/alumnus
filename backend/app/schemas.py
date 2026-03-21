@@ -207,7 +207,7 @@ class UserOut(BaseModel):
     researcher_id: Optional[int]
     last_login:    Optional[datetime]
     created_at:    datetime
-    plan_type:     Optional[str] = None  # trial, monthly, annual — só professor
+    plan_type:     Optional[str] = None  # trial, monthly, annual — professor/superadmin
     plan_status:   Optional[str] = None  # active, expired
     account_activated_at: Optional[datetime] = None
     plan_period_ends_at: Optional[datetime] = None

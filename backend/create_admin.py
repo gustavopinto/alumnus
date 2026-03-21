@@ -21,7 +21,7 @@ pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Criar usuário admin")
+    parser = argparse.ArgumentParser(description="Criar usuário superadmin")
     parser.add_argument("--email",    default="admin@alumnus.local")
     parser.add_argument("--nome",     default="Admin")
     parser.add_argument("--password", default="admin123")
@@ -29,13 +29,15 @@ def main():
 
     with Session() as db:
         from app.models import User
+        from app.plan import clear_plan
 
         existing = db.query(User).filter(User.email == args.email).first()
         if existing:
             existing.password_hash = pwd_ctx.hash(args.password)
-            existing.role = "admin"
+            existing.role = "superadmin"
+            clear_plan(existing)
             db.commit()
-            print(f"✓ Usuário '{args.email}' atualizado para admin.")
+            print(f"✓ Usuário '{args.email}' atualizado para superadmin.")
         else:
             user = User(
                 email=args.email,
@@ -46,7 +48,7 @@ def main():
             )
             db.add(user)
             db.commit()
-            print(f"✓ Admin criado: {args.email} / {args.password}")
+            print(f"✓ Superadmin criado: {args.email} / {args.password}")
             print("  Altere a senha após o primeiro acesso.")
 
 

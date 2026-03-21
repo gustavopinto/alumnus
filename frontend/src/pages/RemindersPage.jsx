@@ -260,7 +260,11 @@ export default function RemindersPage() {
                           </span>
                         )}
                         <span className="text-xs text-gray-400">
-                          Por <span className="font-semibold text-gray-600">{creatorDisplayName(r, creatorOpts)}</span>
+                          Por{' '}
+                          {r.created_by_name
+                            ? <a href={`/app/profile/${slugify(r.created_by_name)}`} className="font-semibold text-gray-600 hover:text-blue-600 hover:underline">{creatorDisplayName(r, creatorOpts)}</a>
+                            : <span className="font-semibold text-gray-600">{creatorDisplayName(r, creatorOpts)}</span>
+                          }
                         </span>
                       </div>
                     </div>
@@ -272,8 +276,8 @@ export default function RemindersPage() {
                         aria-label="Remover lembrete"
                         className="p-1 rounded text-red-400 hover:text-red-600 hover:bg-red-50 shrink-0 mt-0.5"
                       >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
                     )}
@@ -313,7 +317,11 @@ export default function RemindersPage() {
                         </span>
                       )}
                       <span className="text-xs text-gray-400">
-                        Por <span className="font-semibold text-gray-500">{creatorDisplayName(r, creatorOpts)}</span>
+                        Por{' '}
+                        {r.created_by_name
+                          ? <a href={`/app/profile/${slugify(r.created_by_name)}`} className="font-semibold text-gray-500 hover:text-blue-600 hover:underline">{creatorDisplayName(r, creatorOpts)}</a>
+                          : <span className="font-semibold text-gray-500">{creatorDisplayName(r, creatorOpts)}</span>
+                        }
                       </span>
                     </div>
                   </div>
@@ -325,8 +333,8 @@ export default function RemindersPage() {
                       aria-label="Remover lembrete"
                       className="p-1 rounded text-red-400 hover:text-red-600 hover:bg-red-50 shrink-0 ml-auto mt-0.5"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                       </svg>
                     </button>
                   )}

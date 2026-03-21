@@ -9,7 +9,7 @@ from ..schemas import (
     ManualCommentCreate,
     ManualCommentOut,
 )
-from ..deps import get_current_user
+from ..deps import get_current_user, is_privileged
 from ..services import manual_service
 
 router = APIRouter(prefix="/manual", tags=["manual"])
@@ -40,8 +40,12 @@ def delete_entry(
     entry = manual_service.get_entry(db, entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
-    if entry.author_id is None or entry.author_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Só quem criou a entrada pode removê-la")
+    is_author = entry.author_id is not None and entry.author_id == current_user.id
+    if not is_author and not is_privileged(current_user):
+        raise HTTPException(
+            status_code=403,
+            detail="Só o autor ou um moderador (professor, admin ou superadmin) pode remover a entrada",
+        )
     manual_service.delete_entry(db, entry)
     return {"status": "ok"}
 
@@ -82,7 +86,11 @@ def delete_comment(
     comment = manual_service.get_comment(db, comment_id)
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
-    if comment.author_id is None or comment.author_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Só quem escreveu o comentário pode removê-lo")
+    is_author = comment.author_id is not None and comment.author_id == current_user.id
+    if not is_author and not is_privileged(current_user):
+        raise HTTPException(
+            status_code=403,
+            detail="Só o autor ou um moderador (professor, admin ou superadmin) pode remover o comentário",
+        )
     manual_service.delete_comment(db, comment)
     return {"status": "ok"}

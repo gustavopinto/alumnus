@@ -162,9 +162,9 @@ def update(db: Session, reminder: Reminder, data: ReminderUpdate) -> Reminder:
 
 
 def can_user_delete_reminder(user: User, reminder: Reminder) -> bool:
-    """Criador remove o próprio lembrete; sem criador (legado), só professor."""
-    if reminder.created_by_id is None:
-        return user.role in ("professor", "admin")
+    """Privilegiados removem qualquer lembrete; aluno só remove o próprio."""
+    if user.role in ("professor", "admin", "superadmin"):
+        return True
     return reminder.created_by_id == user.id
 
 

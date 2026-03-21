@@ -1,10 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { modKey, isModEnter } from '../platform';
+
+function slugify(nome) {
+  return (nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
+}
 import {
   getManualEntries, createManualEntry, deleteManualEntry,
   toggleManualVote, addManualComment, deleteManualComment,
 } from '../api';
-import { getTokenPayload } from '../auth';
+import { getTokenPayload, isDashboardRole } from '../auth';
 
 function renderFormatted(text) {
   const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_)/g);
@@ -73,7 +79,7 @@ function sameUser(a, b) {
   return Number(a) === Number(b);
 }
 
-function EntryCard({ entry, authUserId, onVote, onDelete, onCommentAdded, onCommentDeleted }) {
+function EntryCard({ entry, authUserId, canModerate, onVote, onDelete, onCommentAdded, onCommentDeleted }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -109,7 +115,7 @@ function EntryCard({ entry, authUserId, onVote, onDelete, onCommentAdded, onComm
     return new Date(iso).toLocaleDateString('pt-BR');
   }
 
-  const canDeleteEntry = sameUser(entry.author_id, authUserId);
+  const canDeleteEntry = sameUser(entry.author_id, authUserId) || canModerate;
 
   return (
     <article className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -153,7 +159,7 @@ function EntryCard({ entry, authUserId, onVote, onDelete, onCommentAdded, onComm
 
             <p className="text-xs text-gray-500 mt-1.5">
               {entry.author_name ? (
-                <>Por <span className="font-medium text-gray-700">{entry.author_name}</span></>
+                <>Por <Link to={`/app/profile/${slugify(entry.author_name)}`} className="font-medium text-gray-700 hover:text-blue-600 hover:underline">{entry.author_name}</Link></>
               ) : (
                 <span className="italic">Autor desconhecido</span>
               )}
@@ -196,11 +202,14 @@ function EntryCard({ entry, authUserId, onVote, onDelete, onCommentAdded, onComm
                 {entry.comments.map(c => (
                   <div key={c.id} className="flex gap-2 group/comment">
                     <div className="flex-1 min-w-0">
-                      <span className="text-xs font-semibold text-gray-600">{c.author_name || 'Anônimo'} </span>
+                      {c.author_name
+                        ? <Link to={`/app/profile/${slugify(c.author_name)}`} className="text-xs font-semibold text-gray-600 hover:text-blue-600 hover:underline">{c.author_name}</Link>
+                        : <span className="text-xs font-semibold text-gray-600">Anônimo</span>
+                      }{' '}
                       <span className="text-xs text-gray-400">{formatDate(c.created_at)}</span>
                       <p className="text-xs text-gray-700 mt-0.5 whitespace-pre-wrap">{c.text}</p>
                     </div>
-                    {sameUser(c.author_id, authUserId) && (
+                    {(sameUser(c.author_id, authUserId) || canModerate) && (
                       <button
                         type="button"
                         onClick={() => handleDeleteComment(c.id)}
@@ -248,7 +257,7 @@ export default function ManualPage() {
   const [answer, setAnswer] = useState('');
   const [saving, setSaving] = useState(false);
   const payload = getTokenPayload();
-  const isProfessor = payload?.role === 'professor' || payload?.role === 'admin';
+  const canModerateManual = isDashboardRole(payload?.role);
   const authUserId = payload?.sub != null ? Number(payload.sub) : null;
 
   async function load() {
@@ -338,6 +347,7 @@ export default function ManualPage() {
               key={entry.id}
               entry={entry}
               authUserId={authUserId}
+              canModerate={canModerateManual}
               onVote={load}
               onDelete={handleDelete}
               onCommentAdded={load}

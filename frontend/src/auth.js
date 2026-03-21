@@ -18,8 +18,16 @@ export function getTokenPayload() {
   }
 }
 
-/** Verifica se o perfil tem acesso elevado (professor ou admin). */
-export const isPrivileged = (role) => role === 'professor' || role === 'admin';
+/** Papéis com acesso ao dashboard admin (alinhado ao backend). */
+export const DASHBOARD_ROLES = ['professor', 'admin', 'superadmin'];
+
+export function isDashboardRole(role) {
+  if (role == null || typeof role !== 'string') return false;
+  return DASHBOARD_ROLES.includes(role.trim());
+}
+
+/** Verifica se o perfil tem acesso elevado (professor, admin ou superadmin). */
+export const isPrivileged = (role) => isDashboardRole(role);
 
 export async function getMe() {
   const token = getToken();

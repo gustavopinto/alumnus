@@ -1,29 +1,59 @@
-from datetime import datetime
-from typing import Optional
-
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import func, case
-from sqlalchemy.orm import Session
+from sqlalchemy import and_, func, or_
+from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
-from ..deps import require_admin
+from ..deps import require_dashboard, require_superadmin
 from ..models import User, Researcher, Reminder, BoardPost, ManualEntry, Note
 from ..plan import clear_plan, ensure_professor_plan_defaults
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
+VALID_ROLES = ("professor", "admin", "student", "superadmin")
+
+# Ordem na listagem /admin/users: superadmin → professor (e admin) → alunos; depois nome.
+_ADMIN_USER_LIST_ROLE_ORDER = {
+    "superadmin": 0,
+    "professor": 1,
+    "admin": 1,
+    "student": 2,
+}
+
 
 class UserRoleUpdate(BaseModel):
     role: str
-    is_admin: bool = False
 
 
-@router.get("/stats")
-def get_stats(db: Session = Depends(get_db), _: User = Depends(require_admin)):
-    role_counts = db.query(User.role, func.count(User.id)).group_by(User.role).all()
-    by_role = {role: cnt for role, cnt in role_counts}
-    by_role["admin"] = db.query(func.count(User.id)).filter(User.is_admin.is_(True)).scalar()
+def _is_superadmin(user: User) -> bool:
+    return user.role == "superadmin"
+
+
+def _stats_global(db: Session, hide_superadmin_count: bool) -> dict:
+    """Estatísticas globais; se hide_superadmin_count, não expõe quantidade de superadmins."""
+    if hide_superadmin_count:
+        role_counts = (
+            db.query(User.role, func.count(User.id))
+            .filter(User.role != "superadmin")
+            .group_by(User.role)
+            .all()
+        )
+        by_role = {role: cnt for role, cnt in role_counts}
+        users_by_role = {
+            "superadmin": 0,
+            "admin":      by_role.get("admin", 0),
+            "professor":  by_role.get("professor", 0),
+            "student":    by_role.get("student", 0),
+        }
+    else:
+        role_counts = db.query(User.role, func.count(User.id)).group_by(User.role).all()
+        by_role = {role: cnt for role, cnt in role_counts}
+        users_by_role = {
+            "superadmin": by_role.get("superadmin", 0),
+            "admin":      by_role.get("admin", 0),
+            "professor":  by_role.get("professor", 0),
+            "student":    by_role.get("student", 0),
+        }
 
     researchers, pending = db.query(
         func.count(Researcher.id).filter(Researcher.ativo.is_(True)),
@@ -31,11 +61,7 @@ def get_stats(db: Session = Depends(get_db), _: User = Depends(require_admin)):
     ).one()
 
     return {
-        "users_by_role": {
-            "admin":     by_role.get("admin", 0),
-            "professor": by_role.get("professor", 0),
-            "student":   by_role.get("student", 0),
-        },
+        "users_by_role":        users_by_role,
         "total_researchers":    researchers,
         "total_pending":        pending,
         "total_reminders":      db.query(func.count(Reminder.id)).scalar(),
@@ -45,17 +71,20 @@ def get_stats(db: Session = Depends(get_db), _: User = Depends(require_admin)):
     }
 
 
+# ── Stats ─────────────────────────────────────────────────────────────────────
+
+@router.get("/stats")
+def get_stats(db: Session = Depends(get_db), current: User = Depends(require_dashboard)):
+    # Superadmin: tudo. Professor/admin: totais globais, mas sem revelar quantos superadmins existem.
+    return _stats_global(db, hide_superadmin_count=not _is_superadmin(current))
+
+
+# ── Users list ────────────────────────────────────────────────────────────────
+
 @router.get("/users")
-def list_users(db: Session = Depends(get_db), _: User = Depends(require_admin)):
-    users = db.query(User).order_by(User.role, User.nome).all()
-
-    pending = db.query(Researcher).filter(
-        Researcher.ativo.is_(True),
-        Researcher.registered.is_(False),
-    ).order_by(Researcher.nome).all()
-
-    result = [
-        {
+def list_users(db: Session = Depends(get_db), current: User = Depends(require_dashboard)):
+    def _serialize_user(u: User) -> dict:
+        return {
             "id": u.id,
             "email": u.email,
             "nome": u.nome,
@@ -69,11 +98,9 @@ def list_users(db: Session = Depends(get_db), _: User = Depends(require_admin)):
             "created_at": u.created_at,
             "pending": False,
         }
-        for u in users
-    ]
 
-    result += [
-        {
+    def _serialize_pending(r: Researcher) -> dict:
+        return {
             "id": None,
             "email": r.email or "—",
             "nome": r.nome,
@@ -86,42 +113,81 @@ def list_users(db: Session = Depends(get_db), _: User = Depends(require_admin)):
             "photo_url": r.photo_thumb_url or r.photo_url,
             "pending": True,
         }
-        for r in pending
-    ]
 
-    return result
+    if _is_superadmin(current):
+        users = (
+            db.query(User)
+            .options(joinedload(User.researcher))
+            .all()
+        )
+    else:
+        # Professor/admin: todos, exceto superadmin “puro” (sem perfil de pesquisador).
+        # Orientadores costumam estar como superadmin após migrações; com researcher_id entram na lista.
+        users = (
+            db.query(User)
+            .options(joinedload(User.researcher))
+            .filter(
+                or_(
+                    User.role != "superadmin",
+                    and_(User.role == "superadmin", User.researcher_id.isnot(None)),
+                )
+            )
+            .all()
+        )
 
+    pending = db.query(Researcher).filter(
+        Researcher.ativo.is_(True),
+        Researcher.registered.is_(False),
+    ).all()
+
+    def _user_sort_key(u: User) -> tuple:
+        role_rank = _ADMIN_USER_LIST_ROLE_ORDER.get(u.role, 99)
+        return (role_rank, (u.nome or "").strip().lower())
+
+    users_sorted = sorted(users, key=_user_sort_key)
+    pending_sorted = sorted(pending, key=lambda r: (r.nome or "").strip().lower())
+
+    return [_serialize_user(u) for u in users_sorted] + [_serialize_pending(r) for r in pending_sorted]
+
+
+# ── Role update (superadmin only) ─────────────────────────────────────────────
 
 @router.put("/users/{user_id}")
 def update_user(
     user_id: int,
     data: UserRoleUpdate,
     db: Session = Depends(get_db),
-    current: User = Depends(require_admin),
+    current: User = Depends(require_superadmin),
 ):
     if user_id == current.id:
         raise HTTPException(status_code=400, detail="Você não pode alterar o próprio perfil")
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
-    if data.role not in ("admin", "professor", "student"):
+    if data.role not in VALID_ROLES:
         raise HTTPException(status_code=400, detail="Perfil inválido")
+
     old_role = user.role
     user.role = data.role
-    user.is_admin = data.is_admin
-    if data.role != "professor":
+    user.is_admin = data.role in ("admin", "superadmin")
+
+    # Assinatura só em professor/superadmin; aluno e admin sem registro de plano.
+    if data.role in ("student", "admin"):
         clear_plan(user)
-    elif old_role != "professor":
+    elif data.role in ("professor", "superadmin") and old_role not in ("professor", "superadmin"):
         ensure_professor_plan_defaults(user)
+
     db.commit()
     return {"id": user.id, "role": user.role, "is_admin": user.is_admin}
 
+
+# ── Delete user (superadmin only) ─────────────────────────────────────────────
 
 @router.delete("/users/{user_id}", status_code=204)
 def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
-    current: User = Depends(require_admin),
+    current: User = Depends(require_superadmin),
 ):
     if user_id == current.id:
         raise HTTPException(status_code=400, detail="Você não pode remover a própria conta")
@@ -132,11 +198,13 @@ def delete_user(
     db.commit()
 
 
+# ── Delete pending researcher (superadmin only) ────────────────────────────────
+
 @router.delete("/researchers/{researcher_id}", status_code=204)
 def delete_pending_researcher(
     researcher_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_superadmin),
 ):
     researcher = db.query(Researcher).filter(Researcher.id == researcher_id).first()
     if not researcher:

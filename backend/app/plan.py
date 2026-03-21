@@ -32,8 +32,8 @@ def now_naive_utc() -> datetime:
 
 
 def is_plan_user(user: User) -> bool:
-    """Plano (trial/mensal/anual) aplica-se apenas a contas de professor."""
-    return user.role == "professor"
+    """Plano (trial/mensal/anual): professor e superadmin. Aluno e admin sem assinatura na base."""
+    return user.role in ("professor", "superadmin")
 
 
 def clear_plan(user: User) -> None:
@@ -43,17 +43,18 @@ def clear_plan(user: User) -> None:
     user.plan_period_ends_at = None
 
 
-def ensure_professor_plan_defaults(user: User) -> None:
-    """Garante trial padrão ao promover alguém a professor (sem sobrescrever plano existente)."""
+def ensure_professor_plan_defaults(user: User) -> bool:
+    """Garante trial padrão para professor/superadmin sem plano (ex.: migração ou promoção de papel)."""
     if not is_plan_user(user):
-        return
+        return False
     if user.plan_type is not None:
-        return
+        return False
     now = datetime.utcnow()
     user.plan_type = PLAN_TRIAL
     user.plan_status = STATUS_ACTIVE
     user.account_activated_at = now
     user.plan_period_ends_at = trial_period_end(now)
+    return True
 
 
 def refresh_user_plan_status(db: Session, user: User) -> None:
