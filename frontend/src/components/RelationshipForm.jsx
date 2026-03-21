@@ -8,7 +8,7 @@ const TYPES = [
   { value: 'mesmo_laboratorio', label: 'Mesmo Laboratório' },
 ];
 
-export default function RelationshipForm({ students, onSaved, onCancel }) {
+export default function RelationshipForm({ researchers, onSaved, onCancel }) {
   const [form, setForm] = useState({ source_researcher_id: '', target_researcher_id: '', relation_type: 'orienta' });
 
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
@@ -29,12 +29,12 @@ export default function RelationshipForm({ students, onSaved, onCancel }) {
 
       <select className="w-full border rounded px-3 py-2 text-sm" required value={form.source_researcher_id} onChange={set('source_researcher_id')}>
         <option value="">Pesquisador origem...</option>
-        {students.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+        {researchers.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
       </select>
 
       <select className="w-full border rounded px-3 py-2 text-sm" required value={form.target_researcher_id} onChange={set('target_researcher_id')}>
         <option value="">Pesquisador destino...</option>
-        {students.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+        {researchers.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
       </select>
 
       <select className="w-full border rounded px-3 py-2 text-sm" value={form.relation_type} onChange={set('relation_type')}>

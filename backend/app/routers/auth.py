@@ -49,6 +49,7 @@ def register(data: RegisterRequest, db: Session = Depends(get_db)):
 def login(data: LoginRequest, db: Session = Depends(get_db)):
     user = auth_service.authenticate(db, data.email, data.password, pwd_ctx)
     if not user:
+        logger.warning("Login falhou: email=%s", data.email)
         raise HTTPException(status_code=401, detail="Credenciais inválidas")
     auth_service.record_login(db, user)
     return TokenOut(access_token=make_token(user))

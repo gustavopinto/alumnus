@@ -1,11 +1,19 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from ..models import ManualComment, ManualEntry, ManualVote
 from ..schemas import ManualEntryCreate
 
 
 def list_entries_ordered(db: Session) -> list[ManualEntry]:
-    entries = db.query(ManualEntry).all()
+    entries = (
+        db.query(ManualEntry)
+        .options(
+            joinedload(ManualEntry.author),
+            joinedload(ManualEntry.votes),
+            joinedload(ManualEntry.comments).joinedload(ManualComment.author),
+        )
+        .all()
+    )
     return sorted(entries, key=lambda e: (-len(e.votes), e.created_at))
 
 

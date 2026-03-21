@@ -9,10 +9,10 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import StudentNode from './StudentNode';
+import ResearcherNode from './StudentNode';
 import { updateLayout } from '../api';
 
-const nodeTypes = { researcher: StudentNode };
+const nodeTypes = { researcher: ResearcherNode };
 
 export default function GraphView({ initialNodes, initialEdges }) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);

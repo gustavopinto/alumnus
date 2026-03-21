@@ -4,7 +4,7 @@ import GraphView from './components/GraphView';
 import Sidebar from './components/Sidebar';
 import Legend from './components/Legend';
 import ProtectedRoute from './components/ProtectedRoute';
-import StudentPage from './pages/StudentPage';
+import ResearcherPage from './pages/StudentPage';
 import RemindersPage from './pages/RemindersPage';
 import BoardPage from './pages/BoardPage';
 import ManualPage from './pages/ManualPage';
@@ -55,7 +55,7 @@ function GraphPage() {
               Sair
             </button>
           </div>
-          <Sidebar students={researchers} onRefresh={loadData} role={getTokenPayload()?.role} />
+          <Sidebar researchers={researchers} onRefresh={loadData} role={getTokenPayload()?.role} />
           <Footer />
         </aside>
       )}
@@ -94,7 +94,7 @@ export default function App() {
       } />
       <Route path="/profile/:slug" element={
         <ProtectedRoute>
-          <StudentPage />
+          <ResearcherPage />
         </ProtectedRoute>
       } />
       <Route path="/reminders" element={

@@ -4,28 +4,28 @@ import Toast from './Toast';
 
 const EMPTY = { nome: '', status: 'graduacao', email: '', observacoes: '', photo_url: '', orientador_id: '', matricula: '', curso: '', enrollment_date: '' };
 
-export default function StudentForm({ student, students, onSaved, onCancel }) {
+export default function ResearcherForm({ researcher, researchers, onSaved, onCancel }) {
   const [form, setForm] = useState(EMPTY);
   const [uploading, setUploading] = useState(false);
   const [toast, setToast] = useState('');
 
   useEffect(() => {
-    if (student) {
+    if (researcher) {
       setForm({
-        nome: student.nome || '',
-        status: student.status || 'graduacao',
-        email: student.email || '',
-        observacoes: student.observacoes || '',
-        photo_url: student.photo_url || '',
-        orientador_id: student.orientador_id || '',
-        matricula: student.matricula || '',
-        curso: student.curso || '',
-        enrollment_date: student.enrollment_date || '',
+        nome: researcher.nome || '',
+        status: researcher.status || 'graduacao',
+        email: researcher.email || '',
+        observacoes: researcher.observacoes || '',
+        photo_url: researcher.photo_url || '',
+        orientador_id: researcher.orientador_id || '',
+        matricula: researcher.matricula || '',
+        curso: researcher.curso || '',
+        enrollment_date: researcher.enrollment_date || '',
       });
     } else {
       setForm(EMPTY);
     }
-  }, [student]);
+  }, [researcher]);
 
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
 
@@ -44,8 +44,8 @@ export default function StudentForm({ student, students, onSaved, onCancel }) {
       ...form,
       orientador_id: form.orientador_id ? Number(form.orientador_id) : null,
     };
-    if (student) {
-      await updateResearcher(student.id, payload);
+    if (researcher) {
+      await updateResearcher(researcher.id, payload);
       setToast('Pesquisador atualizado com sucesso');
     } else {
       await createResearcher(payload);
@@ -58,7 +58,7 @@ export default function StudentForm({ student, students, onSaved, onCancel }) {
     <>
     <Toast message={toast} onClose={() => setToast('')} />
     <form onSubmit={handleSubmit} className="space-y-3">
-      <h3 className="font-bold text-lg">{student ? 'Editar Pesquisador' : 'Novo Pesquisador'}</h3>
+      <h3 className="font-bold text-lg">{researcher ? 'Editar Pesquisador' : 'Novo Pesquisador'}</h3>
 
       <input className="w-full border rounded px-3 py-2 text-sm" placeholder="Nome *" required value={form.nome} onChange={set('nome')} />
 
@@ -73,7 +73,7 @@ export default function StudentForm({ student, students, onSaved, onCancel }) {
 
       <select className="w-full border rounded px-3 py-2 text-sm" value={form.orientador_id} onChange={set('orientador_id')}>
         <option value="">Sem orientador</option>
-        {students.filter((s) => !student || s.id !== student.id).map((s) => (
+        {researchers.filter((s) => !researcher || s.id !== researcher.id).map((s) => (
           <option key={s.id} value={s.id}>{s.nome}</option>
         ))}
       </select>
@@ -107,7 +107,7 @@ export default function StudentForm({ student, students, onSaved, onCancel }) {
 
       <div className="flex gap-2">
         <button type="submit" className="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700">
-          {student ? 'Salvar' : 'Criar'}
+          {researcher ? 'Salvar' : 'Criar'}
         </button>
         <button type="button" onClick={onCancel} className="bg-gray-200 px-4 py-2 rounded text-sm hover:bg-gray-300">
           Cancelar

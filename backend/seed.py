@@ -4,7 +4,7 @@ import sys
 sys.path.insert(0, "/app")
 
 from app.database import SessionLocal, engine
-from app.models import Base, Student, Relationship, GraphLayout
+from app.models import Base, Researcher, Relationship, GraphLayout
 
 Base.metadata.create_all(bind=engine)
 db = SessionLocal()
@@ -12,11 +12,11 @@ db = SessionLocal()
 # Clear existing data
 db.query(Relationship).delete()
 db.query(GraphLayout).delete()
-db.query(Student).delete()
+db.query(Researcher).delete()
 db.commit()
 
 # --- Professor (orientador) ---
-professor = Student(
+professor = Researcher(
     nome="Gustavo Pinto",
     status="professor",
     ativo=True,
@@ -25,7 +25,7 @@ db.add(professor)
 db.flush()
 
 # --- Alunos ---
-students_data = [
+researchers_data = [
     {"nome": "Emmanuel Dias Pereira", "status": "doutorado"},
     {"nome": "Leandro Veloso Dos Santos", "status": "mestrado"},
     {"nome": "Dannilo Cabral Rabelo", "status": "mestrado"},
@@ -35,19 +35,19 @@ students_data = [
     {"nome": "Daniel Naiff Da Costa", "status": "graduacao"},
 ]
 
-student_objs = []
-for s in students_data:
-    obj = Student(nome=s["nome"], status=s["status"], orientador_id=professor.id, ativo=True)
+researcher_objs = []
+for s in researchers_data:
+    obj = Researcher(nome=s["nome"], status=s["status"], orientador_id=professor.id, ativo=True)
     db.add(obj)
-    student_objs.append(obj)
+    researcher_objs.append(obj)
 
 db.flush()
 
 # --- Relações de orientação ---
-for obj in student_objs:
+for obj in researcher_objs:
     db.add(Relationship(
-        source_student_id=professor.id,
-        target_student_id=obj.id,
+        source_researcher_id=professor.id,
+        target_researcher_id=obj.id,
         relation_type="orienta",
     ))
 
@@ -57,8 +57,8 @@ cx, cy = 600, 50
 positions[str(professor.id)] = {"x": cx, "y": cy}
 
 node_w, node_h = 200, 130  # largura e altura estimada dos nós com margem
-row1 = student_objs[:4]  # primeira fileira: 4 alunos
-row2 = student_objs[4:]  # segunda fileira: 3 alunos
+row1 = researcher_objs[:4]  # primeira fileira: 4 pesquisadores
+row2 = researcher_objs[4:]  # segunda fileira: 3 pesquisadores
 
 for i, obj in enumerate(row1):
     x = cx - ((len(row1) - 1) * node_w / 2) + i * node_w
@@ -75,4 +75,4 @@ db.add(GraphLayout(name="default", layout_jsonb=positions))
 db.commit()
 db.close()
 
-print(f"Seed complete: 1 professor + {len(student_objs)} students + {len(student_objs)} relationships")
+print(f"Seed complete: 1 professor + {len(researcher_objs)} researchers + {len(researcher_objs)} relationships")

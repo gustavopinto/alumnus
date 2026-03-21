@@ -42,8 +42,8 @@ def delete_entry(
     entry = manual_service.get_entry(db, entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
-    if current_user.role != "professor":
-        raise HTTPException(status_code=403, detail="Only professors can delete entries")
+    if entry.author_id is None or entry.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Só quem criou a entrada pode removê-la")
     manual_service.delete_entry(db, entry)
     return {"status": "ok"}
 
@@ -84,7 +84,7 @@ def delete_comment(
     comment = manual_service.get_comment(db, comment_id)
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
-    if current_user.role != "professor" and comment.author_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not allowed")
+    if comment.author_id is None or comment.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Só quem escreveu o comentário pode removê-lo")
     manual_service.delete_comment(db, comment)
     return {"status": "ok"}

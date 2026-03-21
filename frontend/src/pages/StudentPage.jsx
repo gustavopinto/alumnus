@@ -372,7 +372,7 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
   );
 }
 
-export default function StudentPage() {
+export default function ResearcherPage() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const [researcher, setResearcher] = useState(null);

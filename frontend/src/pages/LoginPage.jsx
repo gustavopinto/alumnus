@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { saveToken } from '../auth';
+import { formatApiDetail, readResponseJson } from '../apiErrors';
 
 function slugify(nome) {
   return (nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -19,28 +20,83 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError('');
-
-    const res  = await fetch('/api/auth/login', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(form),
-    });
-    const data = await res.json();
-    setLoading(false);
-
-    if (!res.ok) { setError(data.detail || 'Erro ao fazer login'); return; }
-
-    saveToken(data.access_token);
-    const payload = JSON.parse(atob(data.access_token.split('.')[1]));
-
-    if (payload.role === 'student') {
-      const stuRes = await fetch(`/api/researchers/${payload.researcher_id}`, {
-        headers: { Authorization: `Bearer ${data.access_token}` },
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
       });
-      const stu = await stuRes.json();
-      navigate(`/profile/${slugify(stu.nome)}`, { replace: true });
-    } else {
-      navigate('/', { replace: true });
+      const data = await readResponseJson(res, 'login');
+
+      if (data._invalidJson) {
+        setError(
+          res.ok
+            ? 'Resposta inválida do servidor.'
+            : `Não foi possível processar a resposta (${res.status}). Tente novamente.`,
+        );
+        return;
+      }
+
+      if (!res.ok) {
+        const msg = formatApiDetail(data) || 'Erro ao fazer login';
+        console.error('[login] Falha na API', { status: res.status, body: data });
+        setError(msg);
+        return;
+      }
+
+      if (!data.access_token) {
+        console.error('[login] Resposta sem access_token', data);
+        setError('Resposta inesperada do servidor.');
+        return;
+      }
+
+      saveToken(data.access_token);
+      let payload;
+      try {
+        payload = JSON.parse(atob(data.access_token.split('.')[1]));
+      } catch (err) {
+        console.error('[login] Token JWT ilegível', err);
+        setError('Sessão inválida recebida do servidor.');
+        return;
+      }
+
+      if (payload.role === 'student') {
+        const stuRes = await fetch(`/api/researchers/${payload.researcher_id}`, {
+          headers: { Authorization: `Bearer ${data.access_token}` },
+        });
+        const stu = await readResponseJson(stuRes, 'login.profile');
+        if (stu._invalidJson) {
+          console.error('[login] Perfil: JSON inválido', stuRes.status);
+          setError('Login ok, mas a resposta do perfil veio inválida. Tente de novo.');
+          return;
+        }
+        if (!stuRes.ok) {
+          const msg = formatApiDetail(stu) || 'Não foi possível carregar seu perfil.';
+          console.error('[login] Falha ao buscar pesquisador', { status: stuRes.status, body: stu });
+          setError(msg);
+          return;
+        }
+        if (!stu.nome) {
+          console.error('[login] Perfil sem nome', stu);
+          setError('Perfil incompleto. Contate o suporte.');
+          return;
+        }
+        navigate(`/profile/${slugify(stu.nome)}`, { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
+    } catch (err) {
+      console.error('[login] Erro inesperado', err);
+      const offline =
+        err instanceof TypeError ||
+        (typeof err?.message === 'string' && err.message.includes('fetch'));
+      setError(
+        offline
+          ? 'Não foi possível conectar ao servidor. Verifique sua internet e tente de novo.'
+          : 'Falha inesperada. Tente novamente.',
+      );
+    } finally {
+      setLoading(false);
     }
   }
 

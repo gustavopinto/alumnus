@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { formatApiDetail, readResponseJson } from '../apiErrors';
 
 export default function RegisterPage() {
   const navigate  = useNavigate();
@@ -13,17 +14,39 @@ export default function RegisterPage() {
     e.preventDefault();
     setLoading(true);
     setError('');
-
-    const res  = await fetch('/api/auth/register', {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(form),
-    });
-    const data = await res.json();
-    setLoading(false);
-
-    if (!res.ok) { setError(data.detail || 'Erro ao cadastrar'); return; }
-    navigate('/login');
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+      const data = await readResponseJson(res, 'register');
+      if (data._invalidJson) {
+        setError(
+          formatApiDetail(data) ||
+            `Não foi possível processar a resposta (${res.status}). Tente novamente.`,
+        );
+        return;
+      }
+      if (!res.ok) {
+        console.error('[register] Falha na API', { status: res.status, body: data });
+        setError(formatApiDetail(data) || 'Erro ao cadastrar');
+        return;
+      }
+      navigate('/login');
+    } catch (err) {
+      console.error('[register] Erro inesperado', err);
+      const offline =
+        err instanceof TypeError ||
+        (typeof err?.message === 'string' && err.message.includes('fetch'));
+      setError(
+        offline
+          ? 'Não foi possível conectar ao servidor. Verifique sua internet.'
+          : 'Falha inesperada. Tente novamente.',
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

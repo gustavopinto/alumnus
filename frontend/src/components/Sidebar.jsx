@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import StudentForm from './StudentForm';
+import ResearcherForm from './StudentForm';
 import { deleteResearcher, getReminders, createReminder, updateReminder, deleteReminder } from '../api';
 
 function slugify(nome) {
@@ -251,11 +251,11 @@ function Dropdown({ label, icon, badge, children }) {
   );
 }
 
-export default function Sidebar({ students, onRefresh, role }) {
+export default function Sidebar({ researchers, onRefresh, role }) {
   const [view, setView] = useState('list');
-  const [editStudent, setEditStudent] = useState(null);
+  const [editResearcher, setEditResearcher] = useState(null);
 
-  function handleEdit(s) { setEditStudent(s); setView('student-form'); }
+  function handleEdit(s) { setEditResearcher(s); setView('researcher-form'); }
 
   async function handleDeactivate(id) {
     if (!confirm('Inativar este pesquisador?')) return;
@@ -263,13 +263,13 @@ export default function Sidebar({ students, onRefresh, role }) {
     onRefresh();
   }
 
-  function handleSaved() { setView('list'); setEditStudent(null); onRefresh(); }
+  function handleSaved() { setView('list'); setEditResearcher(null); onRefresh(); }
 
-  if (view === 'student-form') {
+  if (view === 'researcher-form') {
     return (
       <div className="p-4">
-        <StudentForm student={editStudent} students={students} onSaved={handleSaved}
-          onCancel={() => { setView('list'); setEditStudent(null); }} />
+        <ResearcherForm researcher={editResearcher} researchers={researchers} onSaved={handleSaved}
+          onCancel={() => { setView('list'); setEditResearcher(null); }} />
       </div>
     );
   }
@@ -284,10 +284,10 @@ export default function Sidebar({ students, onRefresh, role }) {
       <Dropdown
         label="Grupo"
         icon={<svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>}
-        badge={students.length}
+        badge={researchers.length}
       >
         <ul className="space-y-1">
-          {students.map((s) => (
+          {researchers.map((s) => (
             <li key={s.id} className="flex items-center justify-between rounded px-1 py-1 text-sm hover:bg-gray-50">
               <Link to={`/profile/${slugify(s.nome)}`} className="flex-1 truncate hover:text-blue-600">{s.nome}</Link>
               {role === 'professor' && (
