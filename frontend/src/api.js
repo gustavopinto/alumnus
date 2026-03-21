@@ -122,6 +122,7 @@ export const deleteManualComment = (commentId) => request(`/manual/comments/${co
 // Deadlines
 export const getDeadlineInterests = () => request('/deadlines/interests');
 export const toggleDeadlineInterest = (key) => request(`/deadlines/${encodeURIComponent(key)}/interest`, { method: 'POST' });
+export const extractDeadlineFromUrl = (url) => request('/deadlines/extract-url', { method: 'POST', body: JSON.stringify({ url }) });
 
 // Upload
 export async function uploadPhoto(file) {

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { getDeadlineInterests, toggleDeadlineInterest } from '../api';
+import { getDeadlineInterests, toggleDeadlineInterest, extractDeadlineFromUrl } from '../api';
 import { getTokenPayload } from '../auth';
 import { DEADLINES, daysUntil, slugify } from '../deadlines';
+import { useAppLayout } from '../components/AppLayout';
 
 /** Slug do perfil: API ou derivado do nome (alinhado ao grafo / perfil). */
 function profileSlugForInterest(i) {
@@ -39,8 +40,21 @@ export default function DeadlinesPage() {
   const [interests, setInterests] = useState([]);
   const [showPast, setShowPast] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { sidebarOpen } = useAppLayout();
+  const headerPad = sidebarOpen ? 'pl-14' : '';
   const payload = getTokenPayload();
   const myUserId = payload?.sub != null ? Number(payload.sub) : null;
+
+  const [extractOpen, setExtractOpen] = useState(false);
+  const [extractUrl, setExtractUrl] = useState('');
+  const [extracting, setExtracting] = useState(false);
+  const [extracted, setExtracted] = useState(null);  // list | null
+  const [extractError, setExtractError] = useState('');
+
+  const isValidUrl = (() => {
+    try { const u = new URL(extractUrl.trim()); return ['http:', 'https:'].includes(u.protocol); }
+    catch { return false; }
+  })();
 
   const load = useCallback(async () => {
     const data = await getDeadlineInterests();
@@ -59,6 +73,28 @@ export default function DeadlinesPage() {
     } finally {
       await load();
       setLoading(false);
+    }
+  }
+
+  async function handleExtract(e) {
+    e.preventDefault();
+    if (!isValidUrl) return;
+    setExtracting(true);
+    setExtracted(null);
+    setExtractError('');
+    try {
+      const result = await extractDeadlineFromUrl(extractUrl.trim());
+      if (!Array.isArray(result)) {
+        setExtractError(result?.detail || 'Não foi possível acessar a URL.');
+      } else if (result.length === 0) {
+        setExtractError('Nenhum deadline encontrado na página.');
+      } else {
+        setExtracted(result);
+      }
+    } catch {
+      setExtractError('Não foi possível acessar a URL. Verifique o endereço e tente novamente.');
+    } finally {
+      setExtracting(false);
     }
   }
 
@@ -165,8 +201,96 @@ export default function DeadlinesPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto p-6 space-y-8">
-      <h1 className="text-2xl font-bold text-gray-800">Deadlines</h1>
+    <div className="min-h-full bg-gray-50">
+      <header className={`bg-white border-b shadow-sm px-6 py-4 flex items-center gap-4 ${headerPad}`}>
+        <div className="flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <h1 className="text-xl font-bold text-gray-900">Deadlines</h1>
+        </div>
+      </header>
+
+      <div className="max-w-3xl mx-auto p-6 space-y-8">
+
+      {/* Extrair deadline por URL */}
+      <section className="bg-white rounded-xl border shadow-sm overflow-hidden">
+        <button
+          type="button"
+          onClick={() => { setExtractOpen(o => !o); setExtracted(null); setExtractError(''); }}
+          className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-gray-700">Extrair deadline de uma URL</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+              experimental
+            </span>
+          </div>
+          <svg xmlns="http://www.w3.org/2000/svg" className={`w-4 h-4 text-gray-400 transition-transform ${extractOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+
+        {extractOpen && (
+          <div className="px-5 pb-5 space-y-3 border-t">
+            <form onSubmit={handleExtract} className="space-y-1.5 pt-4">
+            <div className="flex gap-2">
+              <div className="flex-1 flex flex-col gap-1">
+                <input
+                  type="text"
+                  value={extractUrl}
+                  onChange={e => { setExtractUrl(e.target.value); setExtractError(''); }}
+                  placeholder="https://conf.example.org/2026"
+                  className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ${extractError ? 'border-red-400 focus:ring-red-300' : 'focus:ring-blue-400'}`}
+                />
+                {extractError && (
+                  <p className="text-xs text-red-500">{extractError}</p>
+                )}
+              </div>
+              <button
+                type="submit"
+                disabled={extracting || !isValidUrl}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-40 shrink-0 self-start"
+              >
+                Extrair
+              </button>
+            </div>
+            </form>
+
+            {extracting && (
+              <div className="flex items-center gap-2 text-sm text-gray-500 py-1">
+                <svg className="w-4 h-4 animate-spin text-blue-500 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Processando… o deadline aparecerá em instantes.
+              </div>
+            )}
+
+            {extracted && extracted.length > 0 && (
+              <div className="space-y-2">
+                {extracted.map((d, i) => (
+                  <div key={i} className="flex flex-wrap items-center gap-3 rounded-lg border bg-gray-50 px-4 py-3 text-sm">
+                    <span className="font-semibold text-gray-800">{d.label}</span>
+                    <span className="text-gray-400">·</span>
+                    <span className="text-blue-700 font-medium">
+                      {new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                    </span>
+                    <a
+                      href={d.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="ml-auto text-xs text-blue-500 hover:underline truncate max-w-[14rem]"
+                    >
+                      {d.url}
+                    </a>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
 
       {/* Próximos */}
       <section className="space-y-3">
@@ -189,7 +313,7 @@ export default function DeadlinesPage() {
           <svg xmlns="http://www.w3.org/2000/svg" className={`w-4 h-4 transition-transform ${showPast ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
-          {past.length} deadline{past.length !== 1 ? 's' : ''} encerrado{past.length !== 1 ? 's' : ''}
+          {past.length} deadline{past.length !== 1 ? 's' : ''} passado{past.length !== 1 ? 's' : ''}
         </button>
         {showPast && (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -197,6 +321,7 @@ export default function DeadlinesPage() {
           </div>
         )}
       </section>
+      </div>
     </div>
   );
 }

@@ -1,7 +1,12 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppLayout } from '../components/AppLayout';
 import { getReminders, createReminder, deleteReminder, markReminderNotificationRead } from '../api';
 import { canDeleteReminder, creatorDisplayName, isReminderFromSomeoneElse } from '../reminderAccess';
+
+function slugify(nome) {
+  return (nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
+}
 
 function formatDue(dateStr) {
   if (!dateStr) return null;
@@ -20,13 +25,15 @@ function todayIso() {
 }
 
 export default function RemindersPage() {
-  const { sidebarOpen, refreshSidebarReminders, currentUser } = useAppLayout();
+  const { sidebarOpen, refreshSidebarReminders, currentUser, researchers = [] } = useAppLayout();
   const creatorOpts = { viewerName: currentUser?.nome };
   const headerPad = sidebarOpen ? 'pl-14' : '';
   const [reminders, setReminders] = useState([]);
   const [text, setText] = useState('');
   const [dueDate, setDueDate] = useState(todayIso);
   const [saving, setSaving] = useState(false);
+  const [mentionSearch, setMentionSearch] = useState(null); // {start, query} | null
+  const textareaRef = useRef();
 
   const load = useCallback(async () => {
     const data = await getReminders();
@@ -63,6 +70,42 @@ export default function RemindersPage() {
     return () => window.removeEventListener('focus', syncMinDate);
   }, []);
 
+  function handleTextChange(e) {
+    const val = e.target.value;
+    setText(val);
+    const pos = e.target.selectionStart;
+    const before = val.slice(0, pos);
+    const match = before.match(/@([\w-]*)$/);
+    if (match) {
+      setMentionSearch({ start: match.index, query: match[1].toLowerCase() });
+    } else {
+      setMentionSearch(null);
+    }
+  }
+
+  function insertMention(slug) {
+    const el = textareaRef.current;
+    if (!el || !mentionSearch) return;
+    const pos = el.selectionStart;
+    const before = text.slice(0, mentionSearch.start);
+    const after = text.slice(pos);
+    const newText = before + '@' + slug + ' ' + after;
+    setText(newText);
+    setMentionSearch(null);
+    requestAnimationFrame(() => {
+      const newPos = before.length + slug.length + 2;
+      el.setSelectionRange(newPos, newPos);
+      el.focus();
+    });
+  }
+
+  const mentionSuggestions = mentionSearch !== null
+    ? researchers.filter(r =>
+        r.nome.toLowerCase().includes(mentionSearch.query) ||
+        slugify(r.nome).includes(mentionSearch.query)
+      ).slice(0, 6)
+    : [];
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (!text.trim()) return;
@@ -91,18 +134,42 @@ export default function RemindersPage() {
   return (
     <div className="min-h-full bg-gray-50">
       <header className={`bg-white border-b shadow-sm px-6 py-4 flex items-center gap-4 ${headerPad}`}>
-        <h1 className="text-xl font-bold text-gray-900">Lembretes</h1>
+        <div className="flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+          <h1 className="text-xl font-bold text-gray-900">Lembretes</h1>
+        </div>
       </header>
 
       <main className="max-w-2xl mx-auto py-8 px-4 space-y-6">
         <section className="bg-white rounded-xl shadow-sm border p-6">
           <form onSubmit={handleSubmit} className="space-y-3">
-            <textarea
-              className="w-full border rounded-lg px-3 py-2 text-sm h-20 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
-              placeholder="Novo lembrete..."
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-            />
+            <div className="relative">
+              <textarea
+                ref={textareaRef}
+                className="w-full border rounded-lg px-3 py-2 text-sm h-20 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+                placeholder="Novo lembrete... (@ para mencionar alguém)"
+                value={text}
+                onChange={handleTextChange}
+                onKeyDown={e => { if (e.key === 'Escape') setMentionSearch(null); }}
+              />
+              {mentionSuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-0.5 bg-white border rounded-lg shadow-lg z-50 py-1">
+                  {mentionSuggestions.map(r => (
+                    <button
+                      key={r.id}
+                      type="button"
+                      onMouseDown={e => { e.preventDefault(); insertMention(slugify(r.nome)); }}
+                      className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2"
+                    >
+                      <span className="font-medium">{r.nome}</span>
+                      <span className="text-xs text-gray-400">@{slugify(r.nome)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <label className="text-xs text-gray-500">Data limite</label>

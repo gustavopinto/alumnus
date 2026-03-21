@@ -14,7 +14,7 @@ function today() {
   return new Date().toISOString().split('T')[0];
 }
 
-function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null }) {
+function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, researchers = [] }) {
   const [open, setOpen] = useState(false);
   const [showOld, setShowOld] = useState(false);
   const [reminders, setReminders] = useState([]);
@@ -22,8 +22,10 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null })
   const [date, setDate] = useState(today());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [mentionSearch, setMentionSearch] = useState(null); // {start, query} | null
   const ref = useRef();
   const dateRef = useRef();
+  const inputRef = useRef();
   const navigate = useNavigate();
 
   const load = useCallback(async () => {
@@ -59,6 +61,42 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null })
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  function handleTextChange(e) {
+    const val = e.target.value;
+    setText(val);
+    const pos = e.target.selectionStart;
+    const before = val.slice(0, pos);
+    const match = before.match(/@([\w-]*)$/);
+    if (match) {
+      setMentionSearch({ start: match.index, query: match[1].toLowerCase() });
+    } else {
+      setMentionSearch(null);
+    }
+  }
+
+  function insertMention(slug) {
+    const input = inputRef.current;
+    if (!input || !mentionSearch) return;
+    const pos = input.selectionStart;
+    const before = text.slice(0, mentionSearch.start);
+    const after = text.slice(pos);
+    const newText = (before + '@' + slug + ' ' + after).slice(0, 50);
+    setText(newText);
+    setMentionSearch(null);
+    requestAnimationFrame(() => {
+      const newPos = before.length + slug.length + 2;
+      input.setSelectionRange(newPos, newPos);
+      input.focus();
+    });
+  }
+
+  const mentionSuggestions = mentionSearch !== null
+    ? researchers.filter(r =>
+        r.nome.toLowerCase().includes(mentionSearch.query) ||
+        slugify(r.nome).includes(mentionSearch.query)
+      ).slice(0, 6)
+    : [];
 
   async function handleAdd(e) {
     e.preventDefault();
@@ -162,13 +200,32 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null })
           {/* Caixa de criação */}
           <div className="p-3 border-b bg-gray-50">
             <form onSubmit={handleAdd} className="space-y-2">
-              <input
-                className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-                placeholder="Novo lembrete..."
-                value={text}
-                maxLength={50}
-                onChange={e => setText(e.target.value)}
-              />
+              <div className="relative">
+                <input
+                  ref={inputRef}
+                  className="w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
+                  placeholder="Novo lembrete... (@ para mencionar)"
+                  value={text}
+                  maxLength={50}
+                  onChange={handleTextChange}
+                  onKeyDown={e => { if (e.key === 'Escape') setMentionSearch(null); }}
+                />
+                {mentionSuggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-0.5 bg-white border rounded-lg shadow-lg z-[70] py-1">
+                    {mentionSuggestions.map(r => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onMouseDown={e => { e.preventDefault(); insertMention(slugify(r.nome)); }}
+                        className="w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 hover:text-blue-700 truncate"
+                      >
+                        {r.nome}
+                        <span className="ml-1.5 text-xs text-gray-400">@{slugify(r.nome)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 <label className="flex-1 flex items-center gap-1.5 border rounded px-2 py-1.5 text-sm text-gray-600 cursor-pointer hover:border-blue-400 hover:text-blue-600 transition-colors bg-white">
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -529,7 +586,7 @@ export default function Sidebar({ researchers, onRefresh, role, remindersRefresh
       </Dropdown>
 
       {/* Lembretes */}
-      <RemindersDropdown refreshKey={remindersRefreshKey} currentUser={currentUser} />
+      <RemindersDropdown refreshKey={remindersRefreshKey} currentUser={currentUser} researchers={researchers} />
 
       {/* Deadlines */}
       <Dropdown label="Deadlines" icon={CALENDAR_ICON} badge={upcomingDeadlines.length} linkTo="/deadlines">
