@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { getToken, getTokenPayload, getMe, removeToken } from '../auth';
+import { getToken, getTokenPayload, getMe, removeToken, isPrivileged } from '../auth';
 
 function slugify(nome) {
   return (nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
 }
 
-export default function ProtectedRoute({ children, professorOnly = false }) {
+export default function ProtectedRoute({ children, professorOnly = false, adminOnly = false }) {
   const location = useLocation();
   const [state, setState]           = useState('loading');
   const [profileSlug, setProfileSlug] = useState('');
@@ -23,9 +23,14 @@ export default function ProtectedRoute({ children, professorOnly = false }) {
         return;
       }
 
-      if (payload.role === 'professor') { setState('ok'); return; }
+      if (adminOnly) {
+        if (payload.role === 'admin') { setState('ok'); return; }
+        setState('forbidden'); return;
+      }
 
-      // student/researcher
+      if (isPrivileged(payload.role)) { setState('ok'); return; }
+
+      // student
       if (professorOnly) { setState('forbidden'); return; }
 
       const me = await getMe();

@@ -17,7 +17,7 @@ export default function BoardPage() {
   const [toast, setToast] = useState('');
 
   const payload = getTokenPayload();
-  const isProfessor = payload?.role === 'professor';
+  const isProfessor = payload?.role === 'professor' || payload?.role === 'admin';
   const currentUserId = payload ? parseInt(payload.sub) : null;
 
   async function load() {

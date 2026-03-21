@@ -18,6 +18,9 @@ export function getTokenPayload() {
   }
 }
 
+/** Verifica se o perfil tem acesso elevado (professor ou admin). */
+export const isPrivileged = (role) => role === 'professor' || role === 'admin';
+
 export async function getMe() {
   const token = getToken();
   if (!token) return null;

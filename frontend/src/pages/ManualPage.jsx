@@ -251,7 +251,7 @@ export default function ManualPage() {
   const [answer, setAnswer] = useState('');
   const [saving, setSaving] = useState(false);
   const payload = getTokenPayload();
-  const isProfessor = payload?.role === 'professor';
+  const isProfessor = payload?.role === 'professor' || payload?.role === 'admin';
   const authUserId = payload?.sub != null ? Number(payload.sub) : null;
 
   async function load() {
@@ -321,13 +321,13 @@ export default function ManualPage() {
                   onKeyDown={e => isModEnter(e) && handleSubmit(e)}
                 />
               </div>
-              <div className="flex justify-end">
+              <div className="flex items-center gap-3">
                 <button
                   type="submit"
                   disabled={saving || !question.trim() || !answer.trim()}
-                  className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+                  className="ml-auto bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {saving ? 'Salvando...' : 'Adicionar'}
+                  {saving ? 'Salvando...' : <>Adicionar <span className="opacity-50 text-xs">{modKey}+Enter</span></>}
                 </button>
               </div>
             </form>

@@ -87,7 +87,7 @@ class User(Base):
     email         = Column(String(255), unique=True, nullable=False, index=True)
     nome          = Column(String(255), nullable=False)
     password_hash = Column(String(255), nullable=False)
-    role          = Column(String(20), nullable=False)  # professor, student
+    role          = Column(String(20), nullable=False)  # admin, professor, student
     researcher_id = Column(Integer, ForeignKey("researchers.id"), nullable=True)
     last_login    = Column(DateTime, nullable=True)
     created_at    = Column(DateTime, default=datetime.utcnow)

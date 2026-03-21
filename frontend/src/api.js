@@ -136,3 +136,10 @@ export async function uploadPhoto(file) {
   });
   return res.json();
 }
+
+
+// --- Admin ---
+export const getAdminStats = () => request('/admin/stats');
+export const getAdminUsers = () => request('/admin/users');
+export const updateUserRole = (id, role) => request(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify({ role }) });
+export const deleteUser = (id) => request(`/admin/users/${id}`, { method: 'DELETE' });

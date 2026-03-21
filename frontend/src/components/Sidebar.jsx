@@ -478,7 +478,7 @@ const BOOK_ICON = (
 );
 
 /** Barra estreita com ícones quando o menu principal está recolhido */
-export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshKey = 0, currentUser = null }) {
+export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshKey = 0, currentUser = null, role = null }) {
   const upcomingDeadlines = DEADLINES.filter(d => daysUntil(d.date) >= 0);
 
   return (
@@ -494,6 +494,18 @@ export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshK
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M6 5l7 7-7 7" />
           </svg>
         </button>
+
+        {role === 'admin' && (
+          <Link
+            to="/admin"
+            title="Dashboard Admin"
+            className="w-11 h-11 flex items-center justify-center rounded-lg border border-purple-200 bg-purple-50 text-purple-600 shadow-sm hover:bg-purple-100 hover:border-purple-300 transition-colors shrink-0"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          </Link>
+        )}
 
         <Link
           to="/"
@@ -576,6 +588,19 @@ export default function Sidebar({ researchers, onRefresh, role, remindersRefresh
   return (
     <div className="p-4 space-y-2 overflow-y-auto h-full">
 
+      {/* Dashboard Admin */}
+      {role === 'admin' && (
+        <Link
+          to="/admin"
+          className="w-full flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 text-sm text-purple-700 shadow-sm hover:bg-purple-100 hover:border-purple-300 transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+          <span className="font-medium">Dashboard Admin</span>
+        </Link>
+      )}
+
       {/* Grupo */}
       <Dropdown
         label="Grupo"
@@ -587,7 +612,7 @@ export default function Sidebar({ researchers, onRefresh, role, remindersRefresh
           {researchers.map((s) => (
             <li key={s.id} className="flex items-center justify-between rounded px-1 py-1 text-sm hover:bg-gray-50">
               <Link to={`/profile/${slugify(s.nome)}`} className="flex-1 truncate hover:text-blue-600">{s.nome}</Link>
-              {role === 'professor' && (
+              {(role === 'professor' || role === 'admin') && (
                 <span className="flex gap-1 shrink-0 ml-1">
                   <button onClick={() => handleEdit(s)} title="Editar" className="text-blue-500 hover:text-blue-700 p-0.5">
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

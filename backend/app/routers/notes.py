@@ -28,7 +28,7 @@ async def create_note(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "professor" and current_user.researcher_id != researcher_id:
+    if current_user.role not in ("professor", "admin") and current_user.researcher_id != researcher_id:
         raise HTTPException(status_code=403, detail="Alunos só podem adicionar notas no próprio perfil")
 
     file_url = None
@@ -52,6 +52,6 @@ def delete_note(note_id: int, db: Session = Depends(get_db), current_user: User 
     note = note_service.get_by_id(db, note_id)
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
-    if current_user.role != "professor" and note.created_by_id != current_user.id:
+    if current_user.role not in ("professor", "admin") and note.created_by_id != current_user.id:
         raise HTTPException(status_code=403, detail="Você só pode remover suas próprias anotações")
     note_service.delete(db, note)

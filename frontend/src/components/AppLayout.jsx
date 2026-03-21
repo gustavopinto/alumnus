@@ -144,6 +144,7 @@ export default function AppLayout() {
             onLogout={handleLogout}
             remindersRefreshKey={remindersRefreshKey}
             currentUser={currentUser}
+            role={payload?.role}
           />
         )}
       </aside>

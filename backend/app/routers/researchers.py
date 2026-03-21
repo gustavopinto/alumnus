@@ -57,7 +57,7 @@ def update_researcher(
     if not researcher:
         raise HTTPException(status_code=404, detail="Researcher not found")
     is_own = current_user.researcher_id == researcher_id
-    if current_user.role != "professor" and not is_own:
+    if current_user.role not in ("professor", "admin") and not is_own:
         raise HTTPException(status_code=403, detail="Você só pode editar o seu próprio perfil")
     return researcher_service.update(db, researcher, data)
 

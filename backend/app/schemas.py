@@ -1,7 +1,11 @@
+import re
 from datetime import datetime, date
 from typing import Optional
 
 from pydantic import BaseModel, field_validator
+
+_INSTAGRAM_HANDLE = re.compile(r"^[A-Za-z0-9._]{1,30}$")
+_TWITTER_HANDLE = re.compile(r"^[A-Za-z0-9_]{1,15}$")
 
 
 # --- Researcher ---
@@ -34,6 +38,30 @@ class ResearcherUpdate(BaseModel):
     matricula: Optional[str] = None
     curso: Optional[str] = None
     enrollment_date: Optional[date] = None
+
+    @field_validator("instagram_url")
+    @classmethod
+    def validate_instagram_handle(cls, v):
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        s = str(v).strip().lstrip("@")
+        if not _INSTAGRAM_HANDLE.match(s):
+            raise ValueError(
+                "Instagram: use o usuário com @ no início (1–30 caracteres: letras, números, . e _)"
+            )
+        return s
+
+    @field_validator("twitter_url")
+    @classmethod
+    def validate_twitter_handle(cls, v):
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        s = str(v).strip().lstrip("@")
+        if not _TWITTER_HANDLE.match(s):
+            raise ValueError(
+                "X/Twitter: use o usuário com @ no início (1–15 caracteres: letras, números e _)"
+            )
+        return s
 
 
 class ResearcherOut(BaseModel):

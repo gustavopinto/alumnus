@@ -24,6 +24,97 @@ function formatLastLogin(iso) {
   return 'Último acesso: há mais de 10 dias';
 }
 
+/** Extrai o handle a partir de texto, URL ou @usuario (sem @ no retorno). */
+function stripSocialUrlToHandle(raw) {
+  if (!raw || !String(raw).trim()) return '';
+  let s = String(raw).trim();
+  if (/^https?:\/\//i.test(s)) {
+    try {
+      const u = new URL(s);
+      const host = u.hostname.replace(/^www\./, '');
+      const path = (u.pathname || '/').replace(/^\//, '').split('/')[0] || '';
+      if (['instagram.com', 'x.com', 'twitter.com'].includes(host)) {
+        s = path.split('?')[0];
+      } else {
+        s = s.replace(/^https?:\/\/(www\.)?(instagram\.com|x\.com|twitter\.com)\//i, '').split('/')[0].split('?')[0];
+      }
+    } catch {
+      s = s.replace(/^https?:\/\/(www\.)?(instagram\.com|x\.com|twitter\.com)\//i, '').split('/')[0].split('?')[0];
+    }
+  }
+  return s.replace(/^@+/, '').replace(/\/$/, '');
+}
+
+function socialToAtForm(raw) {
+  const h = stripSocialUrlToHandle(raw);
+  return h ? `@${h}` : '';
+}
+
+/** No blur: URL vira @handle; texto sem @ ganha @. */
+function normalizeSocialInputOnBlur(value) {
+  const t = (value || '').trim();
+  if (!t) return '';
+  if (/^https?:\/\//i.test(t)) {
+    const h = stripSocialUrlToHandle(t);
+    return h ? `@${h}` : '';
+  }
+  if (!t.startsWith('@')) return `@${t.replace(/^@+/, '')}`;
+  return t;
+}
+
+function validateInstagramForm(value) {
+  const t = (value || '').trim();
+  if (!t) return '';
+  if (/^https?:\/\//i.test(t)) {
+    const h = stripSocialUrlToHandle(t);
+    if (!h) return 'URL do Instagram inválida';
+    if (!/^[A-Za-z0-9._]{1,30}$/.test(h)) {
+      return 'Instagram: usuário inválido (1–30 caracteres: letras, números, . e _)';
+    }
+    return '';
+  }
+  if (!t.startsWith('@')) return 'Use @ no início (ex.: @usuario)';
+  const rest = t.slice(1);
+  if (!rest) return 'Informe o usuário após @';
+  if (!/^[A-Za-z0-9._]{1,30}$/.test(rest)) {
+    return 'Instagram: usuário inválido (1–30 caracteres: letras, números, . e _)';
+  }
+  return '';
+}
+
+function validateTwitterForm(value) {
+  const t = (value || '').trim();
+  if (!t) return '';
+  if (/^https?:\/\//i.test(t)) {
+    const h = stripSocialUrlToHandle(t);
+    if (!h) return 'URL do X inválida';
+    if (!/^[A-Za-z0-9_]{1,15}$/.test(h)) {
+      return 'X/Twitter: usuário inválido (1–15 caracteres: letras, números e _)';
+    }
+    return '';
+  }
+  if (!t.startsWith('@')) return 'Use @ no início (ex.: @usuario)';
+  const rest = t.slice(1);
+  if (!rest) return 'Informe o usuário após @';
+  if (!/^[A-Za-z0-9_]{1,15}$/.test(rest)) {
+    return 'X/Twitter: usuário inválido (1–15 caracteres: letras, números e _)';
+  }
+  return '';
+}
+
+function buildProfileForm(r) {
+  return {
+    lattes_url: r.lattes_url || '',
+    scholar_url: r.scholar_url || '',
+    linkedin_url: r.linkedin_url || '',
+    github_url: r.github_url || '',
+    instagram_url: socialToAtForm(r.instagram_url),
+    twitter_url: socialToAtForm(r.twitter_url),
+    whatsapp: r.whatsapp || '',
+    interesses: r.interesses || '',
+  };
+}
+
 function NotesSection({ researcherId, canAdd, isProfessor, currentUserId }) {
   const [notes, setNotes] = useState([]);
   const [text, setText] = useState('');
@@ -144,17 +235,10 @@ function NotesSection({ researcherId, canAdd, isProfessor, currentUserId }) {
 
 function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({
-    lattes_url: researcher.lattes_url || '',
-    scholar_url: researcher.scholar_url || '',
-    linkedin_url: researcher.linkedin_url || '',
-    github_url: researcher.github_url || '',
-    instagram_url: researcher.instagram_url ? researcher.instagram_url.replace(/^https?:\/\/(www\.)?(instagram\.com|x\.com|twitter\.com)\//, '').replace(/^@/, '') : '',
-    twitter_url: researcher.twitter_url ? researcher.twitter_url.replace(/^https?:\/\/(www\.)?(instagram\.com|x\.com|twitter\.com)\//, '').replace(/^@/, '') : '',
-    whatsapp: researcher.whatsapp || '',
-    interesses: researcher.interesses || '',
-  });
+  const [form, setForm] = useState(() => buildProfileForm(researcher));
   const [whatsappError, setWhatsappError] = useState('');
+  const [instagramError, setInstagramError] = useState('');
+  const [twitterError, setTwitterError] = useState('');
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -163,6 +247,11 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
   const photoRef = useRef();
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
+
+  useEffect(() => {
+    if (editing) return;
+    setForm(buildProfileForm(researcher));
+  }, [researcher, editing]);
 
   function maskPhone(value) {
     const digits = value.replace(/\D/g, '').slice(0, 11);
@@ -192,14 +281,19 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
     e.preventDefault();
     const digits = form.whatsapp.replace(/\D/g, '');
     if (form.whatsapp && digits.length < 10) { setWhatsappError('Número inválido'); return; }
+    const igErr = validateInstagramForm(form.instagram_url);
+    const twErr = validateTwitterForm(form.twitter_url);
+    setInstagramError(igErr);
+    setTwitterError(twErr);
+    if (igErr || twErr) return;
     setSaving(true);
     await updateResearcher(researcher.id, {
       lattes_url: form.lattes_url || null,
       scholar_url: form.scholar_url || null,
       linkedin_url: form.linkedin_url || null,
       github_url: form.github_url || null,
-      instagram_url: form.instagram_url ? form.instagram_url.replace(/^@/, '') : null,
-      twitter_url: form.twitter_url ? form.twitter_url.replace(/^@/, '') : null,
+      instagram_url: form.instagram_url.trim() ? stripSocialUrlToHandle(form.instagram_url) : null,
+      twitter_url: form.twitter_url.trim() ? stripSocialUrlToHandle(form.twitter_url) : null,
       whatsapp: form.whatsapp || null,
       interesses: form.interesses || null,
       ...(pendingPhotoUrl ? { photo_url: pendingPhotoUrl } : {}),
@@ -215,6 +309,8 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
     setEditing(false);
     setPhotoPreview(researcher.photo_url || null);
     setPendingPhotoUrl(null);
+    setInstagramError('');
+    setTwitterError('');
   }
 
   const links = [
@@ -269,7 +365,17 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-bold text-gray-800">Perfil</h2>
         {canEdit && !editing && (
-          <button onClick={() => setEditing(true)} className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
+          <button
+            type="button"
+            onClick={() => {
+              setForm(buildProfileForm(researcher));
+              setInstagramError('');
+              setTwitterError('');
+              setWhatsappError('');
+              setEditing(true);
+            }}
+            className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
@@ -334,19 +440,29 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
             </div>
           ))}
           {[
-            { key: 'instagram_url', label: 'Instagram' },
-            { key: 'twitter_url', label: 'Twitter / X' },
-          ].map(({ key, label }) => (
+            { key: 'instagram_url', label: 'Instagram', error: instagramError, setError: setInstagramError },
+            { key: 'twitter_url', label: 'Twitter / X', error: twitterError, setError: setTwitterError },
+          ].map(({ key, label, error, setError }) => (
             <div key={key}>
               <label className="block text-xs font-medium text-gray-500 mb-1">{label}</label>
               <input
                 type="text"
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 ${error ? 'border-red-400' : ''}`}
                 placeholder="@usuario"
                 maxLength={50}
                 value={form[key]}
-                onChange={set(key)}
+                onChange={(e) => {
+                  setError('');
+                  setForm({ ...form, [key]: e.target.value });
+                }}
+                onBlur={() => {
+                  const norm = normalizeSocialInputOnBlur(form[key]);
+                  if (norm !== form[key]) setForm({ ...form, [key]: norm });
+                }}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? `${key}-err` : undefined}
               />
+              {error && <p id={`${key}-err`} className="text-xs text-red-500 mt-0.5">{error}</p>}
             </div>
           ))}
           <div>
@@ -454,7 +570,7 @@ export default function ResearcherPage() {
   const photoInputRef = useRef();
 
   const payload = getTokenPayload();
-  const isProfessor = payload?.role === 'professor';
+  const isProfessor = payload?.role === 'professor' || payload?.role === 'admin';
   const isOwnProfile = payload?.researcher_id != null && researcher?.id === payload.researcher_id;
   const canEdit = isProfessor || isOwnProfile;
 

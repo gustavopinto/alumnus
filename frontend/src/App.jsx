@@ -8,6 +8,7 @@ import RemindersPage from './pages/RemindersPage';
 import BoardPage from './pages/BoardPage';
 import ManualPage from './pages/ManualPage';
 import DeadlinesPage from './pages/DeadlinesPage';
+import AdminPage from './pages/AdminPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 
@@ -62,6 +63,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <DeadlinesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin"
+          element={
+            <ProtectedRoute adminOnly>
+              <AdminPage />
             </ProtectedRoute>
           }
         />
