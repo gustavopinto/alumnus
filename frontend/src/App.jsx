@@ -7,6 +7,7 @@ import ResearcherPage from './pages/StudentPage';
 import RemindersPage from './pages/RemindersPage';
 import BoardPage from './pages/BoardPage';
 import ManualPage from './pages/ManualPage';
+import DeadlinesPage from './pages/DeadlinesPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 
@@ -19,7 +20,7 @@ export default function App() {
         <Route
           index
           element={
-            <ProtectedRoute professorOnly>
+            <ProtectedRoute>
               <GraphPage />
             </ProtectedRoute>
           }
@@ -53,6 +54,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <BoardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="deadlines"
+          element={
+            <ProtectedRoute>
+              <DeadlinesPage />
             </ProtectedRoute>
           }
         />

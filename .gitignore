@@ -3,6 +3,7 @@ node_modules/
 dist/
 .env
 .env.production
+.credentials
 __pycache__/
 *.pyc
 uploads/*

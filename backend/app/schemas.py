@@ -99,6 +99,7 @@ class NoteOut(BaseModel):
     text: str
     file_url: Optional[str]
     file_name: Optional[str]
+    created_by_id: Optional[int] = None
     created_by_name: Optional[str] = None
     created_at: datetime
 
@@ -107,6 +108,7 @@ class NoteOut(BaseModel):
     @classmethod
     def from_orm_with_creator(cls, note):
         obj = cls.model_validate(note)
+        obj.created_by_id = note.created_by_id
         obj.created_by_name = note.created_by.nome if note.created_by else None
         return obj
 
@@ -284,3 +286,15 @@ class ManualEntryOut(BaseModel):
 
 class ManualCommentCreate(BaseModel):
     text: str
+
+
+# --- Deadline interests ---
+
+class DeadlineInterestOut(BaseModel):
+    deadline_key: str
+    user_id: int
+    user_name: str
+    user_photo_url: Optional[str] = None
+    profile_slug: Optional[str] = None
+
+    model_config = {"from_attributes": True}

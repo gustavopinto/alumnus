@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Outlet, useOutletContext, useNavigate, Link } from 'react-router-dom';
 import Sidebar, { SidebarRail } from './Sidebar';
 import Footer from './Footer';
-import { getGraph, getResearchers, getReminderUnreadCount } from '../api';
+import { getGraph, getResearchers } from '../api';
 import { removeToken, getTokenPayload, getMe } from '../auth';
 
 function slugify(nome) {
@@ -25,7 +25,7 @@ export default function AppLayout() {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('sidebarOpen') !== 'false');
-  const [reminderCount, setReminderCount] = useState(0);
+  const [remindersRefreshKey, setRemindersRefreshKey] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const settingsRef = useRef(null);
@@ -49,26 +49,9 @@ export default function AppLayout() {
     getMe().then((u) => { if (u) setCurrentUser(u); }).catch(() => {});
   }, []);
 
-  const refreshReminderNotifications = useCallback(async () => {
-    try {
-      const data = await getReminderUnreadCount();
-      if (data && typeof data.count === 'number') setReminderCount(data.count);
-    } catch {
-      setReminderCount(0);
-    }
+  const refreshSidebarReminders = useCallback(() => {
+    setRemindersRefreshKey((k) => k + 1);
   }, []);
-
-  useEffect(() => {
-    refreshReminderNotifications();
-    const t = setInterval(refreshReminderNotifications, 45000);
-    return () => clearInterval(t);
-  }, [refreshReminderNotifications]);
-
-  useEffect(() => {
-    function onFocus() { refreshReminderNotifications(); }
-    window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
-  }, [refreshReminderNotifications]);
 
   // Fecha dropdown ao clicar fora
   useEffect(() => {
@@ -111,9 +94,10 @@ export default function AppLayout() {
       loadData,
       graphNodes: nodes,
       graphEdges: edges,
-      refreshReminderNotifications,
+      refreshSidebarReminders,
+      currentUser,
     }),
-    [sidebarOpen, setSidebarOpenPersist, researchers, loadData, nodes, edges, refreshReminderNotifications],
+    [sidebarOpen, setSidebarOpenPersist, researchers, loadData, nodes, edges, refreshSidebarReminders, currentUser],
   );
 
   return (
@@ -133,7 +117,13 @@ export default function AppLayout() {
               </Link>
             </div>
             <div className="flex-1 min-h-0 min-w-0 overflow-y-auto">
-              <Sidebar researchers={researchers} onRefresh={loadData} role={payload?.role} />
+              <Sidebar
+                researchers={researchers}
+                onRefresh={loadData}
+                role={payload?.role}
+                remindersRefreshKey={remindersRefreshKey}
+                currentUser={currentUser}
+              />
             </div>
             <Footer />
           </>
@@ -142,6 +132,8 @@ export default function AppLayout() {
             researchers={researchers}
             onExpand={() => setSidebarOpenPersist(true)}
             onLogout={handleLogout}
+            remindersRefreshKey={remindersRefreshKey}
+            currentUser={currentUser}
           />
         )}
       </aside>
@@ -167,31 +159,8 @@ export default function AppLayout() {
             )}
           </div>
 
-          {/* Direita: sino + nome + configurações */}
+          {/* Direita: configurações */}
           <div className="flex items-center gap-2">
-            {/* Notificações */}
-            <button
-              type="button"
-              aria-label={reminderCount > 0 ? `${reminderCount} lembretes pendentes` : 'Lembretes'}
-              title={reminderCount > 0 ? `${reminderCount} lembrete(s) pendente(s)` : 'Lembretes'}
-              onClick={() => navigate('/reminders')}
-              className="relative p-2 rounded-lg hover:bg-gray-100 text-gray-500"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              {reminderCount > 0 && (
-                <span className="absolute top-1 right-1 min-w-[1rem] h-4 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-0.5 leading-none" aria-hidden="true">
-                  {reminderCount > 9 ? '9+' : reminderCount}
-                </span>
-              )}
-            </button>
-
-            {/* Nome */}
-            <span className="text-sm font-semibold text-gray-800 truncate max-w-[16rem]" title={userName}>
-              {userName}
-            </span>
-
             {/* Configurações */}
             <div className="relative" ref={settingsRef}>
               <button

@@ -287,8 +287,7 @@ export default function ManualPage() {
       </header>
 
       <main className="max-w-2xl mx-auto py-8 px-4 space-y-6">
-        {isProfessor && (
-          <section className="bg-white rounded-xl shadow-sm border p-6">
+        <section className="bg-white rounded-xl shadow-sm border p-6">
             <h2 className="text-base font-semibold text-gray-800 mb-4">Nova entrada</h2>
             <form onSubmit={handleSubmit} className="space-y-3">
               <div>
@@ -329,7 +328,6 @@ export default function ManualPage() {
               </div>
             </form>
           </section>
-        )}
 
         <section className="flex flex-col gap-6" aria-label="Entradas do manual">
           {entries.length === 0 && (

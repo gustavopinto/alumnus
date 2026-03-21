@@ -87,8 +87,17 @@ def update_reminder(
 
 
 @router.delete("/{reminder_id}", status_code=204)
-def delete_reminder(reminder_id: int, db: Session = Depends(get_db)):
+def delete_reminder(
+    reminder_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     reminder = reminder_service.get_by_id(db, reminder_id)
     if not reminder:
         raise HTTPException(status_code=404, detail="Reminder not found")
+    if not reminder_service.can_user_delete_reminder(current_user, reminder):
+        raise HTTPException(
+            status_code=403,
+            detail="Você só pode remover lembretes que você criou.",
+        )
     reminder_service.delete(db, reminder)

@@ -1,37 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import ResearcherForm from './StudentForm';
-import { deleteResearcher, getReminders, createReminder, updateReminder, deleteReminder } from '../api';
+import { deleteResearcher, getReminders, createReminder, updateReminder, deleteReminder, markReminderNotificationRead } from '../api';
+import { canDeleteReminder, creatorDisplayName, isReminderFromSomeoneElse } from '../reminderAccess';
+import { DEADLINES, daysUntil } from '../deadlines';
 
 function slugify(nome) {
   return (nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
 }
 
-const DEADLINES = [
-  { label: 'ICSE 2026', url: 'https://conf.researchr.org/home/icse-2026', date: '2026-01-24' },
-  { label: 'FSE 2026', url: 'https://conf.researchr.org/home/fse-2026', date: '2026-02-06' },
-  { label: 'ASE 2026', url: 'https://conf.researchr.org/home/ase-2026', date: '2026-04-10' },
-  { label: 'MSR 2026', url: 'https://conf.researchr.org/home/msr-2026', date: '2026-02-13' },
-  { label: 'ISSTA 2026', url: 'https://conf.researchr.org/home/issta-2026', date: '2026-02-07' },
-  { label: 'SBES 2026', url: 'https://cbsoft.sbc.org.br/2026/', date: '2026-05-04' },
-  { label: 'SBSI 2026', url: 'https://sbsi.sbc.org.br/2026/', date: '2025-09-29' },
-  { label: 'SBIE 2025', url: 'https://cbie.sbc.org.br/2025/sbie2/', date: '2025-06-09' },
-  { label: 'WASHES 2026', url: 'https://csbc.sbc.org.br/2026/washes/', date: '2026-03-30' },
-  { label: 'WER 2026 – Regular', url: 'https://organizacaower.github.io/WER2026/es/track-regular.html', date: '2026-03-31' },
-  { label: 'WER 2026 – Industry', url: 'https://organizacaower.github.io/WER2026/es/track-industry.html', date: '2026-04-13' },
-];
-
-function daysUntil(dateStr) {
-  const diff = new Date(dateStr) - new Date();
-  return Math.ceil(diff / (1000 * 60 * 60 * 24));
-}
-
 function today() {
   return new Date().toISOString().split('T')[0];
 }
 
-function RemindersDropdown({ rail = false }) {
+function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null }) {
   const [open, setOpen] = useState(false);
   const [showOld, setShowOld] = useState(false);
   const [reminders, setReminders] = useState([]);
@@ -41,13 +24,35 @@ function RemindersDropdown({ rail = false }) {
   const [error, setError] = useState('');
   const ref = useRef();
   const dateRef = useRef();
+  const navigate = useNavigate();
 
-  async function load() {
+  const load = useCallback(async () => {
     const data = await getReminders();
     setReminders(data || []);
-  }
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [refreshKey, load]);
+
+  const dropdownUnreadKey = useMemo(
+    () =>
+      reminders
+        .filter((r) => r.notification_unread)
+        .map((r) => r.id)
+        .sort((a, b) => a - b)
+        .join(','),
+    [reminders],
+  );
+
+  useEffect(() => {
+    if (rail || !open || !dropdownUnreadKey) return;
+    const ids = dropdownUnreadKey.split(',').map(Number);
+    let cancelled = false;
+    (async () => {
+      await Promise.all(ids.map((id) => markReminderNotificationRead(id).catch(() => {})));
+      if (!cancelled) await load();
+    })();
+    return () => { cancelled = true; };
+  }, [rail, open, dropdownUnreadKey, load]);
 
   useEffect(() => {
     function handler(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
@@ -82,8 +87,13 @@ function RemindersDropdown({ rail = false }) {
   }
 
   async function handleDelete(id) {
-    await deleteReminder(id);
-    load();
+    setError('');
+    try {
+      await deleteReminder(id);
+      await load();
+    } catch (e) {
+      setError(e?.message || 'Não foi possível remover');
+    }
   }
 
   const todayStr = today();
@@ -102,34 +112,44 @@ function RemindersDropdown({ rail = false }) {
 
   return (
     <div className="relative" ref={ref}>
-      <button
-        type="button"
-        title={rail ? 'Lembretes' : undefined}
-        onClick={() => setOpen(o => !o)}
-        className={
-          rail
-            ? 'relative w-11 h-11 flex items-center justify-center bg-white border rounded-lg text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors'
-            : 'w-full flex items-center gap-2 bg-white border rounded-lg px-3 py-2 text-sm text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors'
-        }
-      >
-        {bellIcon}
-        {!rail && (
-          <>
-            <span className="flex-1 text-left">Lembretes</span>
+      {rail ? (
+        <button
+          type="button"
+          title="Lembretes"
+          onClick={() => navigate('/reminders')}
+          className="relative w-11 h-11 flex items-center justify-center bg-white border rounded-lg text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors"
+        >
+          {bellIcon}
+          {upcoming.length > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] flex items-center justify-center bg-blue-600 text-white text-[10px] font-bold rounded-full px-0.5 leading-none">
+              {upcoming.length > 9 ? '9+' : upcoming.length}
+            </span>
+          )}
+        </button>
+      ) : (
+        <div className="w-full flex items-center bg-white border rounded-lg text-sm text-gray-700 shadow-sm overflow-hidden">
+          <Link
+            to="/reminders"
+            className="flex items-center gap-2 flex-1 px-3 py-2 hover:bg-blue-50 hover:text-blue-700 transition-colors min-w-0"
+          >
+            {bellIcon}
+            <span className="flex-1 text-left truncate">Lembretes</span>
             {upcoming.length > 0 && (
-              <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{upcoming.length}</span>
+              <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 leading-none shrink-0">{upcoming.length}</span>
             )}
+          </Link>
+          <button
+            type="button"
+            onClick={() => setOpen(o => !o)}
+            className="px-2 py-2 border-l hover:bg-blue-50 hover:text-blue-700 transition-colors text-gray-400 shrink-0"
+            title="Expandir"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
             </svg>
-          </>
-        )}
-        {rail && upcoming.length > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] flex items-center justify-center bg-blue-600 text-white text-[10px] font-bold rounded-full px-0.5 leading-none">
-            {upcoming.length > 9 ? '9+' : upcoming.length}
-          </span>
-        )}
-      </button>
+          </button>
+        </div>
+      )}
 
       {open && (
         <div
@@ -185,15 +205,32 @@ function RemindersDropdown({ rail = false }) {
               {upcoming.map(r => {
                 const days = daysUntil(r.due_date);
                 const urgent = days <= 3;
+                const fromOther = isReminderFromSomeoneElse(r);
+                const receivedRead = fromOther && !r.notification_unread;
+                const receivedUnreadHighlight = fromOther && r.notification_unread;
                 return (
-                  <li key={r.id} className="rounded px-1 py-1 group">
-                    <div className="flex items-start gap-1.5">
-                      <span className="flex-1 text-sm font-medium text-gray-700 leading-snug break-words min-w-0">{r.text}</span>
-                      <button onClick={() => handleDelete(r.id)} className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 shrink-0 mt-0.5" title="Remover">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </button>
+                  <li
+                    key={r.id}
+                    className={[
+                      'rounded px-1 py-1 group',
+                      receivedUnreadHighlight ? 'bg-blue-50/80' : '',
+                      receivedRead ? 'opacity-[0.72]' : '',
+                    ].filter(Boolean).join(' ')}
+                  >
+                    <div className="flex items-start gap-1.5 min-w-0">
+                      <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-1.5 gap-y-0.5">
+                        <span className="inline-flex max-w-[9rem] shrink-0 items-center truncate rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-800 ring-1 ring-inset ring-blue-200/70" title={creatorDisplayName(r, { viewerName: currentUser?.nome })}>
+                          {creatorDisplayName(r, { viewerName: currentUser?.nome })}
+                        </span>
+                        <span className={`min-w-0 flex-1 text-sm font-medium leading-snug break-words ${receivedRead ? 'text-gray-500' : 'text-gray-700'}`}>{r.text}</span>
+                      </div>
+                      {canDeleteReminder(r) && (
+                        <button type="button" onClick={() => handleDelete(r.id)} className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 shrink-0 mt-0.5" title="Remover" aria-label="Remover lembrete">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                     <span className={`text-xs ${urgent ? 'text-orange-500 font-semibold' : 'text-gray-400'}`}>
                       {days === 0 ? 'Hoje!' : `${days}d`} · {new Date(r.due_date + 'T00:00:00').toLocaleDateString('pt-BR')}
@@ -216,21 +253,40 @@ function RemindersDropdown({ rail = false }) {
                 </button>
                 {showOld && (
                   <ul className="mt-1.5 space-y-1.5 max-h-32 overflow-y-auto">
-                    {old.map(r => (
-                      <li key={r.id} className="rounded px-1 py-1 group opacity-60">
-                        <div className="flex items-start gap-1.5">
-                          <span className="flex-1 text-sm font-medium text-gray-600 leading-snug break-words min-w-0">{r.text}</span>
-                          <button onClick={() => handleDelete(r.id)} className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 shrink-0 mt-0.5">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                            </svg>
-                          </button>
+                    {old.map(r => {
+                      const fromOther = isReminderFromSomeoneElse(r);
+                      const receivedRead = fromOther && !r.notification_unread;
+                      const receivedUnreadHighlight = fromOther && r.notification_unread;
+                      return (
+                      <li
+                        key={r.id}
+                        className={[
+                          'rounded px-1 py-1 group',
+                          receivedUnreadHighlight ? 'bg-blue-50/80 opacity-90' : '',
+                          receivedRead ? 'opacity-50' : !receivedUnreadHighlight ? 'opacity-60' : '',
+                        ].filter(Boolean).join(' ')}
+                      >
+                        <div className="flex items-start gap-1.5 min-w-0">
+                          <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-1.5 gap-y-0.5">
+                            <span className="inline-flex max-w-[9rem] shrink-0 items-center truncate rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-800 ring-1 ring-inset ring-blue-200/70" title={creatorDisplayName(r, { viewerName: currentUser?.nome })}>
+                              {creatorDisplayName(r, { viewerName: currentUser?.nome })}
+                            </span>
+                            <span className={`min-w-0 flex-1 text-sm font-medium leading-snug break-words ${receivedRead ? 'text-gray-400' : 'text-gray-600'}`}>{r.text}</span>
+                          </div>
+                          {canDeleteReminder(r) && (
+                            <button type="button" onClick={() => handleDelete(r.id)} className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 shrink-0 mt-0.5" title="Remover" aria-label="Remover lembrete">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                              </svg>
+                            </button>
+                          )}
                         </div>
                         <span className="text-xs text-red-400">
                           Atrasado · {new Date(r.due_date + 'T00:00:00').toLocaleDateString('pt-BR')}
                         </span>
                       </li>
-                    ))}
+                    );
+                    })}
                   </ul>
                 )}
               </div>
@@ -242,7 +298,7 @@ function RemindersDropdown({ rail = false }) {
   );
 }
 
-function Dropdown({ label, icon, badge, children, rail = false }) {
+function Dropdown({ label, icon, badge, children, rail = false, linkTo }) {
   const [open, setOpen] = useState(false);
   const ref = useRef();
 
@@ -252,36 +308,64 @@ function Dropdown({ label, icon, badge, children, rail = false }) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
+  const chevron = (
+    <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+      <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+    </svg>
+  );
+
   return (
     <div className="relative" ref={ref}>
-      <button
-        type="button"
-        title={rail ? label : undefined}
-        onClick={() => setOpen(o => !o)}
-        className={
-          rail
-            ? 'relative w-11 h-11 flex items-center justify-center bg-white border rounded-lg text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors'
-            : 'w-full flex items-center gap-2 bg-white border rounded-lg px-3 py-2 text-sm text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors'
-        }
-      >
-        {icon}
-        {!rail && (
-          <>
-            <span className="flex-1 text-left">{label}</span>
+      {/* Modo expandido com link separado no label */}
+      {!rail && linkTo ? (
+        <div className="w-full flex items-center bg-white border rounded-lg text-sm text-gray-700 shadow-sm overflow-hidden">
+          <Link
+            to={linkTo}
+            className="flex items-center gap-2 flex-1 px-3 py-2 hover:bg-blue-50 hover:text-blue-700 transition-colors min-w-0"
+          >
+            {icon}
+            <span className="flex-1 text-left truncate">{label}</span>
             {badge != null && badge > 0 && (
-              <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{badge}</span>
+              <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 leading-none shrink-0">{badge}</span>
             )}
-            <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-            </svg>
-          </>
-        )}
-        {rail && badge != null && badge > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] flex items-center justify-center bg-blue-600 text-white text-[10px] font-bold rounded-full px-0.5 leading-none">
-            {badge > 9 ? '9+' : badge}
-          </span>
-        )}
-      </button>
+          </Link>
+          <button
+            type="button"
+            onClick={() => setOpen(o => !o)}
+            className="px-2 py-2 border-l hover:bg-blue-50 hover:text-blue-700 transition-colors text-gray-400 shrink-0"
+            title="Expandir"
+          >
+            {chevron}
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          title={rail ? label : undefined}
+          onClick={() => setOpen(o => !o)}
+          className={
+            rail
+              ? 'relative w-11 h-11 flex items-center justify-center bg-white border rounded-lg text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors'
+              : 'w-full flex items-center gap-2 bg-white border rounded-lg px-3 py-2 text-sm text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors'
+          }
+        >
+          {icon}
+          {!rail && (
+            <>
+              <span className="flex-1 text-left">{label}</span>
+              {badge != null && badge > 0 && (
+                <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 leading-none">{badge}</span>
+              )}
+              {chevron}
+            </>
+          )}
+          {rail && badge != null && badge > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] flex items-center justify-center bg-blue-600 text-white text-[10px] font-bold rounded-full px-0.5 leading-none">
+              {badge > 9 ? '9+' : badge}
+            </span>
+          )}
+        </button>
+      )}
       {open && (
         <div
           className={
@@ -316,9 +400,8 @@ const BOOK_ICON = (
 );
 
 /** Barra estreita com ícones quando o menu principal está recolhido */
-export function SidebarRail({ researchers, onExpand, onLogout }) {
-  const upcomingDeadlines = [...DEADLINES].filter(d => daysUntil(d.date) >= 0).sort((a, b) => new Date(a.date) - new Date(b.date));
-  const pastDeadlines = [...DEADLINES].filter(d => daysUntil(d.date) < 0).sort((a, b) => new Date(b.date) - new Date(a.date));
+export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshKey = 0, currentUser = null }) {
+  const upcomingDeadlines = DEADLINES.filter(d => daysUntil(d.date) >= 0);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 h-full bg-gray-100">
@@ -347,30 +430,20 @@ export function SidebarRail({ researchers, onExpand, onLogout }) {
           )}
         </Link>
 
-        <RemindersDropdown rail />
+        <RemindersDropdown rail refreshKey={remindersRefreshKey} currentUser={currentUser} />
 
-        <Dropdown rail label="Deadlines" icon={CALENDAR_ICON} badge={upcomingDeadlines.length}>
-          <ul className="space-y-1.5">
-            {upcomingDeadlines.map((d) => {
-              const days = daysUntil(d.date);
-              return (
-                <li key={d.label} className="rounded px-1 py-1">
-                  <a href={d.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-600 hover:underline block truncate">{d.label}</a>
-                  <span className={`text-xs ${days <= 14 ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
-                    {days === 0 ? 'Hoje!' : `${days}d`} · {new Date(d.date).toLocaleDateString('pt-BR')}
-                  </span>
-                </li>
-              );
-            })}
-            {pastDeadlines.length > 0 && <li className="border-t my-1" />}
-            {pastDeadlines.map((d) => (
-              <li key={d.label} className="rounded px-1 py-1 opacity-40">
-                <a href={d.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-600 hover:underline block truncate">{d.label}</a>
-                <span className="text-xs text-gray-400">Encerrado · {new Date(d.date).toLocaleDateString('pt-BR')}</span>
-              </li>
-            ))}
-          </ul>
-        </Dropdown>
+        <Link
+          to="/deadlines"
+          title="Deadlines"
+          className="relative w-11 h-11 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors shrink-0"
+        >
+          {CALENDAR_ICON}
+          {upcomingDeadlines.length > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[1.125rem] h-[1.125rem] flex items-center justify-center bg-blue-600 text-white text-[10px] font-bold rounded-full px-0.5 leading-none">
+              {upcomingDeadlines.length > 9 ? '9+' : upcomingDeadlines.length}
+            </span>
+          )}
+        </Link>
 
         <Link
           to="/manual"
@@ -397,7 +470,7 @@ export function SidebarRail({ researchers, onExpand, onLogout }) {
   );
 }
 
-export default function Sidebar({ researchers, onRefresh, role }) {
+export default function Sidebar({ researchers, onRefresh, role, remindersRefreshKey = 0, currentUser = null }) {
   const [view, setView] = useState('list');
   const [editResearcher, setEditResearcher] = useState(null);
 
@@ -420,8 +493,7 @@ export default function Sidebar({ researchers, onRefresh, role }) {
     );
   }
 
-  const upcomingDeadlines = [...DEADLINES].filter(d => daysUntil(d.date) >= 0).sort((a, b) => new Date(a.date) - new Date(b.date));
-  const pastDeadlines = [...DEADLINES].filter(d => daysUntil(d.date) < 0).sort((a, b) => new Date(b.date) - new Date(a.date));
+  const upcomingDeadlines = DEADLINES.filter(d => daysUntil(d.date) >= 0);
 
   return (
     <div className="p-4 space-y-2 overflow-y-auto h-full">
@@ -431,6 +503,7 @@ export default function Sidebar({ researchers, onRefresh, role }) {
         label="Grupo"
         icon={GROUP_ICON}
         badge={researchers.length}
+        linkTo="/"
       >
         <ul className="space-y-1">
           {researchers.map((s) => (
@@ -456,34 +529,35 @@ export default function Sidebar({ researchers, onRefresh, role }) {
       </Dropdown>
 
       {/* Lembretes */}
-      <RemindersDropdown />
+      <RemindersDropdown refreshKey={remindersRefreshKey} currentUser={currentUser} />
 
       {/* Deadlines */}
-      <Dropdown
-        label="Deadlines"
-        icon={CALENDAR_ICON}
-        badge={upcomingDeadlines.length}
-      >
-        <ul className="space-y-1.5">
-          {upcomingDeadlines.map((d) => {
-            const days = daysUntil(d.date);
-            return (
-              <li key={d.label} className="rounded px-1 py-1">
-                <a href={d.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-600 hover:underline block truncate">{d.label}</a>
-                <span className={`text-xs ${days <= 14 ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
-                  {days === 0 ? 'Hoje!' : `${days}d`} · {new Date(d.date).toLocaleDateString('pt-BR')}
-                </span>
-              </li>
-            );
-          })}
-          {pastDeadlines.length > 0 && <li className="border-t my-1" />}
-          {pastDeadlines.map((d) => (
-            <li key={d.label} className="rounded px-1 py-1 opacity-40">
-              <a href={d.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-600 hover:underline block truncate">{d.label}</a>
-              <span className="text-xs text-gray-400">Encerrado · {new Date(d.date).toLocaleDateString('pt-BR')}</span>
-            </li>
-          ))}
-        </ul>
+      <Dropdown label="Deadlines" icon={CALENDAR_ICON} badge={upcomingDeadlines.length} linkTo="/deadlines">
+        {(() => {
+          const pastDeadlines = DEADLINES.filter(d => daysUntil(d.date) < 0).sort((a, b) => new Date(b.date) - new Date(a.date));
+          return (
+            <ul className="space-y-1.5">
+              {upcomingDeadlines.map((d) => {
+                const days = daysUntil(d.date);
+                return (
+                  <li key={d.label} className="rounded px-1 py-1">
+                    <a href={d.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-600 hover:underline block truncate">{d.label}</a>
+                    <span className={`text-xs ${days <= 14 ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
+                      {days === 0 ? 'Hoje!' : `${days}d`} · {new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                    </span>
+                  </li>
+                );
+              })}
+              {pastDeadlines.length > 0 && <li className="border-t my-1" />}
+              {pastDeadlines.map((d) => (
+                <li key={d.label} className="rounded px-1 py-1 opacity-40">
+                  <a href={d.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-600 hover:underline block truncate">{d.label}</a>
+                  <span className="text-xs text-gray-400">Encerrado · {new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                </li>
+              ))}
+            </ul>
+          );
+        })()}
       </Dropdown>
 
       {/* Manual de Sobrevivência */}

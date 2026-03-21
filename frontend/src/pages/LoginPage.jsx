@@ -61,27 +61,31 @@ export default function LoginPage() {
       }
 
       if (payload.role === 'student') {
-        const stuRes = await fetch(`/api/researchers/${payload.researcher_id}`, {
-          headers: { Authorization: `Bearer ${data.access_token}` },
-        });
-        const stu = await readResponseJson(stuRes, 'login.profile');
-        if (stu._invalidJson) {
-          console.error('[login] Perfil: JSON inválido', stuRes.status);
-          setError('Login ok, mas a resposta do perfil veio inválida. Tente de novo.');
-          return;
+        if (!payload.researcher_id) {
+          navigate('/manual', { replace: true });
+        } else {
+          const stuRes = await fetch(`/api/researchers/${payload.researcher_id}`, {
+            headers: { Authorization: `Bearer ${data.access_token}` },
+          });
+          const stu = await readResponseJson(stuRes, 'login.profile');
+          if (stu._invalidJson) {
+            console.error('[login] Perfil: JSON inválido', stuRes.status);
+            setError('Login ok, mas a resposta do perfil veio inválida. Tente de novo.');
+            return;
+          }
+          if (!stuRes.ok) {
+            const msg = formatApiDetail(stu) || 'Não foi possível carregar seu perfil.';
+            console.error('[login] Falha ao buscar pesquisador', { status: stuRes.status, body: stu });
+            setError(msg);
+            return;
+          }
+          if (!stu.nome) {
+            console.error('[login] Perfil sem nome', stu);
+            setError('Perfil incompleto. Contate o suporte.');
+            return;
+          }
+          navigate(`/profile/${slugify(stu.nome)}`, { replace: true });
         }
-        if (!stuRes.ok) {
-          const msg = formatApiDetail(stu) || 'Não foi possível carregar seu perfil.';
-          console.error('[login] Falha ao buscar pesquisador', { status: stuRes.status, body: stu });
-          setError(msg);
-          return;
-        }
-        if (!stu.nome) {
-          console.error('[login] Perfil sem nome', stu);
-          setError('Perfil incompleto. Contate o suporte.');
-          return;
-        }
-        navigate(`/profile/${slugify(stu.nome)}`, { replace: true });
       } else {
         navigate('/', { replace: true });
       }

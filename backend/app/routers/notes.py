@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import User
 from ..schemas import NoteOut
-from ..deps import get_optional_user
+from ..deps import get_optional_user, get_current_user
 from ..services import note_service, upload_service
 
 logger = logging.getLogger(__name__)
@@ -26,8 +26,11 @@ async def create_note(
     text: str = Form(...),
     file: UploadFile | None = File(None),
     db: Session = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_user),
+    current_user: User = Depends(get_current_user),
 ):
+    if current_user.role != "professor" and current_user.researcher_id != researcher_id:
+        raise HTTPException(status_code=403, detail="Alunos só podem adicionar notas no próprio perfil")
+
     file_url = None
     file_name = None
     if file and file.filename:
@@ -39,14 +42,16 @@ async def create_note(
         text,
         file_url,
         file_name,
-        current_user.id if current_user else None,
+        current_user.id,
     )
     return NoteOut.from_orm_with_creator(note)
 
 
 @router.delete("/notes/{note_id}", status_code=204)
-def delete_note(note_id: int, db: Session = Depends(get_db)):
+def delete_note(note_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     note = note_service.get_by_id(db, note_id)
     if not note:
         raise HTTPException(status_code=404, detail="Note not found")
+    if current_user.role != "professor" and note.created_by_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Você só pode remover suas próprias anotações")
     note_service.delete(db, note)

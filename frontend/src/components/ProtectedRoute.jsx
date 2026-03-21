@@ -40,10 +40,13 @@ export default function ProtectedRoute({ children, professorOnly = false }) {
 
       const path = location.pathname;
       const allowedStudent =
+        path === '/' ||
         path === `/profile/${slug}` ||
         path === '/manual' ||
         path === '/board' ||
-        path === '/reminders';
+        path === '/reminders' ||
+        path === '/deadlines' ||
+        path.startsWith('/profile/');
 
       if (allowedStudent) {
         setState('ok');

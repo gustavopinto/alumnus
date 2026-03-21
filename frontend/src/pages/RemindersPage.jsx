@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAppLayout } from '../components/AppLayout';
-import { getReminders, createReminder, updateReminder, deleteReminder, markReminderNotificationRead } from '../api';
+import { getReminders, createReminder, deleteReminder, markReminderNotificationRead } from '../api';
+import { canDeleteReminder, creatorDisplayName, isReminderFromSomeoneElse } from '../reminderAccess';
 
 function formatDue(dateStr) {
   if (!dateStr) return null;
@@ -14,34 +15,53 @@ function daysLeft(dateStr) {
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
 
+function todayIso() {
+  return new Date().toISOString().split('T')[0];
+}
+
 export default function RemindersPage() {
-  const { sidebarOpen, refreshReminderNotifications } = useAppLayout();
+  const { sidebarOpen, refreshSidebarReminders, currentUser } = useAppLayout();
+  const creatorOpts = { viewerName: currentUser?.nome };
   const headerPad = sidebarOpen ? 'pl-14' : '';
   const [reminders, setReminders] = useState([]);
   const [text, setText] = useState('');
-  const [dueDate, setDueDate] = useState('');
+  const [dueDate, setDueDate] = useState(todayIso);
   const [saving, setSaving] = useState(false);
-  const [markingReadId, setMarkingReadId] = useState(null);
 
-  async function load() {
+  const load = useCallback(async () => {
     const data = await getReminders();
     setReminders(data || []);
-    refreshReminderNotifications?.();
-  }
+    refreshSidebarReminders?.();
+  }, [refreshSidebarReminders]);
 
-  async function handleMarkNotificationRead(id) {
-    setMarkingReadId(id);
-    try {
-      await markReminderNotificationRead(id);
-      await load();
-    } catch {
-      /* ignore */
-    } finally {
-      setMarkingReadId(null);
+  useEffect(() => { load(); }, [load]);
+
+  const notificationUnreadKey = reminders
+    .filter((r) => r.notification_unread)
+    .map((r) => r.id)
+    .sort((a, b) => a - b)
+    .join(',');
+
+  /** Ao ver a lista, notificações recebidas marcam-se como lidas; o lembrete continua na lista, mais opaco. */
+  useEffect(() => {
+    if (!notificationUnreadKey) return;
+    const ids = notificationUnreadKey.split(',').map(Number);
+    let cancelled = false;
+    (async () => {
+      await Promise.all(ids.map((id) => markReminderNotificationRead(id).catch(() => {})));
+      if (!cancelled) await load();
+    })();
+    return () => { cancelled = true; };
+  }, [notificationUnreadKey, load]);
+
+  useEffect(() => {
+    function syncMinDate() {
+      const t = todayIso();
+      setDueDate((d) => (d && d < t ? t : d));
     }
-  }
-
-  useEffect(() => { load(); }, []);
+    window.addEventListener('focus', syncMinDate);
+    return () => window.removeEventListener('focus', syncMinDate);
+  }, []);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -49,24 +69,24 @@ export default function RemindersPage() {
     setSaving(true);
     await createReminder({ text, due_date: dueDate || null });
     setText('');
-    setDueDate('');
+    setDueDate(todayIso());
     setSaving(false);
-    load();
-  }
-
-  async function toggleDone(r) {
-    await updateReminder(r.id, { done: !r.done });
     load();
   }
 
   async function handleDelete(id) {
     if (!confirm('Remover lembrete?')) return;
-    await deleteReminder(id);
-    load();
+    try {
+      await deleteReminder(id);
+      await load();
+    } catch (e) {
+      alert(e?.message || 'Não foi possível remover');
+    }
   }
 
   const pending = reminders.filter(r => !r.done);
   const done = reminders.filter(r => r.done);
+  const minDue = todayIso();
 
   return (
     <div className="min-h-full bg-gray-50">
@@ -90,7 +110,12 @@ export default function RemindersPage() {
                   type="date"
                   className="border rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
                   value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
+                  min={minDue}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v && v < minDue) setDueDate(minDue);
+                    else setDueDate(v);
+                  }}
                 />
               </div>
               <button
@@ -106,46 +131,50 @@ export default function RemindersPage() {
 
         {pending.length > 0 && (
           <section className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-bold text-gray-800 mb-4">Pendentes</h2>
+            <h2 className="text-lg font-bold text-gray-800 mb-4">Próximo</h2>
             <ul className="space-y-3">
               {pending.map(r => {
                 const days = daysLeft(r.due_date);
                 const overdue = days !== null && days < 0;
                 const urgent = days !== null && days >= 0 && days <= 3;
+                const fromOther = isReminderFromSomeoneElse(r);
+                const receivedRead = fromOther && !r.notification_unread;
+                const receivedUnreadHighlight = fromOther && r.notification_unread;
                 return (
-                  <li key={r.id} className="flex items-start gap-3 border-b pb-3 last:border-0 last:pb-0">
-                    <button
-                      onClick={() => toggleDone(r)}
-                      className="mt-0.5 w-4 h-4 rounded border-2 border-gray-300 hover:border-blue-500 shrink-0 flex items-center justify-center"
-                      title="Marcar como feito"
-                    />
+                  <li
+                    key={r.id}
+                    className={[
+                      'flex items-start gap-3 border-b pb-3 last:border-0 last:pb-0',
+                      receivedUnreadHighlight ? 'bg-blue-50/70 rounded-lg -mx-1 px-1 py-1' : '',
+                      receivedRead ? 'opacity-[0.78]' : '',
+                    ].filter(Boolean).join(' ')}
+                  >
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-gray-800 whitespace-pre-wrap">{r.text}</p>
-                      {r.created_by_name && (
-                        <p className="text-[10px] text-gray-400 mt-0.5">Adicionado por {r.created_by_name}</p>
-                      )}
-                      {r.due_date && (
-                        <span className={`text-xs mt-0.5 inline-block ${overdue ? 'text-red-500 font-semibold' : urgent ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
-                          {overdue ? `Atrasado · ${formatDue(r.due_date)}` : days === 0 ? 'Hoje!' : `${days}d · ${formatDue(r.due_date)}`}
+                      <p className={`text-sm whitespace-pre-wrap mb-2 ${receivedRead ? 'text-gray-500' : 'text-gray-800'}`}>{r.text}</p>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="inline-flex shrink-0 items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-800 ring-1 ring-inset ring-blue-200/80">
+                          {creatorDisplayName(r, creatorOpts)}
                         </span>
-                      )}
-                      {r.notification_unread && (
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <span className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
-                            Notificação nova
+                        {r.due_date && (
+                          <span className={`text-xs ${overdue ? 'text-red-500 font-semibold' : urgent ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
+                            {overdue ? `Atrasado · ${formatDue(r.due_date)}` : days === 0 ? 'Hoje!' : `${days}d · ${formatDue(r.due_date)}`}
                           </span>
-                          <button
-                            type="button"
-                            disabled={markingReadId === r.id}
-                            onClick={() => handleMarkNotificationRead(r.id)}
-                            className="text-xs text-blue-600 hover:underline disabled:opacity-50"
-                          >
-                            {markingReadId === r.id ? 'Marcando…' : 'Marcar notificação como lida'}
-                          </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
-                    <button onClick={() => handleDelete(r.id)} className="text-xs text-red-400 hover:text-red-600 shrink-0">remover</button>
+                    {canDeleteReminder(r) && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(r.id)}
+                        title="Remover"
+                        aria-label="Remover lembrete"
+                        className="p-1 rounded text-red-400 hover:text-red-600 hover:bg-red-50 shrink-0 mt-0.5"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    )}
                   </li>
                 );
               })}
@@ -155,43 +184,53 @@ export default function RemindersPage() {
 
         {done.length > 0 && (
           <section className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-bold text-gray-800 mb-4">Concluídos</h2>
+            <h2 className="text-lg font-bold text-gray-800 mb-4">Passados</h2>
             <ul className="space-y-3">
-              {done.map(r => (
-                <li key={r.id} className="flex items-start gap-3 border-b pb-3 last:border-0 last:pb-0 opacity-50">
-                  <button
-                    onClick={() => toggleDone(r)}
-                    className="mt-0.5 w-4 h-4 rounded border-2 border-blue-400 bg-blue-400 shrink-0 flex items-center justify-center"
-                    title="Desmarcar"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3 text-white" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </button>
+              {done.map(r => {
+                const days = daysLeft(r.due_date);
+                const overdue = days !== null && days < 0;
+                const urgent = days !== null && days >= 0 && days <= 3;
+                const fromOther = isReminderFromSomeoneElse(r);
+                const receivedRead = fromOther && !r.notification_unread;
+                const receivedUnreadHighlight = fromOther && r.notification_unread;
+                return (
+                <li
+                  key={r.id}
+                  className={[
+                    'flex items-start gap-3 border-b pb-3 last:border-0 last:pb-0',
+                    receivedUnreadHighlight ? 'bg-blue-50/70 rounded-lg -mx-1 px-1 py-1' : '',
+                    receivedRead ? 'opacity-[0.42]' : 'opacity-50',
+                  ].filter(Boolean).join(' ')}
+                >
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-gray-500 line-through">{r.text}</p>
-                    {r.created_by_name && (
-                      <p className="text-[10px] text-gray-400 mt-0.5">Adicionado por {r.created_by_name}</p>
-                    )}
-                    {r.notification_unread && (
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <span className="text-[10px] font-semibold uppercase tracking-wide text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">
-                          Notificação nova
+                    <p className={`text-sm whitespace-pre-wrap mb-2 line-through ${receivedRead ? 'text-gray-400' : 'text-gray-500'}`}>{r.text}</p>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className="inline-flex shrink-0 items-center rounded-md bg-blue-50/80 px-2 py-0.5 text-xs font-semibold text-blue-700 ring-1 ring-inset ring-blue-200/60">
+                        {creatorDisplayName(r, creatorOpts)}
+                      </span>
+                      {r.due_date && (
+                        <span className={`text-xs ${overdue ? 'text-red-500 font-semibold' : urgent ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
+                          {overdue ? `Atrasado · ${formatDue(r.due_date)}` : days === 0 ? 'Hoje!' : `${days}d · ${formatDue(r.due_date)}`}
                         </span>
-                        <button
-                          type="button"
-                          disabled={markingReadId === r.id}
-                          onClick={() => handleMarkNotificationRead(r.id)}
-                          className="text-xs text-blue-600 hover:underline disabled:opacity-50"
-                        >
-                          {markingReadId === r.id ? 'Marcando…' : 'Marcar notificação como lida'}
-                        </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
-                  <button onClick={() => handleDelete(r.id)} className="text-xs text-red-400 hover:text-red-600 shrink-0 ml-auto">remover</button>
+                  {canDeleteReminder(r) && (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(r.id)}
+                      title="Remover"
+                      aria-label="Remover lembrete"
+                      className="p-1 rounded text-red-400 hover:text-red-600 hover:bg-red-50 shrink-0 ml-auto mt-0.5"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                  )}
                 </li>
-              ))}
+              );
+              })}
             </ul>
           </section>
         )}

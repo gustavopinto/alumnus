@@ -17,6 +17,7 @@ async function request(path, options = {}) {
     window.location.href = '/login';
     return;
   }
+  if (res.status === 204 || res.status === 205) return null;
   if (options.method === 'DELETE') return null;
   return res.json();
 }
@@ -68,7 +69,28 @@ export const getReminders = () => request('/reminders/');
 export const getReminderUnreadCount = () => request('/reminders/notifications/unread-count');
 export const createReminder = (data) => request('/reminders/', { method: 'POST', body: JSON.stringify(data) });
 export const updateReminder = (id, data) => request(`/reminders/${id}`, { method: 'PUT', body: JSON.stringify(data) });
-export const deleteReminder = (id) => request(`/reminders/${id}`, { method: 'DELETE' });
+export async function deleteReminder(id) {
+  const token = getToken();
+  const res = await fetch(`${BASE}/reminders/${id}`, {
+    method: 'DELETE',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (res.status === 401) {
+    removeToken();
+    window.location.href = '/login';
+    return;
+  }
+  if (!res.ok) {
+    let msg = 'Não foi possível remover';
+    try {
+      const body = await res.json();
+      if (body?.detail) msg = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail);
+    } catch {
+      /* ignore */
+    }
+    throw new Error(msg);
+  }
+}
 
 export async function markReminderNotificationRead(id) {
   const token = getToken();
@@ -96,6 +118,10 @@ export const deleteManualEntry = (id) => request(`/manual/${id}`, { method: 'DEL
 export const toggleManualVote = (entryId) => request(`/manual/${entryId}/vote`, { method: 'POST' });
 export const addManualComment = (entryId, text) => request(`/manual/${entryId}/comments`, { method: 'POST', body: JSON.stringify({ text }) });
 export const deleteManualComment = (commentId) => request(`/manual/comments/${commentId}`, { method: 'DELETE' });
+
+// Deadlines
+export const getDeadlineInterests = () => request('/deadlines/interests');
+export const toggleDeadlineInterest = (key) => request(`/deadlines/${encodeURIComponent(key)}/interest`, { method: 'POST' });
 
 // Upload
 export async function uploadPhoto(file) {

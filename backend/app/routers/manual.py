@@ -27,8 +27,6 @@ def create_entry(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    if current_user.role != "professor":
-        raise HTTPException(status_code=403, detail="Only professors can add manual entries")
     entry = manual_service.create_entry(db, data, current_user.id)
     return ManualEntryOut.from_orm_with_context(entry, current_user.id)
 

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, JSON, Text, LargeBinary
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, JSON, Text, LargeBinary, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from .database import Base
@@ -169,6 +169,19 @@ class ManualVote(Base):
 
     entry = relationship("ManualEntry", back_populates="votes")
     user  = relationship("User", foreign_keys=[user_id])
+
+
+class DeadlineInterest(Base):
+    __tablename__ = "deadline_interests"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    deadline_key = Column(String(200), nullable=False)
+    user_id      = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at   = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", foreign_keys=[user_id])
+
+    __table_args__ = (UniqueConstraint("deadline_key", "user_id"),)
 
 
 class ManualComment(Base):

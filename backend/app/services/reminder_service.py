@@ -2,7 +2,7 @@ import logging
 
 from sqlalchemy.orm import Session, joinedload
 
-from ..models import Reminder, ReminderRead
+from ..models import Reminder, ReminderRead, User
 from ..schemas import ReminderCreate, ReminderOut, ReminderUpdate
 
 logger = logging.getLogger(__name__)
@@ -21,8 +21,14 @@ def reminder_to_out(
     r: Reminder,
     viewer_id: int | None,
     read_ids: set[int] | None = None,
+    creator_name_map: dict[int, str] | None = None,
 ) -> ReminderOut:
-    created_by_name = r.created_by.nome if r.created_by else None
+    created_by_name = None
+    if r.created_by_id is not None:
+        if r.created_by is not None:
+            created_by_name = r.created_by.nome
+        elif creator_name_map:
+            created_by_name = creator_name_map.get(r.created_by_id)
     notification_unread = False
     if (
         viewer_id is not None
@@ -63,7 +69,12 @@ def list_reminders_out(db: Session, viewer_id: int | None) -> list[ReminderOut]:
         read_ids = _read_ids_for_user(db, viewer_id)
     else:
         read_ids = set()
-    return [reminder_to_out(r, viewer_id, read_ids) for r in reminders]
+    creator_ids = {r.created_by_id for r in reminders if r.created_by_id is not None}
+    creator_name_map: dict[int, str] = {}
+    if creator_ids:
+        for uid, nome in db.query(User.id, User.nome).filter(User.id.in_(creator_ids)).all():
+            creator_name_map[uid] = nome
+    return [reminder_to_out(r, viewer_id, read_ids, creator_name_map) for r in reminders]
 
 
 def count_unread_notifications(db: Session, user_id: int) -> int:
@@ -115,6 +126,13 @@ def update(db: Session, reminder: Reminder, data: ReminderUpdate) -> Reminder:
     return reminder
 
 
+def can_user_delete_reminder(user: User, reminder: Reminder) -> bool:
+    """Criador remove o próprio lembrete; sem criador (legado), só professor."""
+    if reminder.created_by_id is None:
+        return user.role == "professor"
+    return reminder.created_by_id == user.id
+
+
 def delete(db: Session, reminder: Reminder) -> None:
     db.delete(reminder)
     db.commit()
@@ -149,4 +167,8 @@ def single_reminder_out(db: Session, reminder_id: int, viewer_id: int | None) ->
     read_ids: set[int] = set()
     if viewer_id is not None:
         read_ids = _read_ids_for_user(db, viewer_id)
-    return reminder_to_out(r, viewer_id, read_ids)
+    creator_name_map = None
+    if r.created_by_id is not None and r.created_by is None:
+        u = db.query(User).filter(User.id == r.created_by_id).first()
+        creator_name_map = {u.id: u.nome} if u else {}
+    return reminder_to_out(r, viewer_id, read_ids, creator_name_map)

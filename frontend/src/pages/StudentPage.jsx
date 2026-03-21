@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useAppLayout } from '../components/AppLayout';
-import { getResearcherBySlug, updateResearcher, uploadPhoto, getNotes, createNote, deleteNote, getResearcherUser } from '../api';
+import { getResearcherBySlug, updateResearcher, uploadPhoto, getNotes, createNote, deleteNote, getResearcherUser, getDeadlineInterests } from '../api';
+import { DEADLINES, slugify } from '../deadlines';
 import { getTokenPayload } from '../auth';
 import Toast from '../components/Toast';
 
@@ -23,7 +24,7 @@ function formatLastLogin(iso) {
   return 'Último acesso: há mais de 10 dias';
 }
 
-function NotesSection({ researcherId }) {
+function NotesSection({ researcherId, canAdd, isProfessor, currentUserId }) {
   const [notes, setNotes] = useState([]);
   const [text, setText] = useState('');
   const [file, setFile] = useState(null);
@@ -62,7 +63,7 @@ function NotesSection({ researcherId }) {
   return (
     <div className="space-y-4">
     <Toast message={toast} onClose={() => setToast('')} />
-    <section className="bg-white rounded-xl shadow-sm border p-6">
+    {canAdd && <section className="bg-white rounded-xl shadow-sm border p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-bold text-gray-800">Anotações de reuniões</h2>
         {lastNote && (
@@ -100,11 +101,11 @@ function NotesSection({ researcherId }) {
           </button>
         </div>
       </form>
-    </section>
+    </section>}
 
     {notes.length > 0 && (
     <section className="bg-white rounded-xl shadow-sm border p-6">
-      <h2 className="text-lg font-bold text-gray-800 mb-4">Histórico de ações</h2>
+      <h2 className="text-lg font-bold text-gray-800 mb-4">Histórico de anotações</h2>
       <div className="max-h-96 overflow-y-auto">
         <ul className="space-y-4">
           {notes.map(note => (
@@ -113,10 +114,14 @@ function NotesSection({ researcherId }) {
                 <div>
                   <span className="text-xs text-gray-400">{formatDate(note.created_at)}</span>
                   {note.created_by_name && (
-                    <span className="ml-1.5 text-xs text-gray-500">por {note.created_by_name}</span>
+                    <span className="ml-1.5 text-xs text-gray-500">
+                      por <Link to={`/profile/${slugify(note.created_by_name)}`} className="hover:underline hover:text-gray-700">{note.created_by_name}</Link>
+                    </span>
                   )}
                 </div>
-                <button onClick={() => handleDelete(note.id)} className="text-xs text-red-400 hover:text-red-600">remover</button>
+                {(isProfessor || note.created_by_id === currentUserId) && (
+                  <button onClick={() => handleDelete(note.id)} className="text-xs text-red-400 hover:text-red-600">remover</button>
+                )}
               </div>
               <p className="text-sm text-gray-700 whitespace-pre-wrap">{note.text}</p>
               {note.file_url && (
@@ -431,6 +436,7 @@ export default function ResearcherPage() {
   const headerPad = sidebarOpen ? 'pl-14' : '';
   const [researcher, setResearcher] = useState(null);
   const [researcherUser, setResearcherUser] = useState(null);
+  const [myDeadlines, setMyDeadlines] = useState([]);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoInputRef = useRef();
 
@@ -441,9 +447,13 @@ export default function ResearcherPage() {
 
   async function load() {
     const r = await getResearcherBySlug(slug);
-    const u = await getResearcherUser(r.id);
+    const [u, allInterests] = await Promise.all([getResearcherUser(r.id), getDeadlineInterests()]);
     setResearcher(r);
     setResearcherUser(u);
+    if (u && allInterests) {
+      const keys = allInterests.filter(i => i.user_id === u.id).map(i => i.deadline_key);
+      setMyDeadlines(DEADLINES.filter(d => keys.includes(d.label)));
+    }
   }
 
   useEffect(() => { load(); }, [slug]);
@@ -520,7 +530,28 @@ export default function ResearcherPage() {
 
       <main className="max-w-3xl mx-auto py-8 px-4 space-y-6">
         <ProfileSection researcher={researcher} canEdit={canEdit} isProfessor={isProfessor} onSaved={load} />
-        <NotesSection researcherId={researcher.id} />
+        {myDeadlines.length > 0 && (
+          <section className="bg-white rounded-xl border shadow-sm p-5 space-y-3">
+            <h2 className="text-sm font-semibold text-gray-700">Trabalhando em</h2>
+            <div className="flex flex-wrap gap-2">
+              {myDeadlines.map(d => (
+                <a
+                  key={d.label}
+                  href={d.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors font-medium"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  {d.label}
+                </a>
+              ))}
+            </div>
+          </section>
+        )}
+        <NotesSection researcherId={researcher.id} canAdd={isProfessor || isOwnProfile} isProfessor={isProfessor} currentUserId={payload?.sub != null ? Number(payload.sub) : null} />
       </main>
     </div>
   );
