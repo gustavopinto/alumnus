@@ -5,10 +5,10 @@ import ProtectedRoute from './components/ProtectedRoute';
 import GraphPage from './pages/GraphPage';
 import ResearcherPage from './pages/ResearcherPage';
 import RemindersPage from './pages/RemindersPage';
-import BoardPage from './pages/BoardPage';
 import ManualPage from './pages/ManualPage';
 import DeadlinesPage from './pages/DeadlinesPage';
 import AdminPage from './pages/AdminPage';
+import InstitutionPage from './pages/InstitutionPage';
 import AuthPage from './pages/AuthPage';
 import LandingPage from './pages/LandingPage';
 
@@ -54,18 +54,18 @@ export default function App() {
           }
         />
         <Route
-          path="board"
-          element={
-            <ProtectedRoute>
-              <BoardPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
           path="deadlines"
           element={
             <ProtectedRoute>
               <DeadlinesPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="institutions"
+          element={
+            <ProtectedRoute adminOnly>
+              <InstitutionPage />
             </ProtectedRoute>
           }
         />

@@ -5,3 +5,12 @@ from ..models import User
 
 def get_by_id(db: Session, user_id: int) -> User | None:
     return db.query(User).get(user_id)
+
+
+def update_profile(db: Session, user: User, data: dict) -> User:
+    for key, value in data.items():
+        if hasattr(user, key):
+            setattr(user, key, value)
+    db.commit()
+    db.refresh(user)
+    return user

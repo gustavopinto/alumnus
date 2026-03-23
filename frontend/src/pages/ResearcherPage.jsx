@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAppLayout } from '../components/AppLayout';
-import { getResearcherBySlug, updateResearcher, uploadPhoto, getNotes, createNote, deleteNote, getResearcherUser, getDeadlineInterests } from '../api';
+import { getResearcherBySlug, updateResearcher, updateUserProfile, uploadPhoto, getNotes, createNote, deleteNote, getResearcherUser, getDeadlineInterests } from '../api';
 import { DEADLINES, slugify } from '../deadlines';
 import { getTokenPayload } from '../auth';
 import { modKey, isModEnter } from '../platform';
 import Toast from '../components/Toast';
 import { renderWithMentions } from '../mentionUtils.jsx';
 
-const STATUS_LABELS = { graduacao: 'Graduação', mestrado: 'Mestrado', doutorado: 'Doutorado', professor: 'Professor' };
-const STATUS_COLORS = { graduacao: '#3B82F6', mestrado: '#F59E0B', doutorado: '#10B981', professor: '#7C3AED' };
+const STATUS_LABELS = { graduacao: 'Graduação', mestrado: 'Mestrado', doutorado: 'Doutorado', postdoc: 'Pós-doc', professor: 'Professor' };
+const STATUS_COLORS = { graduacao: '#3B82F6', mestrado: '#F59E0B', doutorado: '#10B981', postdoc: '#06B6D4', professor: '#7C3AED' };
 
 function formatDate(iso) {
   return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -104,16 +104,18 @@ function validateTwitterForm(value) {
   return '';
 }
 
-function buildProfileForm(r) {
+function buildProfileForm(u) {
+  if (!u) return { lattes_url: '', scholar_url: '', linkedin_url: '', github_url: '', instagram_url: '', twitter_url: '', whatsapp: '', interesses: '', bio: '' };
   return {
-    lattes_url: r.lattes_url || '',
-    scholar_url: r.scholar_url || '',
-    linkedin_url: r.linkedin_url || '',
-    github_url: r.github_url || '',
-    instagram_url: socialToAtForm(r.instagram_url),
-    twitter_url: socialToAtForm(r.twitter_url),
-    whatsapp: r.whatsapp || '',
-    interesses: r.interesses || '',
+    lattes_url: u.lattes_url || '',
+    scholar_url: u.scholar_url || '',
+    linkedin_url: u.linkedin_url || '',
+    github_url: u.github_url || '',
+    instagram_url: socialToAtForm(u.instagram_url),
+    twitter_url: socialToAtForm(u.twitter_url),
+    whatsapp: u.whatsapp || '',
+    interesses: u.interesses || '',
+    bio: u.bio || '',
   };
 }
 
@@ -273,16 +275,16 @@ function NotesSection({ researcherId, canAdd, isProfessor, currentUserId, resear
   );
 }
 
-function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
+function ProfileSection({ researcher, user, canEdit, isProfessor, onSaved }) {
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState(() => buildProfileForm(researcher));
+  const [form, setForm] = useState(() => buildProfileForm(user));
   const [whatsappError, setWhatsappError] = useState('');
   const [instagramError, setInstagramError] = useState('');
   const [twitterError, setTwitterError] = useState('');
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [photoPreview, setPhotoPreview] = useState(researcher.photo_url || null);
+  const [photoPreview, setPhotoPreview] = useState(user?.photo_url || null);
   const [pendingPhotoUrl, setPendingPhotoUrl] = useState(null);
   const [pendingPhotoThumbUrl, setPendingPhotoThumbUrl] = useState(null);
   const photoRef = useRef();
@@ -291,8 +293,9 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
 
   useEffect(() => {
     if (editing) return;
-    setForm(buildProfileForm(researcher));
-  }, [researcher, editing]);
+    setForm(buildProfileForm(user));
+    setPhotoPreview(user?.photo_url || null);
+  }, [user, editing]);
 
   function maskPhone(value) {
     const digits = value.replace(/\D/g, '').slice(0, 11);
@@ -329,19 +332,22 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
     setTwitterError(twErr);
     if (igErr || twErr) return;
     setSaving(true);
-    await updateResearcher(researcher.id, {
-      lattes_url: form.lattes_url || null,
-      scholar_url: form.scholar_url || null,
-      linkedin_url: form.linkedin_url || null,
-      github_url: form.github_url || null,
-      instagram_url: form.instagram_url.trim() ? stripSocialUrlToHandle(form.instagram_url) : null,
-      twitter_url: form.twitter_url.trim() ? stripSocialUrlToHandle(form.twitter_url) : null,
-      whatsapp: form.whatsapp || null,
-      interesses: form.interesses || null,
-      ...(pendingPhotoUrl
-        ? { photo_url: pendingPhotoUrl, photo_thumb_url: pendingPhotoThumbUrl || null }
-        : {}),
-    });
+    if (user) {
+      await updateUserProfile(user.id, {
+        lattes_url: form.lattes_url || null,
+        scholar_url: form.scholar_url || null,
+        linkedin_url: form.linkedin_url || null,
+        github_url: form.github_url || null,
+        instagram_url: form.instagram_url.trim() ? stripSocialUrlToHandle(form.instagram_url) : null,
+        twitter_url: form.twitter_url.trim() ? stripSocialUrlToHandle(form.twitter_url) : null,
+        whatsapp: form.whatsapp || null,
+        interesses: form.interesses || null,
+        bio: form.bio || null,
+        ...(pendingPhotoUrl
+          ? { photo_url: pendingPhotoUrl, photo_thumb_url: pendingPhotoThumbUrl || null }
+          : {}),
+      });
+    }
     setSaving(false);
     setEditing(false);
     setPendingPhotoUrl(null);
@@ -352,7 +358,7 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
 
   function handleCancel() {
     setEditing(false);
-    setPhotoPreview(researcher.photo_url || null);
+    setPhotoPreview(user?.photo_url || null);
     setPendingPhotoUrl(null);
     setPendingPhotoThumbUrl(null);
     setInstagramError('');
@@ -360,42 +366,42 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
   }
 
   const links = [
-    { key: 'lattes_url', label: 'Lattes', value: researcher.lattes_url,
+    { key: 'lattes_url', label: 'Lattes', value: user?.lattes_url,
       cls: 'text-teal-700 bg-teal-50 border-teal-200 hover:bg-teal-100',
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/>
         </svg>
       )},
-    { key: 'scholar_url', label: 'Google Scholar', value: researcher.scholar_url,
+    { key: 'scholar_url', label: 'Google Scholar', value: user?.scholar_url,
       cls: 'text-indigo-600 bg-indigo-50 border-indigo-200 hover:bg-indigo-100',
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 3L1 9l4 2.18V17h2v-4.82L12 14l7-3.82V17h2v-5.82L23 9 12 3zm0 2.36L18.5 9 12 12.36 5.5 9 12 5.36zM5 19v2h14v-2H5z"/>
         </svg>
       )},
-    { key: 'linkedin_url', label: 'LinkedIn', value: researcher.linkedin_url,
+    { key: 'linkedin_url', label: 'LinkedIn', value: user?.linkedin_url,
       cls: 'text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100',
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
           <path d="M19 3a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h14m-.5 15.5v-5.3a3.26 3.26 0 00-3.26-3.26c-.85 0-1.84.52-2.32 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 011.4 1.4v4.93h2.79M6.88 8.56a1.68 1.68 0 001.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 00-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/>
         </svg>
       )},
-    { key: 'github_url', label: 'GitHub', value: researcher.github_url,
+    { key: 'github_url', label: 'GitHub', value: user?.github_url,
       cls: 'text-gray-800 bg-gray-100 border-gray-300 hover:bg-gray-200',
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 2A10 10 0 002 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0012 2z"/>
         </svg>
       )},
-    { key: 'instagram_url', label: 'Instagram', value: researcher.instagram_url ? (researcher.instagram_url.startsWith('http') ? researcher.instagram_url : `https://instagram.com/${researcher.instagram_url.replace(/^@/, '')}`) : null,
+    { key: 'instagram_url', label: 'Instagram', value: user?.instagram_url ? (user.instagram_url.startsWith('http') ? user.instagram_url : `https://instagram.com/${user.instagram_url.replace(/^@/, '')}`) : null,
       cls: 'text-pink-600 bg-pink-50 border-pink-200 hover:bg-pink-100',
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
           <path d="M7.8 2h8.4C19.4 2 22 4.6 22 7.8v8.4a5.8 5.8 0 01-5.8 5.8H7.8C4.6 22 2 19.4 2 16.2V7.8A5.8 5.8 0 017.8 2m-.2 2A3.6 3.6 0 004 7.6v8.8C4 18.39 5.61 20 7.6 20h8.8a3.6 3.6 0 003.6-3.6V7.6C20 5.61 18.39 4 16.4 4H7.6m9.65 1.5a1.25 1.25 0 011.25 1.25A1.25 1.25 0 0117.25 8 1.25 1.25 0 0116 6.75a1.25 1.25 0 011.25-1.25M12 7a5 5 0 015 5 5 5 0 01-5 5 5 5 0 01-5-5 5 5 0 015-5m0 2a3 3 0 00-3 3 3 3 0 003 3 3 3 0 003-3 3 3 0 00-3-3z"/>
         </svg>
       )},
-    { key: 'twitter_url', label: 'Twitter / X', value: researcher.twitter_url ? (researcher.twitter_url.startsWith('http') ? researcher.twitter_url : `https://x.com/${researcher.twitter_url.replace(/^@/, '')}`) : null,
+    { key: 'twitter_url', label: 'Twitter / X', value: user?.twitter_url ? (user.twitter_url.startsWith('http') ? user.twitter_url : `https://x.com/${user.twitter_url.replace(/^@/, '')}`) : null,
       cls: 'text-sky-600 bg-sky-50 border-sky-200 hover:bg-sky-100',
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
@@ -410,11 +416,11 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
     <section className="bg-white rounded-xl shadow-sm border p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-bold text-gray-800">Perfil</h2>
-        {canEdit && !editing && (
+        {canEdit && !editing && user && (
           <button
             type="button"
             onClick={() => {
-              setForm(buildProfileForm(researcher));
+              setForm(buildProfileForm(user));
               setInstagramError('');
               setTwitterError('');
               setWhatsappError('');
@@ -512,6 +518,15 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
             </div>
           ))}
           <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Bio</label>
+            <textarea
+              className="w-full border rounded-lg px-3 py-2 text-sm h-16 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="Breve descrição sobre você..."
+              value={form.bio}
+              onChange={set('bio')}
+            />
+          </div>
+          <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Interesses de pesquisa</label>
             <textarea
               className="w-full border rounded-lg px-3 py-2 text-sm h-20 resize-none focus:outline-none focus:ring-2 focus:ring-blue-400"
@@ -539,9 +554,9 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
                 {label}
               </a>
             ) : null)}
-            {researcher.whatsapp && (
+            {user?.whatsapp && (
               <a
-                href={`https://wa.me/55${researcher.whatsapp.replace(/\D/g, '')}`}
+                href={`https://wa.me/55${user.whatsapp.replace(/\D/g, '')}`}
                 target="_blank" rel="noreferrer"
                 className="inline-flex items-center gap-1.5 text-sm text-green-600 hover:underline bg-green-50 px-3 py-1 rounded-full border border-green-100"
               >
@@ -551,14 +566,20 @@ function ProfileSection({ researcher, canEdit, isProfessor, onSaved }) {
                 WhatsApp
               </a>
             )}
-            {links.every(l => !l.value) && !researcher.interesses && !researcher.whatsapp && (
+            {links.every(l => !l.value) && !user?.interesses && !user?.whatsapp && (
               <p className="text-sm text-gray-400 italic">Nenhuma informação de perfil cadastrada.</p>
             )}
           </div>
-          {researcher.interesses && (
+          {user?.bio && (
+            <div>
+              <p className="text-xs font-medium text-gray-500 mb-1">Bio</p>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{user.bio}</p>
+            </div>
+          )}
+          {user?.interesses && (
             <div>
               <p className="text-xs font-medium text-gray-500 mb-1">Interesses de pesquisa</p>
-              <p className="text-sm text-gray-700">{researcher.interesses}</p>
+              <p className="text-sm text-gray-700">{user.interesses}</p>
             </div>
           )}
           {isProfessor && (researcher.matricula || researcher.curso || researcher.enrollment_date) && (
@@ -615,7 +636,7 @@ export default function ResearcherPage() {
   const photoInputRef = useRef();
 
   const payload = getTokenPayload();
-  const isProfessor = payload?.role === 'professor' || payload?.role === 'admin';
+  const isProfessor = payload?.role === 'professor' || payload?.role === 'superadmin';
   const isOwnProfile = payload?.researcher_id != null && researcher?.id === payload.researcher_id;
   const canEdit = isProfessor || isOwnProfile;
 
@@ -646,7 +667,7 @@ export default function ResearcherPage() {
     const color = STATUS_COLORS[researcher.status] || '#6B7280';
     setProfileTopbar({
       nome: researcher.nome,
-      photoUrl: researcher.photo_url,
+      photoUrl: researcherUser?.photo_url || null,
       statusColor: color,
       statusLabel: STATUS_LABELS[researcher.status] || researcher.status,
       email: researcher.email,
@@ -670,10 +691,10 @@ export default function ResearcherPage() {
 
   async function handlePhotoChange(e) {
     const file = e.target.files[0];
-    if (!file) return;
+    if (!file || !researcherUser) return;
     setUploadingPhoto(true);
     const res = await uploadPhoto(file);
-    await updateResearcher(researcher.id, { photo_url: res.url, photo_thumb_url: res.thumb_url || null });
+    await updateUserProfile(researcherUser.id, { photo_url: res.url, photo_thumb_url: res.thumb_url || null });
     setUploadingPhoto(false);
     load();
   }
@@ -689,7 +710,7 @@ export default function ResearcherPage() {
       )}
 
       <main className="max-w-3xl mx-auto py-8 px-4 space-y-6">
-        <ProfileSection researcher={researcher} canEdit={canEdit} isProfessor={isProfessor} onSaved={load} />
+        <ProfileSection researcher={researcher} user={researcherUser} canEdit={canEdit} isProfessor={isProfessor} onSaved={load} />
         {myDeadlines.length > 0 && (
           <section className="bg-white rounded-xl border shadow-sm p-5 space-y-3">
             <h2 className="text-sm font-semibold text-gray-700">Trabalhando em</h2>

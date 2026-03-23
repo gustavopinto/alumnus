@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ResearcherForm from './ResearcherForm';
-import { deleteResearcher, getReminders, createReminder, updateReminder, deleteReminder } from '../api';
+import { deleteResearcher, getProfessors, getGroups, updateGroup, getReminders, createReminder, updateReminder, deleteReminder } from '../api';
 import { canDeleteReminder, creatorDisplayName, isReminderFromSomeoneElse } from '../reminderAccess';
 import { invalidMentions, renderWithMentions } from '../mentionUtils.jsx';
 import { isModEnter } from '../platform';
@@ -330,7 +330,7 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, r
   );
 }
 
-function Dropdown({ label, icon, badge, children, rail = false, linkTo }) {
+function Dropdown({ label, icon, badge, children, rail = false, linkTo, onLabelClick, disabled = false }) {
   const [open, setOpen] = useState(false);
   const ref = useRef();
 
@@ -354,6 +354,7 @@ function Dropdown({ label, icon, badge, children, rail = false, linkTo }) {
           <Link
             to={linkTo}
             className="flex items-center gap-2 flex-1 px-3 py-2 hover:bg-blue-50 hover:text-blue-700 transition-colors min-w-0"
+            onDoubleClick={(e) => { if (onLabelClick) { e.preventDefault(); setOpen(true); onLabelClick(); } }}
           >
             {icon}
             <span className="flex-1 text-left truncate">{label}</span>
@@ -361,14 +362,16 @@ function Dropdown({ label, icon, badge, children, rail = false, linkTo }) {
               <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 leading-none shrink-0">{badge}</span>
             )}
           </Link>
-          <button
-            type="button"
-            onClick={() => setOpen(o => !o)}
-            className="px-2 py-2 border-l hover:bg-blue-50 hover:text-blue-700 transition-colors text-gray-400 shrink-0"
-            title="Expandir"
-          >
-            {chevron}
-          </button>
+          {!disabled && (
+            <button
+              type="button"
+              onClick={() => setOpen(o => !o)}
+              className="px-2 py-2 border-l hover:bg-blue-50 hover:text-blue-700 transition-colors text-gray-400 shrink-0"
+              title="Expandir"
+            >
+              {chevron}
+            </button>
+          )}
         </div>
       ) : (
         <button
@@ -431,6 +434,12 @@ const BOOK_ICON = (
   </svg>
 );
 
+const INSTITUTION_ICON = (
+  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+  </svg>
+);
+
 /** Barra estreita com ícones quando o menu principal está recolhido */
 export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshKey = 0, currentUser = null, role = null, isAdmin = false }) {
   const upcomingDeadlines = DEADLINES.filter(d => daysUntil(d.date) >= 0);
@@ -457,6 +466,18 @@ export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshK
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          </Link>
+        )}
+
+        {isAdmin && (
+          <Link
+            to="/app/institutions"
+            title="Instituição"
+            className="w-11 h-11 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors shrink-0"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
             </svg>
           </Link>
         )}
@@ -517,6 +538,24 @@ export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshK
 export default function Sidebar({ researchers, onRefresh, role, isAdmin = false, remindersRefreshKey = 0, currentUser = null }) {
   const [view, setView] = useState('list');
   const [editResearcher, setEditResearcher] = useState(null);
+  const [professors, setProfessors] = useState([]);
+  const [currentGroup, setCurrentGroup] = useState(null); // { id, name }
+  const [groupLabel, setGroupLabel] = useState('Grupo');
+  const [renamingGroup, setRenamingGroup] = useState(false);
+  const [renameInput, setRenameInput] = useState('');
+
+  useEffect(() => {
+    if (isAdmin) {
+      getProfessors().then(data => setProfessors(data || [])).catch(() => {});
+      getGroups().then(data => {
+        const groups = Array.isArray(data) ? data : [];
+        if (groups.length > 0) {
+          setCurrentGroup(groups[0]);
+          setGroupLabel(groups[0].name);
+        }
+      }).catch(() => {});
+    }
+  }, [isAdmin]);
 
   function handleEdit(s) { setEditResearcher(s); setView('researcher-form'); }
 
@@ -528,10 +567,24 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
 
   function handleSaved() { setView('list'); setEditResearcher(null); onRefresh(); }
 
+  async function handleRenameGroup() {
+    const name = renameInput.trim() || 'Grupo';
+    setGroupLabel(name);
+    setRenamingGroup(false);
+    if (currentGroup) {
+      try {
+        const updated = await updateGroup(currentGroup.id, { name });
+        if (updated?.name) setGroupLabel(updated.name);
+      } catch {
+        // silently ignore if update fails
+      }
+    }
+  }
+
   if (view === 'researcher-form') {
     return (
       <div className="p-4">
-        <ResearcherForm researcher={editResearcher} researchers={researchers} onSaved={handleSaved}
+        <ResearcherForm researcher={editResearcher} professors={professors} onSaved={handleSaved}
           onCancel={() => { setView('list'); setEditResearcher(null); }} />
       </div>
     );
@@ -555,13 +608,55 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
         </Link>
       )}
 
+      {/* Instituição */}
+      {isAdmin && (
+        <Link
+          to="/app/institutions"
+          className="w-full flex items-center gap-2 bg-white border rounded-lg px-3 py-2 text-sm text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors"
+        >
+          {INSTITUTION_ICON}
+          <span>Instituição</span>
+        </Link>
+      )}
+
       {/* Grupo */}
       <Dropdown
-        label="Grupo"
+        label={groupLabel}
         icon={GROUP_ICON}
         badge={researchers.length}
         linkTo="/app"
+        onLabelClick={() => { setRenameInput(groupLabel); setRenamingGroup(true); }}
+        disabled={researchers.length === 0}
       >
+        {renamingGroup && (
+          <div className="mb-2 pb-2 border-b">
+            <p className="text-xs text-gray-500 mb-1">Renomear grupo</p>
+            <div className="flex gap-1">
+              <input
+                autoFocus
+                className="flex-1 border rounded px-2 py-1 text-sm"
+                value={renameInput}
+                onChange={e => setRenameInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleRenameGroup();
+                  if (e.key === 'Escape') setRenamingGroup(false);
+                }}
+              />
+              <button
+                onClick={handleRenameGroup}
+                className="text-xs bg-blue-600 text-white rounded px-2 hover:bg-blue-700"
+              >
+                OK
+              </button>
+              <button
+                onClick={() => setRenamingGroup(false)}
+                className="text-xs text-gray-400 hover:text-gray-600 px-1"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
         <ul className="space-y-1">
           {researchers.map((s) => (
             <li key={s.id} className="flex items-center justify-between rounded px-1 py-1 text-sm hover:bg-gray-50">
@@ -626,8 +721,6 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
         <span>Manual de Sobrevivência</span>
       </Link>
 
-      {/* Mural — hidden for now */}
-      {/* <Link to="/board" ...>Mural</Link> */}
     </div>
   );
 }

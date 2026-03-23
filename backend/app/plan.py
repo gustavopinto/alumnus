@@ -32,7 +32,7 @@ def now_naive_utc() -> datetime:
 
 
 def is_plan_user(user: User) -> bool:
-    """Plano (trial/mensal/anual): professor e superadmin. Aluno e admin sem assinatura na base."""
+    """Plano (trial/mensal/anual): professor e superadmin."""
     return user.role in ("professor", "superadmin")
 
 
@@ -83,12 +83,27 @@ def compute_trial_days_remaining(user: User) -> int | None:
 def user_to_out(user: User) -> "UserOut":
     from .schemas import UserOut
 
+    _profile = dict(
+        photo_url=user.photo_url,
+        photo_thumb_url=user.photo_thumb_url,
+        lattes_url=user.lattes_url,
+        scholar_url=user.scholar_url,
+        linkedin_url=user.linkedin_url,
+        github_url=user.github_url,
+        instagram_url=user.instagram_url,
+        twitter_url=user.twitter_url,
+        whatsapp=user.whatsapp,
+        interesses=user.interesses,
+        bio=user.bio,
+    )
+
     if not is_plan_user(user):
         return UserOut(
             id=user.id,
             email=user.email,
             nome=user.nome,
             role=user.role,
+            professor_id=user.professor_id,
             researcher_id=user.researcher_id,
             last_login=user.last_login,
             created_at=user.created_at,
@@ -97,6 +112,7 @@ def user_to_out(user: User) -> "UserOut":
             account_activated_at=None,
             plan_period_ends_at=None,
             trial_days_remaining=None,
+            **_profile,
         )
 
     return UserOut(
@@ -104,6 +120,7 @@ def user_to_out(user: User) -> "UserOut":
         email=user.email,
         nome=user.nome,
         role=user.role,
+        professor_id=user.professor_id,
         researcher_id=user.researcher_id,
         last_login=user.last_login,
         created_at=user.created_at,
@@ -112,4 +129,5 @@ def user_to_out(user: User) -> "UserOut":
         account_activated_at=user.account_activated_at,
         plan_period_ends_at=user.plan_period_ends_at,
         trial_days_remaining=compute_trial_days_remaining(user),
+        **_profile,
     )

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 
 const STATUS_COLOR = {
   professor: '#7C3AED',
+  postdoc:    '#06B6D4',
   doutorado:  '#10B981',
   mestrado:   '#F59E0B',
   graduacao:  '#3B82F6',
@@ -10,6 +11,7 @@ const STATUS_COLOR = {
 
 const STATUS_LABEL = {
   professor: 'Professor',
+  postdoc:    'Pós-doc',
   doutorado:  'Doutorado',
   mestrado:   'Mestrado',
   graduacao:  'Graduação',
@@ -48,6 +50,7 @@ export default function BoxView({ researchers, hiddenStatuses }) {
 
   const groups = [
     { status: 'professor', items: visible.filter(r => r.status === 'professor') },
+    { status: 'postdoc',    items: visible.filter(r => r.status === 'postdoc') },
     { status: 'doutorado',  items: visible.filter(r => r.status === 'doutorado') },
     { status: 'mestrado',   items: visible.filter(r => r.status === 'mestrado') },
     { status: 'graduacao',  items: visible.filter(r => r.status === 'graduacao') },

@@ -18,7 +18,7 @@ def h(pw): return pwd_ctx.hash(pw)
 def run():
     with Session() as db:
         from app.models import (
-            Researcher, User, Note, Work, Reminder, BoardPost,
+            Researcher, User, Note, Work, Reminder,
             ManualEntry, Relationship, GraphLayout
         )
 
@@ -322,23 +322,6 @@ def run():
                 db.add(Note(researcher_id=r_id, text=text_, created_by_id=u_id,
                             created_at=datetime.utcnow() - timedelta(days=10)))
 
-        # ── BOARD POSTS ────────────────────────────────────────────────────
-        posts = [
-            (prof1_uid, '📢 **Reunião geral do grupo — 18/06/2024 às 14h** na sala 312 do ICEN.\n\nPauta:\n- Atualizações de pesquisa (5min por pessoa)\n- Deadlines do 2º semestre\n- Planejamento de submissões para SBES/SBCAS\n\nPresença obrigatória! Quem não puder comparecer, avisar com antecedência.'),
-            (prof1_uid, '🎉 **Parabéns ao Rafael Mendes!** O artigo dele foi aceito na ICSE 2023 — um dos melhores venues de Engenharia de Software do mundo. Orgulho enorme! 🏆'),
-            (ana_uid,   '📄 Compartilhando o survey de LLMs para SE que usei na minha pesquisa: Zhang et al. (2023), "A Survey of Large Language Models for Code". Vale muito a leitura pra quem trabalha na área.\n\nLink: https://arxiv.org/abs/2311.07989'),
-            (raf_uid,   '🛠️ Deixei o plugin VSCode do nosso grupo disponível para teste interno. Quem quiser instalar e dar feedback, é só me chamar no WhatsApp. Funciona para Java e Python por enquanto.'),
-            (car_uid,   '📅 Lembrete: o prazo para submissão de resumos para o SEMISH 2024 é **30 de junho**. Quem tiver trabalho relevante, não deixa passar!'),
-            (fer_uid,   '💡 Achei essa ferramenta incrível para análise de repositórios: **Sourcegraph**. Dá pra fazer buscas de código em escala em todos os repos do GitHub. Ajudou muito na coleta de dados pra minha dissertação.'),
-            (prof1_uid, '📋 **Atualização importante:** A CAPES exige que todos os bolsistas registrem as atividades mensais no SigaBolsas até o dia **5 de cada mês**. Confiram se estão em dia!'),
-            (marina_uid,'🚀 **CloudLab recebe infraestrutura nova!** Temos agora um cluster Kubernetes de 8 nós disponível para experimentos. Quem precisar de acesso, me manda e-mail com o descritivo do experimento.'),
-        ]
-
-        for u_id, text_ in posts:
-            if u_id:
-                db.add(BoardPost(text=text_, author_id=u_id,
-                                 created_at=datetime.utcnow() - timedelta(days=20)))
-
         # ── REMINDERS ─────────────────────────────────────────────────────
         def add_reminder(u_id, text_, due, done=False):
             if u_id and not db.query(Reminder).filter_by(text=text_, created_by_id=u_id).first():
@@ -418,7 +401,6 @@ def run():
         print(f'  Users: {db.query(User).count()}')
         print(f'  Works: {db.query(Work).count()}')
         print(f'  Notes: {db.query(Note).count()}')
-        print(f'  Board posts: {db.query(BoardPost).count()}')
         print(f'  Reminders: {db.query(Reminder).count()}')
         print(f'  Manual entries: {db.query(ManualEntry).count()}')
         print(f'  Relationships: {db.query(Relationship).count()}')

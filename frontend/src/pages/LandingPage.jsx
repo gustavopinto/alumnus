@@ -355,7 +355,7 @@ export default function LandingPage() {
               Visão completa do grupo em uma tela.
             </h2>
             <p className="text-lg text-gray-500 leading-relaxed mb-8">
-              Acompanhe em tempo real quantos orientandos estão ativos, quantos ainda não se cadastraram, posts no mural, lembretes e entradas no manual — tudo consolidado no dashboard.
+              Acompanhe em tempo real quantos orientandos estão ativos, quantos ainda não se cadastraram, lembretes e entradas no manual — tudo consolidado no dashboard.
             </p>
             <ul className="space-y-3">
               {['Contadores por categoria em destaque', 'Lista de usuários com último acesso', 'Controle de papéis e permissões', 'Filtrado ao seu grupo automaticamente'].map(t => (

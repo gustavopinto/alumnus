@@ -2,11 +2,22 @@ import logging
 
 from sqlalchemy.orm import Session
 
-from ..models import Researcher, User
+from ..models import Professor, ProfessorGroup, Researcher, User
 from ..schemas import ResearcherCreate, ResearcherUpdate
 from ..slug import slugify
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_group_id(db: Session, orientador_id: int | None) -> int | None:
+    """Dado um professor orientador, retorna o group_id do seu grupo principal (coordinator)."""
+    if orientador_id is None:
+        return None
+    pg = db.query(ProfessorGroup).filter(
+        ProfessorGroup.professor_id == orientador_id,
+        ProfessorGroup.role_in_group == "coordinator",
+    ).first()
+    return pg.group_id if pg else None
 
 
 def list_all(db: Session, ativo: bool | None) -> list[Researcher]:
@@ -17,7 +28,11 @@ def list_all(db: Session, ativo: bool | None) -> list[Researcher]:
 
 
 def create(db: Session, data: ResearcherCreate) -> Researcher:
-    researcher = Researcher(**data.model_dump())
+    payload = data.model_dump()
+    # Auto-resolve group_id from orientador if not explicitly provided
+    if payload.get("group_id") is None and payload.get("orientador_id") is not None:
+        payload["group_id"] = _resolve_group_id(db, payload["orientador_id"])
+    researcher = Researcher(**payload)
     db.add(researcher)
     db.commit()
     db.refresh(researcher)
@@ -42,7 +57,13 @@ def get_linked_user(db: Session, researcher_id: int) -> User | None:
 
 
 def update(db: Session, researcher: Researcher, data: ResearcherUpdate) -> Researcher:
-    for key, value in data.model_dump(exclude_unset=True).items():
+    payload = data.model_dump(exclude_unset=True)
+
+    # When orientador changes, auto-update group_id (unless explicitly provided)
+    if "orientador_id" in payload and "group_id" not in payload:
+        payload["group_id"] = _resolve_group_id(db, payload["orientador_id"])
+
+    for key, value in payload.items():
         setattr(researcher, key, value)
     db.commit()
     db.refresh(researcher)

@@ -3,7 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { getAdminStats, getAdminUsers, updateUserRole, deleteUser, deletePendingResearcher, bulkDeleteUsers } from '../api';
 import { getTokenPayload } from '../auth';
 
-const ROLE_LABELS = { superadmin: 'Superadmin', admin: 'Admin', professor: 'Professor', student: 'Aluno' };
+const ROLE_LABELS = { superadmin: 'Superadmin', professor: 'Professor', student: 'Aluno' };
+const STATUS_LABELS = { graduacao: 'Graduação', mestrado: 'Mestrado', doutorado: 'Doutorado', postdoc: 'Pós-doc', professor: 'Professor' };
+const STATUS_COLORS = {
+  professor: 'bg-purple-100 text-purple-700 border-purple-200',
+  postdoc:    'bg-cyan-100 text-cyan-700 border-cyan-200',
+  doutorado: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  mestrado:  'bg-amber-100 text-amber-700 border-amber-200',
+  graduacao: 'bg-blue-100 text-blue-700 border-blue-200',
+};
 const ROLE_COLORS = {
   superadmin: 'bg-red-100 text-red-700 border-red-200',
   admin:      'bg-purple-100 text-purple-700 border-purple-200',
@@ -39,7 +47,7 @@ export default function AdminPage() {
 
   const myRole = getTokenPayload()?.role;
   const isSuperadmin = myRole === 'superadmin';
-  const canDelete = ['superadmin', 'professor', 'admin'].includes(myRole);
+  const canDelete = ['superadmin', 'professor'].includes(myRole);
 
   function copyInviteLink(u) {
     const token = btoa(u.email);
@@ -50,7 +58,7 @@ export default function AdminPage() {
     });
   }
 
-  const ROLE_ORDER = { superadmin: 0, professor: 1, admin: 2, student: 3 };
+  const ROLE_ORDER = { superadmin: 0, professor: 1, student: 2 };
 
   async function load() {
     const [s, u] = await Promise.all([getAdminStats(), getAdminUsers()]);
@@ -105,7 +113,7 @@ export default function AdminPage() {
 
   async function handleRoleChange(userId) {
     setSaving(true);
-    await updateUserRole(userId, editRole, ['admin','superadmin'].includes(editRole));
+    await updateUserRole(userId, editRole, editRole === 'superadmin');
     setEditingId(null);
     setSaving(false);
     load();
@@ -134,9 +142,9 @@ export default function AdminPage() {
         <section>
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">Visão geral</h2>
           <div className={`grid grid-cols-2 gap-4 ${isSuperadmin ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-            {isSuperadmin && (stats?.users_by_role?.admin ?? 0) > 0 ? (
-              <StatCard label="Admins"       value={stats?.users_by_role?.admin      ?? 0} color="text-purple-600" />
-            ) : null}
+            {isSuperadmin && (
+              <StatCard label="Superadmins" value={stats?.users_by_role?.superadmin ?? 0} color="text-red-600" />
+            )}
             <StatCard label="Professores"  value={stats?.users_by_role?.professor  ?? 0} color="text-blue-600" />
             <div className="bg-white rounded-xl border shadow-sm p-5 flex flex-col gap-1">
               <span className="text-3xl font-bold text-green-600">{stats?.users_by_role?.student ?? 0}</span>
@@ -146,10 +154,9 @@ export default function AdminPage() {
               )}
             </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
+          <div className="grid grid-cols-2 sm:grid-cols-2 gap-4 mt-4">
             <StatCard label="Lembretes"    value={stats?.total_reminders}           color="text-amber-600" />
             <StatCard label="Manual"       value={stats?.total_manual_entries}      color="text-teal-600" />
-            <StatCard label="Posts mural"  value={stats?.total_board_posts}         color="text-orange-600" />
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
             <StatCard label="Anotações"   value={stats?.total_notes}               color="text-rose-600" />
@@ -188,6 +195,7 @@ export default function AdminPage() {
                   <th className="px-4 py-3">Nome</th>
                   <th className="px-4 py-3">Email</th>
                   <th className="px-4 py-3">Perfil</th>
+                  <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">WhatsApp</th>
                   <th className="px-4 py-3">Último acesso</th>
                   <th className="px-4 py-3">Ações</th>
@@ -228,7 +236,6 @@ export default function AdminPage() {
                             className="border rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-purple-400"
                           >
                             <option value="superadmin">Superadmin</option>
-                            <option value="admin">Admin</option>
                             <option value="professor">Professor</option>
                             <option value="student">Aluno</option>
                           </select>
@@ -253,6 +260,13 @@ export default function AdminPage() {
                           </span>
                         </div>
                       )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {u.researcher_status ? (
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_COLORS[u.researcher_status] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                          {STATUS_LABELS[u.researcher_status] || u.researcher_status}
+                        </span>
+                      ) : '—'}
                     </td>
                     <td className="px-4 py-3 text-gray-500">
                       {u.whatsapp

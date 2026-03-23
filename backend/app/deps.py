@@ -15,8 +15,8 @@ ALGORITHM = "HS256"
 bearer = HTTPBearer()
 optional_bearer = HTTPBearer(auto_error=False)
 
-# Papéis com acesso ao dashboard (filtrado pelo próprio grupo, exceto superadmin)
-DASHBOARD_ROLES = {"professor", "admin", "superadmin"}
+# Papéis com acesso ao dashboard
+DASHBOARD_ROLES = {"professor", "superadmin"}
 
 
 def decode_token(token: str) -> dict:
@@ -77,13 +77,6 @@ def require_superadmin(user: User = Depends(get_current_user)) -> User:
     return user
 
 
-# Mantido por compatibilidade — equivalente a require_dashboard
-def require_admin(user: User = Depends(get_current_user)) -> User:
-    if user.role not in DASHBOARD_ROLES:
-        raise HTTPException(status_code=403, detail="Acesso restrito a administradores")
-    return user
-
-
 def is_privileged(user: User) -> bool:
-    """Retorna True para professor, admin e superadmin."""
+    """Retorna True para professor e superadmin."""
     return user.role in DASHBOARD_ROLES

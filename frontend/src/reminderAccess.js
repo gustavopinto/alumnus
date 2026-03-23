@@ -45,6 +45,6 @@ export function canDeleteReminder(reminder) {
   const viewerId = viewerUserId();
   if (viewerId == null) return false;
   const role = getTokenPayload()?.role;
-  if (['professor', 'admin', 'superadmin'].includes(role)) return true;
+  if (['professor', 'superadmin'].includes(role)) return true;
   return normalizeUserId(reminder.created_by_id) === viewerId;
 }

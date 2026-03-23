@@ -8,86 +8,119 @@ _INSTAGRAM_HANDLE = re.compile(r"^[A-Za-z0-9._]{1,30}$")
 _TWITTER_HANDLE = re.compile(r"^[A-Za-z0-9_]{1,15}$")
 
 
+# --- Institution ---
+
+class InstitutionOut(BaseModel):
+    id: int
+    name: str
+    domain: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# --- Professor ---
+
+class ProfessorOut(BaseModel):
+    id: int
+    nome: str
+    ativo: bool
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ProfessorUpdate(BaseModel):
+    nome: Optional[str] = None
+
+
+class ProfessorInstitutionOut(BaseModel):
+    id: int
+    professor_id: int
+    institution_id: int
+    institutional_email: str
+    institution_name: Optional[str] = None
+    institution_domain: Optional[str] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AddInstitutionalEmail(BaseModel):
+    email: str
+
+    @field_validator("email")
+    @classmethod
+    def email_normalize(cls, v: str) -> str:
+        return (v or "").strip().lower()
+
+
+# --- Research Group ---
+
+class ResearchGroupOut(BaseModel):
+    id: int
+    name: str
+    institution_id: Optional[int] = None
+    institution_name: Optional[str] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ResearchGroupCreate(BaseModel):
+    name: str
+    institution_id: int
+
+
+class ResearchGroupUpdate(BaseModel):
+    name: Optional[str] = None
+    institution_id: Optional[int] = None
+
+
+class JoinGroupRequest(BaseModel):
+    institution_id: int
+
+
 # --- Researcher ---
 
 class ResearcherCreate(BaseModel):
     nome: str
-    photo_url: Optional[str] = None
-    photo_thumb_url: Optional[str] = None
     status: str
     email: Optional[str] = None
-    orientador_id: Optional[int] = None
+    orientador_id: Optional[int] = None  # FK → professors.id
+    group_id: Optional[int] = None
     observacoes: Optional[str] = None
 
 
 class ResearcherUpdate(BaseModel):
     nome: Optional[str] = None
-    photo_url: Optional[str] = None
-    photo_thumb_url: Optional[str] = None
     status: Optional[str] = None
     email: Optional[str] = None
-    orientador_id: Optional[int] = None
+    orientador_id: Optional[int] = None  # FK → professors.id
+    group_id: Optional[int] = None
     observacoes: Optional[str] = None
     ativo: Optional[bool] = None
-    lattes_url: Optional[str] = None
-    scholar_url: Optional[str] = None
-    linkedin_url: Optional[str] = None
-    github_url: Optional[str] = None
-    instagram_url: Optional[str] = None
-    twitter_url: Optional[str] = None
-    whatsapp: Optional[str] = None
-    interesses: Optional[str] = None
     matricula: Optional[str] = None
     curso: Optional[str] = None
     enrollment_date: Optional[date] = None
-
-    @field_validator("instagram_url")
-    @classmethod
-    def validate_instagram_handle(cls, v):
-        if v is None or (isinstance(v, str) and not v.strip()):
-            return None
-        s = str(v).strip().lstrip("@")
-        if not _INSTAGRAM_HANDLE.match(s):
-            raise ValueError(
-                "Instagram: use o usuário com @ no início (1–30 caracteres: letras, números, . e _)"
-            )
-        return s
-
-    @field_validator("twitter_url")
-    @classmethod
-    def validate_twitter_handle(cls, v):
-        if v is None or (isinstance(v, str) and not v.strip()):
-            return None
-        s = str(v).strip().lstrip("@")
-        if not _TWITTER_HANDLE.match(s):
-            raise ValueError(
-                "X/Twitter: use o usuário com @ no início (1–15 caracteres: letras, números e _)"
-            )
-        return s
 
 
 class ResearcherOut(BaseModel):
     id: int
     nome: str
-    photo_url: Optional[str]
-    photo_thumb_url: Optional[str] = None
     status: str
     email: Optional[str]
-    orientador_id: Optional[int]
+    group_id: Optional[int] = None
+    orientador_id: Optional[int] = None
+    orientador_nome: Optional[str] = None
     observacoes: Optional[str]
     ativo: bool
     registered: bool
-    lattes_url: Optional[str]
-    scholar_url: Optional[str]
-    linkedin_url: Optional[str]
-    github_url: Optional[str]
-    instagram_url: Optional[str]
-    twitter_url: Optional[str]
-    whatsapp: Optional[str]
-    interesses: Optional[str]
     matricula: Optional[str]
     curso: Optional[str]
     enrollment_date: Optional[date]
+    photo_url: Optional[str] = None
+    photo_thumb_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -209,16 +242,66 @@ class UserOut(BaseModel):
     email:         str
     nome:          str
     role:          str
-    researcher_id: Optional[int]
+    professor_id:  Optional[int] = None
+    researcher_id: Optional[int] = None
     last_login:    Optional[datetime]
     created_at:    datetime
-    plan_type:     Optional[str] = None  # trial, monthly, annual — professor/superadmin
-    plan_status:   Optional[str] = None  # active, expired
+    plan_type:     Optional[str] = None
+    plan_status:   Optional[str] = None
     account_activated_at: Optional[datetime] = None
     plan_period_ends_at: Optional[datetime] = None
-    trial_days_remaining: Optional[int] = None  # só professor em trial; 0 se vencido
+    trial_days_remaining: Optional[int] = None
+    photo_url:       Optional[str] = None
+    photo_thumb_url: Optional[str] = None
+    lattes_url:      Optional[str] = None
+    scholar_url:     Optional[str] = None
+    linkedin_url:    Optional[str] = None
+    github_url:      Optional[str] = None
+    instagram_url:   Optional[str] = None
+    twitter_url:     Optional[str] = None
+    whatsapp:        Optional[str] = None
+    interesses:      Optional[str] = None
+    bio:             Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+class UserProfileUpdate(BaseModel):
+    photo_url:       Optional[str] = None
+    photo_thumb_url: Optional[str] = None
+    lattes_url:      Optional[str] = None
+    scholar_url:     Optional[str] = None
+    linkedin_url:    Optional[str] = None
+    github_url:      Optional[str] = None
+    instagram_url:   Optional[str] = None
+    twitter_url:     Optional[str] = None
+    whatsapp:        Optional[str] = None
+    interesses:      Optional[str] = None
+    bio:             Optional[str] = None
+
+    @field_validator("instagram_url")
+    @classmethod
+    def validate_instagram_handle(cls, v):
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        s = str(v).strip().lstrip("@")
+        if not _INSTAGRAM_HANDLE.match(s):
+            raise ValueError(
+                "Instagram: use o usuário com @ no início (1–30 caracteres: letras, números, . e _)"
+            )
+        return s
+
+    @field_validator("twitter_url")
+    @classmethod
+    def validate_twitter_handle(cls, v):
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        s = str(v).strip().lstrip("@")
+        if not _TWITTER_HANDLE.match(s):
+            raise ValueError(
+                "X/Twitter: use o usuário com @ no início (1–15 caracteres: letras, números e _)"
+            )
+        return s
 
 
 # --- Reminder ---
@@ -250,28 +333,6 @@ class ReminderOut(BaseModel):
 
 class LayoutUpdate(BaseModel):
     positions: dict  # {researcher_id: {x, y}}
-
-
-# --- Board ---
-
-class BoardPostCreate(BaseModel):
-    text: str
-
-
-class BoardPostOut(BaseModel):
-    id: int
-    text: str
-    author_id: Optional[int]
-    author_name: Optional[str] = None
-    created_at: datetime
-
-    model_config = {"from_attributes": True}
-
-    @classmethod
-    def from_orm_with_author(cls, post):
-        obj = cls.model_validate(post)
-        obj.author_name = post.author.nome if post.author else None
-        return obj
 
 
 # --- Manual ---

@@ -1,9 +1,10 @@
 import React from 'react';
 
-const ITEMS = [
+const ALL_ITEMS = [
   { label: 'Professor', color: '#7C3AED', status: 'professor' },
+  { label: 'Pós-doc',   color: '#06B6D4', status: 'postdoc' },
   { label: 'Doutorado', color: '#10B981', status: 'doutorado' },
-  { label: 'Mestrado', color: '#F59E0B', status: 'mestrado' },
+  { label: 'Mestrado',  color: '#F59E0B', status: 'mestrado' },
   { label: 'Graduação', color: '#3B82F6', status: 'graduacao' },
 ];
 
@@ -25,7 +26,9 @@ function IconGrid() {
   );
 }
 
-export default function Legend({ hiddenStatuses, onToggleStatus, viewMode, onToggleView }) {
+export default function Legend({ hiddenStatuses, onToggleStatus, viewMode, onToggleView, researchers = [] }) {
+  const activeStatuses = new Set(researchers.filter(r => r.ativo).map(r => r.status));
+  const items = ALL_ITEMS.filter(item => activeStatuses.has(item.status));
   return (
     <div className="absolute top-4 right-4 bg-white rounded-lg shadow-md px-4 py-3 z-10 border border-gray-100 max-w-[11rem]">
       <div className="flex items-center justify-between mb-2">
@@ -47,7 +50,7 @@ export default function Legend({ hiddenStatuses, onToggleStatus, viewMode, onTog
         </div>
       </div>
       <ul className="space-y-1">
-        {ITEMS.map((item) => {
+        {items.map((item) => {
           const hidden = hiddenStatuses.has(item.status);
           return (
             <li key={item.status}>

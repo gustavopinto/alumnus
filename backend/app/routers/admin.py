@@ -5,19 +5,17 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
 from ..deps import require_dashboard, require_superadmin, require_professor
-from ..models import User, Researcher, Reminder, BoardPost, ManualEntry, Note
+from ..models import User, Researcher, Reminder, ManualEntry, Note
 from ..plan import clear_plan, ensure_professor_plan_defaults
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
-VALID_ROLES = ("professor", "admin", "student", "superadmin")
+VALID_ROLES = ("professor", "student", "superadmin")
 
-# Ordem na listagem /admin/users: superadmin → professor (e admin) → alunos; depois nome.
 _ADMIN_USER_LIST_ROLE_ORDER = {
     "superadmin": 0,
-    "professor": 1,
-    "admin": 1,
-    "student": 2,
+    "professor":  1,
+    "student":    2,
 }
 
 
@@ -46,7 +44,6 @@ def _stats_global(db: Session, hide_superadmin_count: bool) -> dict:
         by_role = {role: cnt for role, cnt in role_counts}
         users_by_role = {
             "superadmin": 0,
-            "admin":      by_role.get("admin", 0),
             "professor":  by_role.get("professor", 0),
             "student":    by_role.get("student", 0),
         }
@@ -55,7 +52,6 @@ def _stats_global(db: Session, hide_superadmin_count: bool) -> dict:
         by_role = {role: cnt for role, cnt in role_counts}
         users_by_role = {
             "superadmin": by_role.get("superadmin", 0),
-            "admin":      by_role.get("admin", 0),
             "professor":  by_role.get("professor", 0),
             "student":    by_role.get("student", 0),
         }
@@ -70,7 +66,6 @@ def _stats_global(db: Session, hide_superadmin_count: bool) -> dict:
         "total_researchers":    researchers,
         "total_pending":        pending,
         "total_reminders":      db.query(func.count(Reminder.id)).scalar(),
-        "total_board_posts":    db.query(func.count(BoardPost.id)).scalar(),
         "total_manual_entries": db.query(func.count(ManualEntry.id)).scalar(),
         "total_notes":          db.query(func.count(Note.id)).scalar(),
     }
@@ -97,8 +92,9 @@ def list_users(db: Session = Depends(get_db), current: User = Depends(require_da
             "is_admin": u.is_admin,
             "researcher_id": u.researcher_id,
             "researcher_nome": u.researcher.nome if u.researcher else None,
-            "whatsapp": u.researcher.whatsapp if u.researcher else None,
-            "photo_url": (u.researcher.photo_thumb_url or u.researcher.photo_url) if u.researcher else None,
+            "researcher_status": u.researcher.status if u.researcher else None,
+            "whatsapp": u.whatsapp,
+            "photo_url": u.photo_thumb_url or u.photo_url,
             "last_login": u.last_login,
             "created_at": u.created_at,
             "pending": False,
@@ -112,10 +108,11 @@ def list_users(db: Session = Depends(get_db), current: User = Depends(require_da
             "role": "student",
             "researcher_id": r.id,
             "researcher_nome": r.nome,
+            "researcher_status": r.status,
             "last_login": None,
             "created_at": None,
-            "whatsapp": r.whatsapp,
-            "photo_url": r.photo_thumb_url or r.photo_url,
+            "whatsapp": None,
+            "photo_url": None,
             "pending": True,
         }
 
@@ -174,10 +171,9 @@ def update_user(
 
     old_role = user.role
     user.role = data.role
-    user.is_admin = data.role in ("admin", "superadmin")
+    user.is_admin = data.role == "superadmin"
 
-    # Assinatura só em professor/superadmin; aluno e admin sem registro de plano.
-    if data.role in ("student", "admin"):
+    if data.role == "student":
         clear_plan(user)
     elif data.role in ("professor", "superadmin") and old_role not in ("professor", "superadmin"):
         ensure_professor_plan_defaults(user)

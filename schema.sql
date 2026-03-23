@@ -1,5 +1,9 @@
--- Schema único consolidado — representa o estado final do banco.
--- Execute este arquivo em um banco limpo.
+-- =============================================================================
+-- Alumnus — DDL completo
+-- PostgreSQL 16+
+-- =============================================================================
+
+-- ── Institucional ─────────────────────────────────────────────────────────────
 
 CREATE TABLE institutions (
     id         SERIAL PRIMARY KEY,
@@ -41,13 +45,15 @@ CREATE TABLE professor_groups (
     PRIMARY KEY (professor_id, group_id)
 );
 
+-- ── Pesquisadores ─────────────────────────────────────────────────────────────
+
 CREATE TABLE researchers (
     id              SERIAL PRIMARY KEY,
     nome            VARCHAR(255) NOT NULL,
-    status          VARCHAR(50)  NOT NULL,
+    status          VARCHAR(50)  NOT NULL,   -- graduacao | mestrado | doutorado | postdoc
     email           VARCHAR(255),
     group_id        INTEGER REFERENCES research_groups(id) ON DELETE SET NULL,
-    orientador_id   INTEGER REFERENCES professors(id) ON DELETE SET NULL,
+    orientador_id   INTEGER REFERENCES professors(id)      ON DELETE SET NULL,
     observacoes     TEXT,
     ativo           BOOLEAN NOT NULL DEFAULT TRUE,
     registered      BOOLEAN NOT NULL DEFAULT FALSE,
@@ -66,20 +72,34 @@ CREATE TABLE relationships (
     created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE works (
+    id            SERIAL PRIMARY KEY,
+    researcher_id INTEGER NOT NULL REFERENCES researchers(id) ON DELETE CASCADE,
+    title         VARCHAR(500) NOT NULL,
+    type          VARCHAR(50)  NOT NULL,   -- projeto | artigo | publicacao
+    description   TEXT,
+    year          INTEGER,
+    url           VARCHAR(500),
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- ── Usuários ──────────────────────────────────────────────────────────────────
+
 CREATE TABLE users (
     id                   SERIAL PRIMARY KEY,
     email                VARCHAR(255) UNIQUE NOT NULL,
     nome                 VARCHAR(255) NOT NULL,
     password_hash        VARCHAR(255) NOT NULL,
-    role                 VARCHAR(20)  NOT NULL,
+    role                 VARCHAR(20)  NOT NULL,   -- superadmin | professor | student
     is_admin             BOOLEAN NOT NULL DEFAULT FALSE,
-    professor_id         INTEGER REFERENCES professors(id) ON DELETE SET NULL,
-    researcher_id        INTEGER REFERENCES researchers(id) ON DELETE SET NULL,
+    professor_id         INTEGER REFERENCES professors(id)   ON DELETE SET NULL,
+    researcher_id        INTEGER REFERENCES researchers(id)  ON DELETE SET NULL,
     last_login           TIMESTAMPTZ,
     plan_type            VARCHAR(20),
     plan_status          VARCHAR(20),
     account_activated_at TIMESTAMPTZ,
     plan_period_ends_at  TIMESTAMPTZ,
+    -- perfil público
     photo_url            VARCHAR(500),
     photo_thumb_url      VARCHAR(500),
     lattes_url           VARCHAR(500),
@@ -94,16 +114,7 @@ CREATE TABLE users (
     created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE works (
-    id            SERIAL PRIMARY KEY,
-    researcher_id INTEGER NOT NULL REFERENCES researchers(id) ON DELETE CASCADE,
-    title         VARCHAR(500) NOT NULL,
-    type          VARCHAR(50)  NOT NULL,
-    description   TEXT,
-    year          INTEGER,
-    url           VARCHAR(500),
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+-- ── Conteúdo colaborativo ─────────────────────────────────────────────────────
 
 CREATE TABLE notes (
     id            SERIAL PRIMARY KEY,
@@ -113,21 +124,6 @@ CREATE TABLE notes (
     file_name     VARCHAR(255),
     created_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE file_uploads (
-    id            SERIAL PRIMARY KEY,
-    data          BYTEA        NOT NULL,
-    mime_type     VARCHAR(100) NOT NULL,
-    original_name VARCHAR(255) NOT NULL,
-    created_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
-);
-
-CREATE TABLE graph_layouts (
-    id           SERIAL PRIMARY KEY,
-    name         VARCHAR(100) DEFAULT 'default',
-    layout_jsonb JSONB        DEFAULT '{}',
-    updated_at   TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
 CREATE TABLE reminders (
@@ -150,7 +146,7 @@ CREATE TABLE manual_entries (
 
 CREATE TABLE manual_votes (
     entry_id INTEGER NOT NULL REFERENCES manual_entries(id) ON DELETE CASCADE,
-    user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id  INTEGER NOT NULL REFERENCES users(id)          ON DELETE CASCADE,
     PRIMARY KEY (entry_id, user_id)
 );
 
@@ -170,10 +166,25 @@ CREATE TABLE deadline_interests (
     UNIQUE (deadline_key, user_id)
 );
 
+-- ── Infraestrutura ────────────────────────────────────────────────────────────
+
+CREATE TABLE file_uploads (
+    id            SERIAL PRIMARY KEY,
+    data          BYTEA        NOT NULL,
+    mime_type     VARCHAR(100) NOT NULL,
+    original_name VARCHAR(255) NOT NULL,
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
+CREATE TABLE graph_layouts (
+    id           SERIAL PRIMARY KEY,
+    name         VARCHAR(100) DEFAULT 'default',
+    layout_jsonb JSONB        DEFAULT '{}',
+    updated_at   TIMESTAMPTZ  NOT NULL DEFAULT now()
+);
+
 CREATE TABLE schema_migrations (
     id      SERIAL PRIMARY KEY,
     name    TEXT UNIQUE NOT NULL,
     applied TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
-INSERT INTO schema_migrations (name) VALUES ('000_schema.sql');

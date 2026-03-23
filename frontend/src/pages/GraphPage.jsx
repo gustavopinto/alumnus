@@ -37,7 +37,7 @@ export default function GraphPage() {
       ) : (
         <BoxView researchers={researchers} hiddenStatuses={hiddenStatuses} />
       )}
-      <Legend hiddenStatuses={hiddenStatuses} onToggleStatus={toggleStatus} viewMode={viewMode} onToggleView={setViewMode} />
+      <Legend hiddenStatuses={hiddenStatuses} onToggleStatus={toggleStatus} viewMode={viewMode} onToggleView={setViewMode} researchers={researchers} />
     </div>
   );
 }

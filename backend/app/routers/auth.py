@@ -23,13 +23,14 @@ EXPIRE_H = int(os.getenv("TOKEN_EXPIRE_HOURS", "8"))
 
 def make_token(user: User) -> str:
     payload = {
-        "sub": str(user.id),
-        "nome": user.nome,
-        "email": user.email,
-        "role": user.role,
-        "is_admin": user.role in ("admin", "superadmin"),
+        "sub":           str(user.id),
+        "nome":          user.nome,
+        "email":         user.email,
+        "role":          user.role,
+        "is_admin":      user.role == "superadmin",
+        "professor_id":  user.professor_id,
         "researcher_id": user.researcher_id,
-        "exp": datetime.utcnow() + timedelta(hours=EXPIRE_H),
+        "exp":           datetime.utcnow() + timedelta(hours=EXPIRE_H),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 

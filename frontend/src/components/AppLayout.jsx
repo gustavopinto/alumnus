@@ -74,12 +74,6 @@ function AppPageHeadingIcon({ name }) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
         </svg>
       );
-    case 'board':
-      return (
-        <svg xmlns="http://www.w3.org/2000/svg" className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-        </svg>
-      );
     case 'admin': {
       const adminCls = 'w-5 h-5 shrink-0 text-purple-600';
       return (
@@ -278,7 +272,6 @@ export default function AppLayout() {
     if (p === '/app/manual') return { title: 'Manual de Sobrevivência', icon: 'manual' };
     if (p === '/app/reminders') return { title: 'Lembretes', icon: 'reminders' };
     if (p === '/app/deadlines') return { title: 'Deadlines', icon: 'deadlines' };
-    if (p === '/app/board') return { title: 'Mural', icon: 'board' };
     if (p === '/app/admin') return { title: 'Dashboard', icon: 'admin' };
     return null;
   }, [pathname]);
@@ -315,7 +308,7 @@ export default function AppLayout() {
                 researchers={researchers}
                 onRefresh={loadData}
                 role={payload?.role}
-                isAdmin={['professor','admin','superadmin'].includes(payload?.role)}
+                isAdmin={['professor','superadmin'].includes(payload?.role)}
                 remindersRefreshKey={remindersRefreshKey}
                 currentUser={currentUser}
               />
@@ -341,7 +334,7 @@ export default function AppLayout() {
             remindersRefreshKey={remindersRefreshKey}
             currentUser={currentUser}
             role={payload?.role}
-            isAdmin={['professor','admin','superadmin'].includes(payload?.role)}
+            isAdmin={['professor','superadmin'].includes(payload?.role)}
           />
         )}
       </aside>
@@ -401,7 +394,7 @@ export default function AppLayout() {
 
               {settingsOpen && (
                 <div className="absolute right-0 top-full mt-1 w-48 bg-white border rounded-xl shadow-lg z-50 py-1 overflow-hidden">
-                  {['professor','admin','superadmin'].includes(payload?.role) && (
+                  {['professor','superadmin'].includes(payload?.role) && (
                     <>
                       <button
                         type="button"

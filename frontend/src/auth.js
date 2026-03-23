@@ -19,7 +19,7 @@ export function getTokenPayload() {
 }
 
 /** Papéis com acesso ao dashboard admin (alinhado ao backend). */
-export const DASHBOARD_ROLES = ['professor', 'admin', 'superadmin'];
+export const DASHBOARD_ROLES = ['professor', 'superadmin'];
 
 export function isDashboardRole(role) {
   if (role == null || typeof role !== 'string') return false;

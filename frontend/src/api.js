@@ -22,6 +22,13 @@ async function request(path, options = {}) {
   return res.json();
 }
 
+// Professors
+export const getProfessors = () => request('/professors/');
+
+// User profile
+export const updateMyProfile   = (data) => request('/users/me', { method: 'PATCH', body: JSON.stringify(data) });
+export const updateUserProfile = (userId, data) => request(`/users/${userId}`, { method: 'PATCH', body: JSON.stringify(data) });
+
 // Researchers
 export const getResearchers = () => request('/researchers/');
 export const createResearcher = (data) => request('/researchers/', { method: 'POST', body: JSON.stringify(data) });
@@ -106,11 +113,6 @@ export async function markReminderNotificationRead(id) {
   if (!res.ok) throw new Error('mark read failed');
 }
 
-// Board
-export const getBoardPosts = () => request('/board/');
-export const createBoardPost = (data) => request('/board/', { method: 'POST', body: JSON.stringify(data) });
-export const deleteBoardPost = (id) => request(`/board/${id}`, { method: 'DELETE' });
-
 // Manual
 export const getManualEntries = () => request('/manual/');
 export const createManualEntry = (data) => request('/manual/', { method: 'POST', body: JSON.stringify(data) });
@@ -137,6 +139,17 @@ export async function uploadPhoto(file) {
   return res.json();
 }
 
+
+// Institutions
+export const getInstitutions = () => request('/institutions/');
+export const getMyEmails = () => request('/institutions/my-emails');
+export const addMyEmail = (email) => request('/institutions/my-emails', { method: 'POST', body: JSON.stringify({ email }) });
+export const removeMyEmail = (piId) => request(`/institutions/my-emails/${piId}`, { method: 'DELETE' });
+
+// Groups
+export const getGroups = () => request('/groups/');
+export const createGroup = (name, institution_id) => request('/groups/', { method: 'POST', body: JSON.stringify({ name, institution_id }) });
+export const updateGroup = (id, data) => request(`/groups/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
 
 // --- Admin ---
 export const getAdminStats = () => request('/admin/stats');
