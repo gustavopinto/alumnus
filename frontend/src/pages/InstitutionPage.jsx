@@ -6,7 +6,7 @@ import { getTokenPayload } from '../auth';
 import { isModEnter } from '../platform';
 
 export default function InstitutionPage() {
-  const { refreshInstitutions } = useAppLayout();
+  const { refreshInstitutions, setCurrentInstitution } = useAppLayout();
   const payload = getTokenPayload();
   const isSuperadmin = payload?.role === 'superadmin';
   const isProfessor = payload?.role === 'professor' || isSuperadmin;
@@ -69,6 +69,11 @@ export default function InstitutionPage() {
 
   const instOptions = isSuperadmin ? institutions : myInstitutions;
   const selectedInst = instOptions.find(i => i.id === selectedInstId) || instOptions[0] || null;
+
+  function handleSelectInstitution(inst) {
+    setSelectedInstId(inst.id);
+    setCurrentInstitution?.({ id: inst.id, name: inst.name });
+  }
 
   // Groups for the selected institution
   const filteredGroups = selectedInstId
@@ -164,7 +169,7 @@ export default function InstitutionPage() {
                   className={`flex items-start justify-between border rounded-lg px-4 py-3 shadow-sm cursor-pointer transition-colors ${
                     selectedInstId === inst.id ? 'bg-blue-50 border-blue-200' : 'bg-white hover:bg-gray-50'
                   }`}
-                  onClick={() => setSelectedInstId(inst.id)}
+                  onClick={() => handleSelectInstitution(inst)}
                 >
                   <div>
                     <p className="text-sm font-semibold text-gray-800 uppercase tracking-wide">{inst.name}</p>
@@ -212,7 +217,7 @@ export default function InstitutionPage() {
                   className={`border rounded-lg px-4 py-3 shadow-sm cursor-pointer transition-colors ${
                     selectedInstId === inst.id ? 'bg-blue-50 border-blue-200' : 'bg-white hover:bg-gray-50'
                   }`}
-                  onClick={() => setSelectedInstId(inst.id)}
+                  onClick={() => handleSelectInstitution(inst)}
                 >
                   <p className="text-sm font-semibold text-gray-800 uppercase tracking-wide">{inst.name}</p>
                   <p className="text-xs text-gray-400">{inst.domain}</p>

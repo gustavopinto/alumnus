@@ -381,6 +381,10 @@ export default function AppLayout() {
   const myResearcher = researchers.find(r => r.id === payload?.researcher_id);
   const profileSlug = myResearcher ? slugify(myResearcher.nome) : null;
 
+  const updateGraphNodePosition = useCallback((nodeId, position) => {
+    setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, position } : n));
+  }, []);
+
   const outletContext = useMemo(
     () => ({
       sidebarOpen,
@@ -392,6 +396,7 @@ export default function AppLayout() {
       refreshSidebarReminders,
       refreshSidebarDeadlines,
       refreshSidebarTips,
+      updateGraphNodePosition,
       currentUser,
       setProfileTopbar,
       currentInstitution,
@@ -399,7 +404,7 @@ export default function AppLayout() {
       institutions,
       refreshInstitutions,
     }),
-    [sidebarOpen, setSidebarOpenPersist, researchers, loadData, nodes, edges, refreshSidebarReminders, refreshSidebarDeadlines, refreshSidebarTips, currentUser, currentInstitution, institutions, refreshInstitutions],
+    [sidebarOpen, setSidebarOpenPersist, researchers, loadData, nodes, edges, refreshSidebarReminders, refreshSidebarDeadlines, refreshSidebarTips, updateGraphNodePosition, currentUser, currentInstitution, institutions, refreshInstitutions],
   );
 
   const { pathname } = useLocation();
@@ -409,7 +414,7 @@ export default function AppLayout() {
   }, [pathname]);
   const pageHeading = useMemo(() => {
     const p = pathname || '/';
-    if (p === '/app' || p === '/app/') return { title: 'Grupo', icon: 'grupo' };
+    if (p === '/app/group') return { title: 'Grupo', icon: 'grupo' };
     if (p === '/app/manual') return { title: 'Manual de Sobrevivência', icon: 'manual' };
     if (p === '/app/reminders') return { title: 'Lembretes', icon: 'reminders' };
     if (p === '/app/deadlines') return { title: 'Próximos deadlines', icon: 'deadlines' };
@@ -428,7 +433,7 @@ export default function AppLayout() {
         {sidebarOpen ? (
           <>
             <div className="p-4 border-b bg-white shrink-0">
-              <Link to="/app" className="group flex items-start gap-2">
+              <Link to="/app/group" className="group flex items-start gap-2">
                 <div className="w-7 h-7 rounded-lg bg-blue-600 flex items-center justify-center shrink-0 mt-0.5">
                   <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}

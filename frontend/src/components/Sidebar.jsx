@@ -460,20 +460,8 @@ export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshK
           </svg>
         </button>
 
-        {isAdmin && (
-          <Link
-            to="/app/admin"
-            title="Dashboard Admin"
-            className="w-11 h-11 flex items-center justify-center rounded-lg border border-purple-200 bg-purple-50 text-purple-600 shadow-sm hover:bg-purple-100 hover:border-purple-300 transition-colors shrink-0"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-          </Link>
-        )}
-
         <Link
-          to="/app"
+          to="/app/group"
           title="Grupo — ir para o grafo"
           className="relative w-11 h-11 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors shrink-0"
         >
@@ -592,20 +580,6 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
   return (
     <div className="p-4 space-y-2 overflow-y-auto h-full">
 
-      {/* Dashboard */}
-      {isAdmin && (
-        <Link
-          to="/app/admin"
-          className="w-full flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2 text-sm text-purple-700 shadow-sm hover:bg-purple-100 hover:border-purple-300 transition-colors"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-          </svg>
-          <span className="font-medium">Dashboard</span>
-        </Link>
-      )}
-
-
       {/* Grupo */}
       {renamingGroup ? (
         <div className="w-full flex items-center gap-1 bg-white border rounded-lg px-2 py-1.5 shadow-sm">
@@ -628,7 +602,7 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
         label={groupLabel}
         icon={GROUP_ICON}
         badge={researchers.length}
-        linkTo="/app"
+        linkTo="/app/group"
         onLabelClick={isAdmin ? () => { setRenameInput(groupLabel); setRenamingGroup(true); } : undefined}
         disabled={researchers.length === 0}
       >

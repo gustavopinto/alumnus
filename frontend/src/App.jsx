@@ -21,8 +21,9 @@ export default function App() {
       <Route path="/login" element={<Navigate to="/entrar" replace />} />
       <Route path="/register" element={<Navigate to="/entrar?tab=cadastro" replace />} />
       <Route path="/app" element={<AppLayout />}>
+        <Route index element={<Navigate to="group" replace />} />
         <Route
-          index
+          path="group"
           element={
             <ProtectedRoute>
               <GraphPage />

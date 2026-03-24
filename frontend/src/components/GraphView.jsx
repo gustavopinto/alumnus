@@ -11,10 +11,12 @@ import '@xyflow/react/dist/style.css';
 
 import ResearcherNode from './ResearcherNode';
 import { updateLayout } from '../api';
+import { useAppLayout } from './AppLayout';
 
 const nodeTypes = { researcher: ResearcherNode };
 
 export default function GraphView({ initialNodes, initialEdges }) {
+  const { updateGraphNodePosition } = useAppLayout();
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
@@ -27,9 +29,9 @@ export default function GraphView({ initialNodes, initialEdges }) {
   }, [initialEdges, setEdges]);
 
   const onNodeDragStop = useCallback((_event, node) => {
-    const positions = { [node.id]: node.position };
-    updateLayout(positions);
-  }, []);
+    updateLayout({ [node.id]: node.position });
+    updateGraphNodePosition?.(node.id, node.position);
+  }, [updateGraphNodePosition]);
 
   return (
     <div style={{ width: '100%', height: '100%' }}>
