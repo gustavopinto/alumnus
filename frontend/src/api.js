@@ -28,6 +28,7 @@ export const getProfessors = () => request('/professors/');
 // User profile
 export const updateMyProfile   = (data) => request('/users/me', { method: 'PATCH', body: JSON.stringify(data) });
 export const updateUserProfile = (userId, data) => request(`/users/${userId}`, { method: 'PATCH', body: JSON.stringify(data) });
+export const getProfileBySlug = (slug) => request(`/profiles/by-slug/${slug}`);
 
 // Researchers
 export const getResearchers = (institutionId, ativo) => {
@@ -72,7 +73,6 @@ export async function createNote(researcherId, text, file) {
 // Researcher
 export const getResearcher = (id) => request(`/researchers/${id}`);
 export const getResearcherUser = (researcherId) => request(`/researchers/${researcherId}/user`);
-export const getResearcherBySlug = (slug) => request(`/researchers/by-slug/${slug}`);
 
 // Reminders
 export const getReminders = (institutionId) =>

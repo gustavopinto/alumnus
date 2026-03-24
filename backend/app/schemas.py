@@ -275,6 +275,11 @@ class UserProfileUpdate(BaseModel):
         return s
 
 
+class ProfileBySlugOut(BaseModel):
+    user: Optional[UserOut] = None
+    researcher: Optional[ResearcherOut] = None
+
+
 # --- Reminder ---
 
 class ReminderCreate(BaseModel):

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAppLayout } from '../components/AppLayout';
-import { getResearcherBySlug, updateResearcher, updateUserProfile, uploadPhoto, getNotes, createNote, deleteNote, getResearcherUser, getDeadlineInterests, getDeadlines } from '../api';
+import { getProfileBySlug, updateResearcher, updateMyProfile, updateUserProfile, uploadPhoto, getNotes, createNote, deleteNote, getDeadlineInterests, getDeadlines } from '../api';
 import { slugify } from '../deadlines';
 import { getTokenPayload } from '../auth';
 import { modKey, isModEnter } from '../platform';
@@ -62,6 +62,19 @@ function normalizeSocialInputOnBlur(value) {
   }
   if (!t.startsWith('@')) return `@${t.replace(/^@+/, '')}`;
   return t;
+}
+
+function extractApiErrorMessage(detail) {
+  if (!detail) return '';
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    const first = detail[0];
+    if (typeof first === 'string') return first;
+    if (first && typeof first === 'object' && first.msg) return String(first.msg);
+    return 'Erro de validação';
+  }
+  if (typeof detail === 'object' && detail.msg) return String(detail.msg);
+  return '';
 }
 
 function validateInstagramForm(value) {
@@ -275,7 +288,7 @@ function NotesSection({ researcherId, canAdd, isProfessor, currentUserId, resear
   );
 }
 
-function ProfileSection({ researcher, user, canEdit, isProfessor, onSaved }) {
+function ProfileSection({ researcher, user, canEdit, isProfessor, isOwnProfile, onSaved }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(() => buildProfileForm(user));
   const [whatsappError, setWhatsappError] = useState('');
@@ -290,6 +303,7 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, onSaved }) {
   const [photoPreview, setPhotoPreview] = useState(user?.photo_url || null);
   const [pendingPhotoUrl, setPendingPhotoUrl] = useState(null);
   const [pendingPhotoThumbUrl, setPendingPhotoThumbUrl] = useState(null);
+  const [saveError, setSaveError] = useState('');
   const photoRef = useRef();
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
@@ -327,6 +341,7 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, onSaved }) {
 
   async function handleSave(e) {
     e.preventDefault();
+    setSaveError('');
     const digits = form.whatsapp.replace(/\D/g, '');
     if (form.whatsapp && digits.length < 10) { setWhatsappError('Número inválido'); return; }
     const igErr = validateInstagramForm(form.instagram_url);
@@ -344,31 +359,45 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, onSaved }) {
     }
     setPasswordError('');
     setSaving(true);
-    if (user) {
-      await updateUserProfile(user.id, {
-        lattes_url: form.lattes_url || null,
-        scholar_url: form.scholar_url || null,
-        linkedin_url: form.linkedin_url || null,
-        github_url: form.github_url || null,
-        instagram_url: form.instagram_url.trim() ? stripSocialUrlToHandle(form.instagram_url) : null,
-        twitter_url: form.twitter_url.trim() ? stripSocialUrlToHandle(form.twitter_url) : null,
-        whatsapp: form.whatsapp || null,
-        interesses: form.interesses || null,
-        bio: form.bio || null,
-        ...(pendingPhotoUrl
-          ? { photo_url: pendingPhotoUrl, photo_thumb_url: pendingPhotoThumbUrl || null }
-          : {}),
-        ...(newPassword ? { password: newPassword } : {}),
+    try {
+      if (user) {
+        const payload = {
+          lattes_url: form.lattes_url || null,
+          scholar_url: form.scholar_url || null,
+          linkedin_url: form.linkedin_url || null,
+          github_url: form.github_url || null,
+          instagram_url: form.instagram_url.trim() ? stripSocialUrlToHandle(form.instagram_url) : null,
+          twitter_url: form.twitter_url.trim() ? stripSocialUrlToHandle(form.twitter_url) : null,
+          whatsapp: form.whatsapp || null,
+          interesses: form.interesses || null,
+          bio: form.bio || null,
+          ...(pendingPhotoUrl
+            ? { photo_url: pendingPhotoUrl, photo_thumb_url: pendingPhotoThumbUrl || null }
+            : {}),
+          ...(newPassword ? { password: newPassword } : {}),
+        };
+        const numericUserId = Number(user.id);
+        const resp = isOwnProfile || !Number.isFinite(numericUserId)
+          ? await updateMyProfile(payload)
+          : await updateUserProfile(numericUserId, payload);
+        if (resp?.detail) {
+          throw new Error(extractApiErrorMessage(resp.detail) || 'Erro ao salvar perfil');
+        }
+      }
+      setEditing(false);
+      setPendingPhotoUrl(null);
+      setPendingPhotoThumbUrl(null);
+      setNewPassword('');
+      setConfirmPassword('');
+      setToast('Perfil salvo com sucesso');
+      Promise.resolve(onSaved()).catch(() => {
+        setToast('Perfil salvo, mas houve erro ao atualizar a visualização');
       });
+    } catch (err) {
+      setSaveError(err?.message || 'Não foi possível salvar o perfil');
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    setEditing(false);
-    setPendingPhotoUrl(null);
-    setPendingPhotoThumbUrl(null);
-    setNewPassword('');
-    setConfirmPassword('');
-    setToast('Perfil salvo com sucesso');
-    onSaved();
   }
 
   function handleCancel() {
@@ -378,6 +407,7 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, onSaved }) {
     setPendingPhotoThumbUrl(null);
     setInstagramError('');
     setTwitterError('');
+    setSaveError('');
     setNewPassword('');
     setConfirmPassword('');
     setPasswordError('');
@@ -442,6 +472,7 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, onSaved }) {
               setInstagramError('');
               setTwitterError('');
               setWhatsappError('');
+              setSaveError('');
               setEditing(true);
             }}
             className="inline-flex items-center gap-1.5 text-sm text-blue-600 hover:underline"
@@ -582,6 +613,7 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, onSaved }) {
               Cancelar
             </button>
           </div>
+          {saveError && <p className="text-xs text-red-500">{saveError}</p>}
         </form>
       ) : (
         <div className="space-y-3">
@@ -621,7 +653,7 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, onSaved }) {
               <p className="text-sm text-gray-700">{user.interesses}</p>
             </div>
           )}
-          {isProfessor && (researcher.matricula || researcher.curso || researcher.enrollment_date) && (
+          {isProfessor && researcher && (researcher.matricula || researcher.curso || researcher.enrollment_date) && (
             <div className="border-t pt-3 mt-1 flex gap-6 flex-wrap">
               {researcher.matricula && (
                 <div>
@@ -676,17 +708,36 @@ export default function ResearcherPage() {
 
   const payload = getTokenPayload();
   const isProfessor = payload?.role === 'professor' || payload?.role === 'superadmin';
-  const isOwnProfile = payload?.researcher_id != null && researcher?.id === payload.researcher_id;
+  const isOwnProfile = researcherUser?.id != null && Number(payload?.sub) === Number(researcherUser.id);
   const canEdit = isProfessor || isOwnProfile;
 
   async function load() {
-    const r = await getResearcherBySlug(slug);
-    const [u, allInterests, allDeadlines] = await Promise.all([getResearcherUser(r.id), getDeadlineInterests(currentInstitution?.id), getDeadlines(currentInstitution?.id)]);
+    let r = null;
+    let u = null;
+    const profile = await getProfileBySlug(slug);
+    if (profile && !profile.detail) {
+      r = profile.researcher || null;
+      u = profile.user || null;
+    }
+
     setResearcher(r);
     setResearcherUser(u);
-    if (u && allInterests && allDeadlines) {
-      const ids = new Set(allInterests.filter(i => i.user_id === u.id).map(i => i.deadline_id));
-      setMyDeadlines(allDeadlines.filter(d => ids.has(d.id)));
+
+    // Deadlines are secondary for this screen.
+    // Profile data must still refresh even if these requests fail.
+    try {
+      const [allInterests, allDeadlines] = await Promise.all([
+        getDeadlineInterests(currentInstitution?.id),
+        getDeadlines(currentInstitution?.id),
+      ]);
+      if (u && allInterests && allDeadlines) {
+        const ids = new Set(allInterests.filter(i => i.user_id === u.id).map(i => i.deadline_id));
+        setMyDeadlines(allDeadlines.filter(d => ids.has(d.id)));
+      } else {
+        setMyDeadlines([]);
+      }
+    } catch {
+      setMyDeadlines([]);
     }
   }
 
@@ -701,15 +752,16 @@ export default function ResearcherPage() {
   }, []);
 
   useEffect(() => {
-    if (!researcher) return;
-    if (slugify(researcher.nome) !== slug) return;
-    const color = STATUS_COLORS[researcher.status] || '#6B7280';
+    const displayName = researcher?.nome || researcherUser?.nome;
+    if (!displayName) return;
+    if (slugify(displayName) !== slug) return;
+    const color = STATUS_COLORS[researcher?.status] || '#6B7280';
     setProfileTopbar({
-      nome: researcher.nome,
+      nome: displayName,
       photoUrl: researcherUser?.photo_url || null,
       statusColor: color,
-      statusLabel: STATUS_LABELS[researcher.status] || researcher.status,
-      email: researcher.email,
+      statusLabel: researcher ? (STATUS_LABELS[researcher.status] || researcher.status) : (researcherUser?.role === 'professor' ? 'Professor' : 'Usuário'),
+      email: researcher?.email || researcherUser?.email,
       lastLoginLine: isProfessor
         ? (researcherUser?.last_login ? formatLastLogin(researcherUser.last_login) : 'Nunca acessou')
         : null,
@@ -738,7 +790,7 @@ export default function ResearcherPage() {
     load();
   }
 
-  if (!researcher) {
+  if (!researcher && !researcherUser) {
     return <div className="flex items-center justify-center min-h-[50vh] text-gray-400">Carregando...</div>;
   }
 
@@ -760,7 +812,7 @@ export default function ResearcherPage() {
             </div>
           </div>
         )}
-        <ProfileSection researcher={researcher} user={researcherUser} canEdit={canEdit} isProfessor={isProfessor} onSaved={load} />
+        <ProfileSection researcher={researcher} user={researcherUser} canEdit={canEdit} isProfessor={isProfessor} isOwnProfile={isOwnProfile} onSaved={load} />
         {myDeadlines.length > 0 && (
           <section className="bg-white rounded-xl border shadow-sm p-5 space-y-3">
             <h2 className="text-sm font-semibold text-gray-700">Trabalhando em</h2>
@@ -782,7 +834,9 @@ export default function ResearcherPage() {
             </div>
           </section>
         )}
-        <NotesSection researcherId={researcher.id} canAdd={isProfessor || isOwnProfile} isProfessor={isProfessor} currentUserId={payload?.sub != null ? Number(payload.sub) : null} researchers={researchers} />
+        {researcher && (
+          <NotesSection researcherId={researcher.id} canAdd={isProfessor || isOwnProfile} isProfessor={isProfessor} currentUserId={payload?.sub != null ? Number(payload.sub) : null} researchers={researchers} />
+        )}
       </main>
     </div>
   );

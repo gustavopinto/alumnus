@@ -18,7 +18,7 @@ def h(pw): return pwd_ctx.hash(pw)
 def run():
     with Session() as db:
         from app.models import (
-            Researcher, User, Note, Reminder,
+            Professor, Researcher, User, Note, Reminder,
             Tip, Relationship, GraphLayout
         )
 
@@ -31,7 +31,11 @@ def run():
             u = db.query(User).filter_by(email=email).first()
             return u.id if u else None
 
-        prof1_rid = rid('gustavo.pinto@ufpa.br')
+        def pid(email):
+            u = db.query(User).filter_by(email=email).first()
+            return u.professor_id if u and u.professor_id else None
+
+        prof1_pid = pid('gustavo.pinto@ufpa.br')
         ana_rid   = rid('ana.beatriz@ufpa.br')
         raf_rid   = rid('rafael.mendes@ufpa.br')
         thi_rid   = rid('thiago.barbosa@ufpa.br')
@@ -47,23 +51,18 @@ def run():
         ana_uid   = uid('ana.beatriz@ufpa.br')
 
         # ── 2º Grupo: Profa. Marina Santos ───────────────────────────────
-        if not db.query(Researcher).filter_by(email='marina.santos@ufpa.br').first():
-            prof2 = Researcher(
-                nome='Marina Santos', status='professor',
-                email='marina.santos@ufpa.br', ativo=True, registered=True,
-                lattes_url='http://lattes.cnpq.br/9900000000000001',
-                scholar_url='https://scholar.google.com/citations?user=marinasantos',
-                linkedin_url='https://linkedin.com/in/marinasantos',
-                interesses='Sistemas Distribuídos, Computação em Nuvem, DevOps, Segurança da Informação',
-                observacoes='Professora adjunta. Coordenadora do laboratório CloudLab.',
-                photo_url='https://i.pravatar.cc/300?img=25',
-                created_at=datetime.utcnow(), updated_at=datetime.utcnow()
+        if not db.query(User).filter_by(email='marina.santos@ufpa.br').first():
+            prof2 = Professor(
+                nome='Marina Santos',
+                ativo=True,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow(),
             )
             db.add(prof2)
             db.flush()
-            prof2_rid = prof2.id
+            prof2_pid = prof2.id
         else:
-            prof2_rid = rid('marina.santos@ufpa.br')
+            prof2_pid = pid('marina.santos@ufpa.br')
 
         # Alunos da Profa. Marina
         marina_students = [
@@ -106,17 +105,18 @@ def run():
         ]
         for s in marina_students:
             if not db.query(Researcher).filter_by(email=s['email']).first():
-                db.add(Researcher(orientador_id=prof2_rid, ativo=True, registered=False,
+                db.add(Researcher(orientador_id=prof2_pid, ativo=True, registered=False,
                                   created_at=datetime.utcnow(), updated_at=datetime.utcnow(), **s))
         db.flush()
 
         # ── Users ──────────────────────────────────────────────────────────
-        def ensure_user(email, nome, role, researcher_id, is_admin=False, pw='alumnus123'):
+        def ensure_user(email, nome, role, professor_id=None, researcher_id=None, is_admin=False, pw='alumnus123'):
             if not db.query(User).filter_by(email=email).first():
                 now = datetime.utcnow()
                 db.add(User(
                     email=email, nome=nome, password_hash=h(pw),
                     role=role, is_admin=is_admin,
+                    professor_id=professor_id,
                     researcher_id=researcher_id,
                     last_login=now - timedelta(days=1),
                     created_at=now,
@@ -126,7 +126,7 @@ def run():
                     plan_period_ends_at=now + timedelta(days=25) if role == 'professor' else None,
                 ))
 
-        ensure_user('marina.santos@ufpa.br', 'Marina Santos', 'professor', prof2_rid)
+        ensure_user('marina.santos@ufpa.br', 'Marina Santos', 'professor', professor_id=prof2_pid)
 
         # Registra alguns alunos de Gustavo que ainda não têm conta
         for email, nome in [
@@ -175,11 +175,6 @@ def run():
         gabriel_rid  = rid('gabriel.neto@ufpa.br')
 
         # Grupo da Profa. Marina
-        ensure_rel(prof2_rid, diego_rid,   'orientacao')
-        ensure_rel(prof2_rid, beatriz_rid, 'orientacao')
-        ensure_rel(prof2_rid, renato_rid,  'orientacao')
-        ensure_rel(prof2_rid, isabela_rid, 'orientacao')
-        ensure_rel(prof2_rid, gabriel_rid, 'orientacao')
         ensure_rel(diego_rid,   renato_rid,  'colaboracao')
         ensure_rel(beatriz_rid, renato_rid,  'colaboracao')
         ensure_rel(diego_rid,   gabriel_rid, 'co-autoria')
@@ -283,7 +278,6 @@ def run():
         # ── GRAPH LAYOUT ───────────────────────────────────────────────────
         # Layout para o grupo do Gustavo (posições espalhadas e visualmente agradáveis)
         layout_g1 = {
-            str(prof1_rid): {"x": 450, "y": 280},
             str(ana_rid):   {"x": 220, "y": 120},
             str(raf_rid):   {"x": 620, "y": 110},
             str(thi_rid):   {"x": 760, "y": 280},
@@ -295,6 +289,8 @@ def run():
             str(mar_rid):   {"x": 200, "y": 460},
             str(ped_rid):   {"x": 450, "y": 530},
         }
+        if prof1_pid:
+            layout_g1[f"p{prof1_pid}"] = {"x": 450, "y": 280}
         existing = db.query(GraphLayout).filter_by(name='default').first()
         if existing:
             existing.layout_jsonb = layout_g1

@@ -140,24 +140,8 @@ export default function InstitutionPage() {
     }
   }
 
-  // ── Header title / institution selector ───────────────────────────────────
+  // ── Header title ───────────────────────────────────────────────────────────
   function renderTitle() {
-    if (instOptions.length > 1) {
-      return (
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold text-gray-800 shrink-0">Instituição</h1>
-          <select
-            className="border rounded-lg px-2 py-1 text-sm font-semibold text-blue-700 uppercase tracking-wide bg-white"
-            value={selectedInstId || ''}
-            onChange={e => setSelectedInstId(Number(e.target.value))}
-          >
-            {instOptions.map(inst => (
-              <option key={inst.id} value={inst.id}>{inst.name.toUpperCase()}</option>
-            ))}
-          </select>
-        </div>
-      );
-    }
     return <h1 className="text-xl font-bold text-gray-800">Instituição</h1>;
   }
 

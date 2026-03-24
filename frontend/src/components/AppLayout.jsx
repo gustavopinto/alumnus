@@ -176,6 +176,7 @@ export default function AppLayout() {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('sidebarOpen') !== 'false');
+  const [loadingData, setLoadingData] = useState(true);
   const [remindersRefreshKey, setRemindersRefreshKey] = useState(0);
   const [deadlinesRefreshKey, setDeadlinesRefreshKey] = useState(0);
   const [tipsRefreshKey, setTipsRefreshKey] = useState(0);
@@ -183,7 +184,7 @@ export default function AppLayout() {
   const [currentUser, setCurrentUser] = useState(null);
   const [institutionName, setInstitutionName] = useState(null);
   const [institutions, setInstitutions] = useState([]);
-  const [currentInstitution, setCurrentInstitution] = useState(null);
+  const [currentInstitution, setCurrentInstitution] = useState(undefined);
   const [profileTopbar, setProfileTopbar] = useState(null);
   const [changePwOpen, setChangePwOpen] = useState(false);
   const [changePwNew, setChangePwNew] = useState('');
@@ -229,6 +230,7 @@ export default function AppLayout() {
       })),
     );
     setEdges(graphData?.edges || []);
+    setLoadingData(false);
   }, []);
 
   // Reload data when institution changes
@@ -237,6 +239,7 @@ export default function AppLayout() {
   }, [currentInstitution]); // eslint-disable-line
 
   function handleSetCurrentInstitution(inst) {
+    setLoadingData(true);
     setCurrentInstitution(inst);
     setInstitutionName(inst.name);
     localStorage.setItem('selectedInstId', String(inst.id));
@@ -286,8 +289,10 @@ export default function AppLayout() {
               const inst = preferred || list[0];
               setInstitutionName(inst.name);
               setCurrentInstitution({ id: inst.id, name: inst.name });
+            } else {
+              setCurrentInstitution(null);
             }
-          }).catch(() => {});
+          }).catch(() => { setCurrentInstitution(null); });
         } else if (u.role === 'professor') {
           getMyEmails().then(list => {
             if (Array.isArray(list) && list.length > 0) {
@@ -300,8 +305,13 @@ export default function AppLayout() {
               const selected = preferred || inst[0];
               setInstitutionName(selected.name);
               setCurrentInstitution(selected);
+            } else {
+              setCurrentInstitution(null);
             }
-          }).catch(() => {});
+          }).catch(() => { setCurrentInstitution(null); });
+        } else {
+          // student: sem filtro de instituição
+          setCurrentInstitution(null);
         }
       }
     }).catch(() => {});
@@ -601,7 +611,15 @@ export default function AppLayout() {
           </div>
         </header>
 
-        <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto relative">
+          {loadingData && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/70 backdrop-blur-sm">
+              <svg className="w-8 h-8 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+            </div>
+          )}
           <Outlet context={outletContext} />
         </div>
       </div>
