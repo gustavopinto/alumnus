@@ -94,17 +94,6 @@ CREATE TABLE users (
     created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE works (
-    id            SERIAL PRIMARY KEY,
-    researcher_id INTEGER NOT NULL REFERENCES researchers(id) ON DELETE CASCADE,
-    title         VARCHAR(500) NOT NULL,
-    type          VARCHAR(50)  NOT NULL,
-    description   TEXT,
-    year          INTEGER,
-    url           VARCHAR(500),
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
 CREATE TABLE notes (
     id            SERIAL PRIMARY KEY,
     researcher_id INTEGER NOT NULL REFERENCES researchers(id) ON DELETE CASCADE,
@@ -131,43 +120,54 @@ CREATE TABLE graph_layouts (
 );
 
 CREATE TABLE reminders (
-    id            SERIAL PRIMARY KEY,
-    text          TEXT NOT NULL,
-    due_date      DATE,
-    done          BOOLEAN NOT NULL DEFAULT FALSE,
-    created_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    id             SERIAL PRIMARY KEY,
+    text           TEXT NOT NULL,
+    due_date       DATE,
+    done           BOOLEAN NOT NULL DEFAULT FALSE,
+    created_by_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    institution_id INTEGER REFERENCES institutions(id) ON DELETE SET NULL,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE manual_entries (
-    id         SERIAL PRIMARY KEY,
-    question   TEXT NOT NULL,
-    answer     TEXT NOT NULL,
-    author_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    position   INTEGER NOT NULL DEFAULT 0,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+CREATE TABLE tips (
+    id             SERIAL PRIMARY KEY,
+    question       TEXT NOT NULL,
+    answer         TEXT NOT NULL,
+    author_id      INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    institution_id INTEGER REFERENCES institutions(id) ON DELETE SET NULL,
+    position       INTEGER NOT NULL DEFAULT 0,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE manual_votes (
-    entry_id INTEGER NOT NULL REFERENCES manual_entries(id) ON DELETE CASCADE,
+CREATE TABLE tip_votes (
+    entry_id INTEGER NOT NULL REFERENCES tips(id) ON DELETE CASCADE,
     user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     PRIMARY KEY (entry_id, user_id)
 );
 
-CREATE TABLE manual_comments (
+CREATE TABLE tip_comments (
     id         SERIAL PRIMARY KEY,
-    entry_id   INTEGER NOT NULL REFERENCES manual_entries(id) ON DELETE CASCADE,
+    entry_id   INTEGER NOT NULL REFERENCES tips(id) ON DELETE CASCADE,
     text       TEXT NOT NULL,
     author_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE deadlines (
+    id             SERIAL PRIMARY KEY,
+    label          VARCHAR(255) NOT NULL,
+    url            TEXT         NOT NULL,
+    date           DATE         NOT NULL,
+    institution_id INTEGER REFERENCES institutions(id) ON DELETE CASCADE,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE deadline_interests (
-    id           SERIAL PRIMARY KEY,
-    deadline_key VARCHAR(200) NOT NULL,
-    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (deadline_key, user_id)
+    id          SERIAL PRIMARY KEY,
+    deadline_id INTEGER NOT NULL REFERENCES deadlines(id) ON DELETE CASCADE,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT deadline_interests_key UNIQUE (deadline_id, user_id)
 );
 
 CREATE TABLE schema_migrations (

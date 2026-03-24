@@ -140,6 +140,31 @@ function RegisterForm({ inviteEmail }) {
         setError(formatApiDetail(data) || 'Erro ao cadastrar');
         return;
       }
+      if (inviteEmail) {
+        const loginRes = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: form.email, password: form.password }),
+        });
+        const loginData = await readResponseJson(loginRes, 'auto-login');
+        if (loginRes.ok && loginData.access_token) {
+          saveToken(loginData.access_token);
+          let payload;
+          try { payload = JSON.parse(atob(loginData.access_token.split('.')[1])); } catch { payload = {}; }
+          if (payload.researcher_id) {
+            const stuRes = await fetch(`/api/researchers/${payload.researcher_id}`, {
+              headers: { Authorization: `Bearer ${loginData.access_token}` },
+            });
+            if (stuRes.ok) {
+              const stu = await stuRes.json();
+              navigate(`/app/profile/${slugify(stu.nome)}`, { replace: true });
+              return;
+            }
+          }
+          navigate('/app', { replace: true });
+          return;
+        }
+      }
       navigate('/entrar', { replace: true });
     } catch (err) {
       const offline = err instanceof TypeError || err?.message?.includes('fetch');
@@ -151,11 +176,12 @@ function RegisterForm({ inviteEmail }) {
 
   return (
     <>
-      <p className="text-xs text-gray-600 mb-3 leading-relaxed">{REGISTER_PROFESSOR_ONLY_HINT_PT}</p>
-      {inviteEmail && (
+      {inviteEmail ? (
         <p className="text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 mb-4">
           Você foi convidado para ativar sua conta. Defina uma senha para continuar.
         </p>
+      ) : (
+        <p className="text-xs text-gray-600 mb-3 leading-relaxed">{REGISTER_PROFESSOR_ONLY_HINT_PT}</p>
       )}
       {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
       <form onSubmit={handleSubmit} className="space-y-4">

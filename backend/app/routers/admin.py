@@ -5,7 +5,8 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
 from ..deps import require_dashboard, require_superadmin, require_professor
-from ..models import User, Researcher, Reminder, Tip, Note
+from ..models import User, Researcher, Reminder, Tip, TipComment, Note, ResearchGroup, ProfessorGroup
+from ..services import professor_service
 from ..plan import clear_plan, ensure_professor_plan_defaults
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -32,7 +33,19 @@ def _is_superadmin(user: User) -> bool:
     return user.role == "superadmin"
 
 
-def _stats_global(db: Session, hide_superadmin_count: bool) -> dict:
+def _count_groups(db: Session, current: User | None) -> int:
+    """Superadmin vê todos os grupos; professor vê apenas seus grupos."""
+    if current is None or _is_superadmin(current):
+        return db.query(func.count(ResearchGroup.id)).scalar()
+    professor = professor_service.get_by_user(db, current)
+    if not professor:
+        return 0
+    return db.query(func.count(ProfessorGroup.group_id)).filter(
+        ProfessorGroup.professor_id == professor.id
+    ).scalar()
+
+
+def _stats_global(db: Session, hide_superadmin_count: bool, current: User = None) -> dict:
     """Estatísticas globais; se hide_superadmin_count, não expõe quantidade de superadmins."""
     if hide_superadmin_count:
         role_counts = (
@@ -65,8 +78,9 @@ def _stats_global(db: Session, hide_superadmin_count: bool) -> dict:
         "users_by_role":        users_by_role,
         "total_researchers":    researchers,
         "total_pending":        pending,
+        "total_groups":         _count_groups(db, current),
         "total_reminders":      db.query(func.count(Reminder.id)).scalar(),
-        "total_manual_entries": db.query(func.count(Tip.id)).scalar(),
+        "total_tips":           db.query(func.count(Tip.id)).scalar(),
         "total_notes":          db.query(func.count(Note.id)).scalar(),
     }
 
@@ -76,7 +90,7 @@ def _stats_global(db: Session, hide_superadmin_count: bool) -> dict:
 @router.get("/stats")
 def get_stats(db: Session = Depends(get_db), current: User = Depends(require_dashboard)):
     # Superadmin: tudo. Professor/admin: totais globais, mas sem revelar quantos superadmins existem.
-    return _stats_global(db, hide_superadmin_count=not _is_superadmin(current))
+    return _stats_global(db, hide_superadmin_count=not _is_superadmin(current), current=current)
 
 
 # ── Users list ────────────────────────────────────────────────────────────────
@@ -202,6 +216,11 @@ def delete_user(
         if researcher:
             researcher.ativo = False
             researcher.registered = False
+    # Nullify FK references to avoid integrity errors
+    db.query(Note).filter(Note.created_by_id == user_id).update({"created_by_id": None})
+    db.query(Reminder).filter(Reminder.created_by_id == user_id).update({"created_by_id": None})
+    db.query(Tip).filter(Tip.author_id == user_id).update({"author_id": None})
+    db.query(TipComment).filter(TipComment.author_id == user_id).update({"author_id": None})
     db.delete(user)
     db.commit()
 
@@ -224,6 +243,10 @@ def bulk_delete(
                 if researcher:
                     researcher.ativo = False
                     researcher.registered = False
+            db.query(Note).filter(Note.created_by_id == uid).update({"created_by_id": None})
+            db.query(Reminder).filter(Reminder.created_by_id == uid).update({"created_by_id": None})
+            db.query(Tip).filter(Tip.author_id == uid).update({"author_id": None})
+            db.query(TipComment).filter(TipComment.author_id == uid).update({"author_id": None})
             db.delete(user)
     for rid in data.researcher_ids:
         researcher = db.query(Researcher).filter(Researcher.id == rid).first()

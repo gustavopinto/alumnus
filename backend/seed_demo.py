@@ -18,7 +18,7 @@ def h(pw): return pwd_ctx.hash(pw)
 def run():
     with Session() as db:
         from app.models import (
-            Researcher, User, Note, Work, Reminder,
+            Researcher, User, Note, Reminder,
             Tip, Relationship, GraphLayout
         )
 
@@ -188,95 +188,6 @@ def run():
         # Co-autorias entre grupos
         ensure_rel(ana_rid, diego_rid, 'co-autoria')
 
-        # ── WORKS ─────────────────────────────────────────────────────────
-        works_data = [
-            # Ana Beatriz
-            (ana_rid, 'Detecção de Code Smells via Transformers', 'publicacao',
-             'Publicado na SBES 2023. Abordagem baseada em BERT fine-tuned para detectar smells em repositórios Python e Java.', 2023,
-             'https://doi.org/10.1145/3555228.3555555'),
-            (ana_rid, 'Geração de Testes Unitários com LLMs', 'artigo',
-             'Em revisão na JSS. Avaliação de GPT-4 e CodeLlama para geração automatizada de testes em projetos open source.', 2024, None),
-            (ana_rid, 'Modelo Preditivo de Defeitos em Microsserviços', 'projeto',
-             'Projeto em andamento. Construção de dataset de 200 projetos microsserviços para treinamento de modelo preditivo.', 2024, None),
-
-            # Rafael Mendes
-            (raf_rid, 'Refatoração Automatizada com AST Transformations', 'publicacao',
-             'Publicado na ICSE 2023. Técnica de refatoração automática baseada em transformações de AST com validação por testes.', 2023,
-             'https://doi.org/10.1145/3597503.3623000'),
-            (raf_rid, 'Análise de Débito Técnico em Projetos Python', 'artigo',
-             'Submetido à EMSE. Estudo empírico com 500 repositórios Python medindo evolução do débito técnico.', 2024, None),
-            (raf_rid, 'Plugin VSCode para Detecção de Smells em Tempo Real', 'projeto',
-             'Plugin integrado ao LSP do VSCode para feedback imediato sobre code smells durante a edição.', 2024, None),
-
-            # Thiago Barbosa
-            (thi_rid, 'Mineração de Revisões de Código no GitHub', 'publicacao',
-             'Publicado na MSR 2022. Dataset de 1M+ revisões de código categorizadas por tipo de feedback.', 2022,
-             'https://doi.org/10.1145/3524842.3527000'),
-            (thi_rid, 'Predição de Aprovação de Pull Requests', 'artigo',
-             'Em revisão na IST. Modelo de ML para prever aprovação de PRs com base em métricas de código e histórico do autor.', 2024, None),
-
-            # Carlos Souza
-            (car_rid, 'Análise de Padrões de Commits em Equipes Ágeis', 'artigo',
-             'Submetido à SAST 2024. Estudo sobre frequência e granularidade de commits em sprints de equipes distribuídas.', 2024, None),
-            (car_rid, 'Ferramenta de Visualização de Evolução de Software', 'projeto',
-             'Dashboard web para visualizar evolução do código ao longo do tempo usando dados do Git.', 2024, None),
-
-            # Fernanda Castro
-            (fer_rid, 'Avaliação de Ferramentas de Análise Estática', 'artigo',
-             'Comparação sistemática de 8 ferramentas de análise estática em projetos Java de código aberto.', 2024, None),
-            (fer_rid, 'Impacto de Code Reviews na Qualidade do Código', 'projeto',
-             'Projeto de dissertação. Análise longitudinal do impacto de code reviews na redução de bugs.', 2024, None),
-
-            # Júlia Nunes
-            (jul_rid, 'Estudo sobre Documentação em APIs REST', 'artigo',
-             'Análise de 300 APIs públicas avaliando completude e precisão da documentação OpenAPI.', 2023, None),
-            (jul_rid, 'Gerador de Documentação Automática de APIs', 'projeto',
-             'Ferramenta que gera documentação OpenAPI a partir de testes de integração existentes.', 2024, None),
-
-            # Lucas Ferreira
-            (luc_rid, 'Análise de Problemas de Desempenho em Aplicações Mobile', 'artigo',
-             'Submetido à MOBILESoft 2024. Identificação de anti-padrões de desempenho em apps Android open source.', 2024, None),
-            (luc_rid, 'Detector de Memory Leaks em Apps Flutter', 'projeto',
-             'Ferramenta estática para detectar vazamentos de memória em aplicações Flutter.', 2024, None),
-
-            # Letícia Moura
-            (let_rid, 'IC: Análise de Sentimentos em Issues do GitHub', 'projeto',
-             'Iniciação científica. Classificação automática de sentimentos em comentários de issues usando NLP.', 2024, None),
-
-            # Mariana Lima
-            (mar_rid, 'IC: Dashboard de Métricas de Qualidade de Software', 'projeto',
-             'Iniciação científica. Desenvolvimento de dashboard para acompanhamento de métricas CK em projetos Java.', 2024, None),
-
-            # Pedro Henrique
-            (ped_rid, 'IC: Análise de Boas Práticas em Repositórios Educacionais', 'projeto',
-             'Estudo sobre adoção de boas práticas de desenvolvimento em projetos de alunos de graduação.', 2024, None),
-
-            # Diego Almeida (grupo Marina)
-            (diego_rid, 'Autoscaling Preditivo em Kubernetes com Aprendizado de Máquina', 'publicacao',
-             'Publicado na IEEE Cloud 2023. Algoritmo de autoscaling preditivo baseado em séries temporais com LSTM.', 2023,
-             'https://doi.org/10.1109/CLOUD.2023.00055'),
-            (diego_rid, 'Otimização de Custo em Clusters Multi-Cloud', 'artigo',
-             'Em revisão na FGCS. Estratégias de alocação de workloads em ambientes multi-cloud com otimização de custo.', 2024, None),
-
-            # Beatriz Tavares
-            (beatriz_rid, 'Detecção de Ataques a APIs com Anomaly Detection', 'artigo',
-             'Submetido à RAID 2024. Modelo não supervisionado para detecção de ataques em tempo real a APIs REST.', 2024, None),
-            (beatriz_rid, 'Zero Trust Architecture em Microsserviços', 'projeto',
-             'Implementação e avaliação de arquitetura Zero Trust em ambiente de microsserviços com Istio.', 2024, None),
-
-            # Renato Vieira
-            (renato_rid, 'Pipeline de CI/CD Auto-Reparável', 'artigo',
-             'Técnica de auto-healing para pipelines de CI/CD que diagnostica e repara falhas automaticamente.', 2024, None),
-            (renato_rid, 'Comparativo de Ferramentas IaC: Terraform vs Pulumi vs CDK', 'projeto',
-             'Avaliação empírica de ferramentas de infraestrutura como código em termos de produtividade e manutenibilidade.', 2024, None),
-        ]
-
-        for r_id, title, wtype, desc, year, url in works_data:
-            if r_id and not db.query(Work).filter_by(researcher_id=r_id, title=title).first():
-                db.add(Work(researcher_id=r_id, title=title, type=wtype,
-                            description=desc, year=year, url=url,
-                            created_at=datetime.utcnow()))
-
         # ── NOTES ─────────────────────────────────────────────────────────
         notes_data = [
             # Ana Beatriz
@@ -287,7 +198,7 @@ def run():
 
             # Rafael
             (raf_rid, prof1_uid, '**Reunião 02/05/2024** — Rafael apresentou resultados do plugin VSCode. Demo funcionando para Java. Precisamos adicionar suporte a Python ainda. Desempenho aceitável: < 200ms de latência para arquivos de até 1000 linhas.\n\n**Ação:** Rafael vai perfilar o código e identificar gargalos até 09/05.'),
-            (raf_rid, prof1_uid, '**Reunião 16/05/2024** — Revisão do artigo EMSE. Introdução e trabalhos relacionados OK. Seção de metodologia precisa de mais detalhes sobre o processo de seleção dos repositórios. Adicionar critérios de exclusão explícitos.\n\n**Deadline EMSE:** 15/06/2024 — Rafael está em tempo.'),
+            (raf_rid, prof1_uid, '**Reunião 16/05/2024** — Revisão do artigo EMSE. Introdução e trabalhos relacionados OK. Seção de metodologia precisa de mais detalhes sobre o processo de seleção dos repositórios. Adicionar critérios de exclusão explícitos.'),
             (raf_rid, raf_uid,   '**Reunião 30/05/2024** — Gustavo aprovou a metodologia revisada. Agora foco na seção de resultados: incluir tabela comparativa com outras ferramentas. Preparar gráficos de boxplot para as métricas de latência.'),
 
             # Thiago
@@ -309,7 +220,7 @@ def run():
 
             # Lucas
             (luc_rid, prof1_uid, '**Reunião 17/05/2024** — Lucas apresentou análise dos anti-padrões de desempenho mobile. Identificados 12 anti-padrões recorrentes. Os mais frequentes: uso inadequado do main thread, queries síncronas de banco.\n\n**Próximo:** Implementar detector estático para os 5 anti-padrões mais frequentes.'),
-            (luc_rid, prof1_uid, '**Reunião 31/05/2024** — Detector implementado para 3 dos 5 padrões. Precision de 82%, recall de 74%. Precisamos melhorar o recall. Ideia: adicionar análise de fluxo de dados inter-procedural.\n\n**Prazo MOBILESOF:** Verificar CFP para confirmar deadline.'),
+            (luc_rid, prof1_uid, '**Reunião 31/05/2024** — Detector implementado para 3 dos 5 padrões. Precision de 82%, recall de 74%. Precisamos melhorar o recall. Ideia: adicionar análise de fluxo de dados inter-procedural.'),
 
             # Grupo Marina
             (diego_rid, marina_uid, '**Reunião 06/05/2024** — Diego apresentou resultados do algoritmo LSTM para autoscaling. MAPE de 8.3% vs 15.1% do HPA padrão do Kubernetes. Excelente resultado. Próximo passo: validar em cluster de produção da UFPA.\n\n**Publicação:** Expandir para journal com versão completa dos experimentos.'),
@@ -336,7 +247,7 @@ def run():
         add_reminder(prof1_uid, 'Bancas de qualificação: Thiago (20/06) e Lucas (27/06)', today + timedelta(days=18), False)
         add_reminder(prof1_uid, 'Submeter relatório anual CNPq', today + timedelta(days=21), False)
         add_reminder(prof1_uid, 'Confirmar presença no SBES 2024 (Curitiba, setembro)', today + timedelta(days=30), False)
-        add_reminder(prof1_uid, 'Ler artigo do Thiago e dar feedback (deadline EMSE)', today - timedelta(days=2), True)
+        add_reminder(prof1_uid, 'Ler artigo do Thiago e dar feedback — EMSE', today - timedelta(days=2), True)
         add_reminder(prof1_uid, 'Aprovar plano de trabalho do Pedro e da Mariana', today - timedelta(days=5), True)
 
         add_reminder(marina_uid, 'Avaliar relatório semestral do Diego Almeida', today + timedelta(days=5), False)
@@ -358,9 +269,6 @@ def run():
 
             ('Como acessar os recursos do laboratório remotamente?',
              'O laboratório mantém um servidor de acesso remoto (VPN institucional). Para acessar:\n\n1. Solicite acesso ao prof. Gustavo com justificativa\n2. Você receberá credenciais para a VPN (OpenVPN)\n3. Após conectar na VPN, acesse os servidores via SSH:\n   - Servidor principal: `lab-server.ufpa.br`\n   - GPU cluster (uso agendado): `gpu01.ufpa.br`\n\nO acesso ao GPU cluster requer agendamento prévio via planilha compartilhada no grupo do WhatsApp.\n\nAlgum problema? Fale com o Diego (administrador de sistemas).', 3),
-
-            ('Onde submeter artigos para as principais conferências da área?',
-             '**Nacionais:**\n- SBES (Simpósio Brasileiro de Engenharia de Software) — setembro\n- SBCAS (Sistemas de Computação de Alto Desempenho) — setembro\n- SEMISH (Seminário Integrado de Software e Hardware) — julho\n- WASHES (Workshop de Análise de Software em Hardware Especializado) — junto ao SBES\n\n**Internacionais:**\n- ICSE (International Conference on Software Engineering) — deadline geralmente em agosto/setembro\n- FSE/ESEC — deadline março/abril\n- ASE — deadline março\n- MSR (Mining Software Repositories) — dezembro/janeiro\n- ICSME — março/abril\n\n**Dica:** Use o DBLP (dblp.org) para encontrar os CFPs das conferências.', 2),
 
             ('Como funciona o pagamento das bolsas?',
              'Bolsas CAPES e CNPq são pagas mensalmente, geralmente entre os dias 5 e 10 de cada mês, via depósito em conta corrente do Banco do Brasil.\n\nPara manter a bolsa você deve:\n- Registrar atividades no SigaBolsas mensalmente (até dia 5)\n- Não ter vínculo empregatício com carga horária > 20h\n- Manter desempenho acadêmico satisfatório\n- Cumprir as obrigações de ensino (estágio em docência para doutorado)\n\n**Mestrado CAPES:** R$ 2.100,00/mês\n**Doutorado CAPES:** R$ 3.100,00/mês\n\nEm caso de problemas no pagamento, entre em contato diretamente com a secretaria da pós-graduação.', 1),
@@ -399,7 +307,6 @@ def run():
         print('✓ Seed demo concluído com sucesso!')
         print(f'  Researchers: {db.query(Researcher).count()}')
         print(f'  Users: {db.query(User).count()}')
-        print(f'  Works: {db.query(Work).count()}')
         print(f'  Notes: {db.query(Note).count()}')
         print(f'  Reminders: {db.query(Reminder).count()}')
         print(f'  Tips: {db.query(Tip).count()}')

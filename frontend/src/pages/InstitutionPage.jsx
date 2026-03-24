@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { getMyEmails, addMyEmail, removeMyEmail, getGroups, createGroup, updateGroup, getInstitutions, createInstitution } from '../api';
 import { getTokenPayload } from '../auth';
+import { isModEnter } from '../platform';
 
 export default function InstitutionPage() {
   const payload = getTokenPayload();
@@ -159,32 +160,23 @@ export default function InstitutionPage() {
 
   // ── Header title / institution selector ───────────────────────────────────
   function renderTitle() {
-    if (instOptions.length === 0) {
-      return <h1 className="text-xl font-bold text-gray-800">Instituição</h1>;
-    }
-    if (instOptions.length === 1) {
+    if (instOptions.length > 1) {
       return (
-        <h1 className="text-xl font-bold text-gray-800">
-          Instituição{' '}
-          <span className="text-blue-700 uppercase tracking-wide">{selectedInst?.name}</span>
-        </h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold text-gray-800 shrink-0">Instituição</h1>
+          <select
+            className="border rounded-lg px-2 py-1 text-sm font-semibold text-blue-700 uppercase tracking-wide bg-white"
+            value={selectedInstId || ''}
+            onChange={e => setSelectedInstId(Number(e.target.value))}
+          >
+            {instOptions.map(inst => (
+              <option key={inst.id} value={inst.id}>{inst.name.toUpperCase()}</option>
+            ))}
+          </select>
+        </div>
       );
     }
-    // 2+ institutions: dropdown
-    return (
-      <div className="flex items-center gap-2">
-        <h1 className="text-xl font-bold text-gray-800 shrink-0">Instituição</h1>
-        <select
-          className="border rounded-lg px-2 py-1 text-sm font-semibold text-blue-700 uppercase tracking-wide bg-white"
-          value={selectedInstId || ''}
-          onChange={e => setSelectedInstId(Number(e.target.value))}
-        >
-          {instOptions.map(inst => (
-            <option key={inst.id} value={inst.id}>{inst.name.toUpperCase()}</option>
-          ))}
-        </select>
-      </div>
-    );
+    return <h1 className="text-xl font-bold text-gray-800">Instituição</h1>;
   }
 
   return (
@@ -212,24 +204,20 @@ export default function InstitutionPage() {
                     <p className="text-sm font-semibold text-gray-800 uppercase tracking-wide">{inst.name}</p>
                     <p className="text-xs text-gray-400">{inst.email}</p>
                   </div>
-                  <button
-                    onClick={ev => { ev.stopPropagation(); handleRemoveEmail(inst.pi_id); }}
-                    className="text-xs text-red-400 hover:text-red-600 ml-4 mt-0.5"
-                  >
-                    Remover
-                  </button>
                 </li>
               ))}
             </ul>
           )}
 
-          <form onSubmit={handleAddEmail} className="flex gap-2 mt-2">
+          <p className="text-sm font-medium text-gray-700">Adicionar nova instituição</p>
+          <form onSubmit={handleAddEmail} className="flex gap-2">
             <input
               type="email"
               placeholder="Email institucional (ex: nome@unicamp.br)"
               className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
               value={newEmail}
               onChange={e => setNewEmail(e.target.value)}
+              onKeyDown={e => isModEnter(e) && !addingEmail && handleAddEmail(e)}
             />
             <button
               type="submit"
@@ -267,6 +255,7 @@ export default function InstitutionPage() {
             </ul>
           )}
 
+          <p className="text-sm font-medium text-gray-700">Adicionar nova instituição</p>
           <form onSubmit={handleCreateInstitution} className="flex gap-2">
             <input
               type="email"
@@ -274,6 +263,7 @@ export default function InstitutionPage() {
               className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
               value={newInstEmail}
               onChange={e => setNewInstEmail(e.target.value)}
+              onKeyDown={e => isModEnter(e) && !addingInst && handleCreateInstitution(e)}
             />
             <button
               type="submit"

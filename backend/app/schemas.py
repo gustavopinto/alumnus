@@ -177,37 +177,6 @@ class NoteOut(BaseModel):
         return obj
 
 
-# --- Work ---
-
-class WorkCreate(BaseModel):
-    title: str
-    type: str  # projeto, artigo, publicacao
-    description: Optional[str] = None
-    year: Optional[int] = None
-    url: Optional[str] = None
-
-
-class WorkUpdate(BaseModel):
-    title: Optional[str] = None
-    type: Optional[str] = None
-    description: Optional[str] = None
-    year: Optional[int] = None
-    url: Optional[str] = None
-
-
-class WorkOut(BaseModel):
-    id: int
-    researcher_id: int
-    title: str
-    type: str
-    description: Optional[str]
-    year: Optional[int]
-    url: Optional[str]
-    created_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
 # --- Auth ---
 
 class RegisterRequest(BaseModel):
@@ -223,7 +192,7 @@ class RegisterRequest(BaseModel):
     @classmethod
     def password_length(cls, v):
         if len(v) < 8:
-            raise ValueError("Password must be at least 8 characters")
+            raise ValueError("A senha deve ter ao menos 8 caracteres")
         return v
 
 
@@ -278,6 +247,7 @@ class UserProfileUpdate(BaseModel):
     whatsapp:        Optional[str] = None
     interesses:      Optional[str] = None
     bio:             Optional[str] = None
+    password:        Optional[str] = None
 
     @field_validator("instagram_url")
     @classmethod
@@ -392,10 +362,28 @@ class TipCommentCreate(BaseModel):
     text: str
 
 
-# --- Deadline interests ---
+# --- Deadlines ---
+
+class DeadlineCreate(BaseModel):
+    label: str
+    url: str
+    date: date
+    institution_id: Optional[int] = None
+
+
+class DeadlineOut(BaseModel):
+    id: int
+    label: str
+    url: str
+    date: date
+    institution_id: Optional[int] = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
 
 class DeadlineInterestOut(BaseModel):
-    deadline_key: str
+    deadline_id: int
     user_id: int
     user_name: str
     user_photo_url: Optional[str] = None

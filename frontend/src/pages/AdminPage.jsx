@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getAdminStats, getAdminUsers, updateUserRole, deleteUser, deletePendingResearcher, bulkDeleteUsers } from '../api';
+import { getAdminStats, getAdminUsers, updateUserRole, deleteUser, deletePendingResearcher, bulkDeleteUsers, createResearcher } from '../api';
 import { getTokenPayload } from '../auth';
+import Toast from '../components/Toast';
 
 const ROLE_LABELS = { superadmin: 'Superadmin', professor: 'Professor', student: 'Aluno' };
 const STATUS_LABELS = { graduacao: 'Graduação', mestrado: 'Mestrado', doutorado: 'Doutorado', postdoc: 'Pós-doc', professor: 'Professor' };
@@ -44,9 +45,18 @@ export default function AdminPage() {
   const [copiedId, setCopiedId] = useState(null);
   const [selected, setSelected] = useState(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [showAddStudent, setShowAddStudent] = useState(false);
+  const [newStudentNome, setNewStudentNome] = useState('');
+  const [newStudentEmail, setNewStudentEmail] = useState('');
+  const [newStudentStatus, setNewStudentStatus] = useState('mestrado');
+  const [addingStudent, setAddingStudent] = useState(false);
+  const [addStudentError, setAddStudentError] = useState('');
+  const [inviteLink, setInviteLink] = useState('');
+  const [toast, setToast] = useState('');
 
   const myRole = getTokenPayload()?.role;
   const isSuperadmin = myRole === 'superadmin';
+  const isProfessor = ['professor', 'superadmin'].includes(myRole);
   const canDelete = ['superadmin', 'professor'].includes(myRole);
 
   function copyInviteLink(u) {
@@ -55,6 +65,7 @@ export default function AdminPage() {
     navigator.clipboard.writeText(url).then(() => {
       setCopiedId(u.researcher_id ?? u.id);
       setTimeout(() => setCopiedId(null), 2000);
+      setToast('Link de convite copiado com sucesso');
     });
   }
 
@@ -126,7 +137,34 @@ export default function AdminPage() {
     } else {
       await deleteUser(u.id);
     }
+    setToast(`"${u.nome}" removido`);
     load();
+  }
+
+  async function handleAddStudent(e) {
+    e.preventDefault();
+    if (!newStudentNome.trim() || !newStudentEmail.trim()) return;
+    setAddingStudent(true);
+    setAddStudentError('');
+    try {
+      const myPayload = getTokenPayload();
+      const r = await createResearcher({ nome: newStudentNome.trim(), email: newStudentEmail.trim(), status: newStudentStatus, orientador_id: myPayload?.professor_id || null });
+      if (r?.id) {
+        const token = btoa(newStudentEmail.trim());
+        const url = `${window.location.origin}/entrar?tab=cadastro&token=${token}`;
+        setInviteLink(url);
+        setNewStudentNome('');
+        setNewStudentEmail('');
+        setNewStudentStatus('mestrado');
+        load();
+      } else {
+        setAddStudentError(r?.detail || 'Erro ao cadastrar aluno');
+      }
+    } catch {
+      setAddStudentError('Erro ao cadastrar aluno');
+    } finally {
+      setAddingStudent(false);
+    }
   }
 
   function formatDate(iso) {
@@ -136,6 +174,7 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-full bg-gray-50">
+      <Toast message={toast} onClose={() => setToast('')} />
       <main className="max-w-5xl mx-auto py-8 px-4 space-y-8">
 
         {/* Stats */}
@@ -154,9 +193,10 @@ export default function AdminPage() {
               )}
             </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-2 gap-4 mt-4">
-            <StatCard label="Lembretes"    value={stats?.total_reminders}           color="text-amber-600" />
-            <StatCard label="Manual"       value={stats?.total_manual_entries}      color="text-teal-600" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-4">
+            <StatCard label="Grupos de pesquisa" value={stats?.total_groups}          color="text-indigo-600" />
+            <StatCard label="Lembretes"          value={stats?.total_reminders}       color="text-amber-600" />
+            <StatCard label="Tips"               value={stats?.total_tips}            color="text-teal-600" />
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
             <StatCard label="Anotações"   value={stats?.total_notes}               color="text-rose-600" />
@@ -170,19 +210,92 @@ export default function AdminPage() {
               <h2 className="text-base font-semibold text-gray-800">Usuários</h2>
               <p className="text-sm text-gray-500 mt-0.5">{users.length} usuário{users.length !== 1 ? 's' : ''} cadastrado{users.length !== 1 ? 's' : ''}</p>
             </div>
-            {canDelete && selected.size > 0 && (
-              <button
-                onClick={handleBulkDelete}
-                disabled={bulkDeleting}
-                className="flex items-center gap-2 bg-red-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                Remover {selected.size} selecionado{selected.size !== 1 ? 's' : ''}
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {isProfessor && (
+                <button
+                  onClick={() => { setShowAddStudent(v => !v); setInviteLink(''); setAddStudentError(''); }}
+                  className="flex items-center gap-1.5 bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Cadastrar Aluno
+                </button>
+              )}
+              {canDelete && selected.size > 0 && (
+                <button
+                  onClick={handleBulkDelete}
+                  disabled={bulkDeleting}
+                  className="flex items-center gap-2 bg-red-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Remover {selected.size} selecionado{selected.size !== 1 ? 's' : ''}
+                </button>
+              )}
+            </div>
           </div>
+
+          {showAddStudent && (
+            <div className="px-6 py-4 border-b bg-green-50">
+              {inviteLink ? (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-green-800">Aluno cadastrado! Compartilhe o link de convite:</p>
+                  <div className="flex gap-2">
+                    <input readOnly value={inviteLink} className="flex-1 border rounded-lg px-3 py-2 text-xs bg-white text-gray-700 focus:outline-none" />
+                    <button
+                      onClick={() => { navigator.clipboard.writeText(inviteLink); setToast('Link de convite copiado com sucesso'); }}
+                      className="bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700"
+                    >
+                      Copiar
+                    </button>
+                  </div>
+                  <button onClick={() => { setShowAddStudent(false); setInviteLink(''); }} className="text-xs text-gray-500 hover:text-gray-700">Fechar</button>
+                </div>
+              ) : (
+                <form onSubmit={handleAddStudent} className="space-y-3">
+                  <p className="text-sm font-semibold text-gray-700">Cadastrar novo aluno</p>
+                  <div className="flex gap-3 flex-wrap">
+                    <input
+                      required
+                      placeholder="Nome completo"
+                      value={newStudentNome}
+                      onChange={e => setNewStudentNome(e.target.value)}
+                      className="flex-1 min-w-40 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                    />
+                    <input
+                      required
+                      type="email"
+                      placeholder="Email"
+                      value={newStudentEmail}
+                      onChange={e => setNewStudentEmail(e.target.value)}
+                      className="flex-1 min-w-48 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                    />
+                    <select
+                      value={newStudentStatus}
+                      onChange={e => setNewStudentStatus(e.target.value)}
+                      className="border rounded-lg px-3 py-2 text-sm"
+                    >
+                      <option value="graduacao">Graduação</option>
+                      <option value="mestrado">Mestrado</option>
+                      <option value="doutorado">Doutorado</option>
+                      <option value="postdoc">Pós-doc</option>
+                    </select>
+                  </div>
+                  {addStudentError && <p className="text-xs text-red-500">{addStudentError}</p>}
+                  <div className="flex gap-2">
+                    <button type="submit" disabled={addingStudent} className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">
+                      {addingStudent ? 'Cadastrando...' : 'Cadastrar e gerar link'}
+                    </button>
+                    <button type="button" onClick={() => setShowAddStudent(false)} className="bg-gray-200 px-4 py-2 rounded-lg text-sm hover:bg-gray-300">
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -195,7 +308,6 @@ export default function AdminPage() {
                   <th className="px-4 py-3">Nome</th>
                   <th className="px-4 py-3">Email</th>
                   <th className="px-4 py-3">Perfil</th>
-                  <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">WhatsApp</th>
                   <th className="px-4 py-3">Último acesso</th>
                   <th className="px-4 py-3">Ações</th>
@@ -255,18 +367,24 @@ export default function AdminPage() {
                         </div>
                       ) : (
                         <div className="flex items-center gap-1 flex-wrap">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${ROLE_COLORS[u.role] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
-                            {ROLE_LABELS[u.role] || u.role}
-                          </span>
+                          {u.role !== 'student' ? (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${ROLE_COLORS[u.role] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                              {ROLE_LABELS[u.role] || u.role}
+                            </span>
+                          ) : (
+                            <>
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${ROLE_COLORS.student}`}>
+                                Aluno
+                              </span>
+                              {u.researcher_status && (
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_COLORS[u.researcher_status] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                                  {STATUS_LABELS[u.researcher_status] || u.researcher_status}
+                                </span>
+                              )}
+                            </>
+                          )}
                         </div>
                       )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {u.researcher_status ? (
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_COLORS[u.researcher_status] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
-                          {STATUS_LABELS[u.researcher_status] || u.researcher_status}
-                        </span>
-                      ) : '—'}
                     </td>
                     <td className="px-4 py-3 text-gray-500">
                       {u.whatsapp

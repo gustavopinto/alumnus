@@ -6,6 +6,7 @@ import { useAppLayout } from '../components/AppLayout';
 
 export default function GraphPage() {
   const { graphNodes, graphEdges, researchers } = useAppLayout();
+  const nodeStatuses = useMemo(() => new Set(graphNodes.map(n => n.data?.status).filter(Boolean)), [graphNodes]);
   const [hiddenStatuses, setHiddenStatuses] = useState(() => new Set());
   const [viewMode, setViewMode] = useState('graph');
 
@@ -37,7 +38,7 @@ export default function GraphPage() {
       ) : (
         <BoxView researchers={researchers} hiddenStatuses={hiddenStatuses} />
       )}
-      <Legend hiddenStatuses={hiddenStatuses} onToggleStatus={toggleStatus} viewMode={viewMode} onToggleView={setViewMode} researchers={researchers} />
+      <Legend hiddenStatuses={hiddenStatuses} onToggleStatus={toggleStatus} viewMode={viewMode} onToggleView={setViewMode} researchers={researchers} nodeStatuses={nodeStatuses} />
     </div>
   );
 }

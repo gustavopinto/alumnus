@@ -1,18 +1,18 @@
 import os
 import json
+from typing import Optional
 
 import httpx
 from bs4 import BeautifulSoup
 from openai import OpenAI
-from fastapi import APIRouter, Depends, Response, HTTPException
+from fastapi import APIRouter, Depends, Response, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
-from ..models import DeadlineInterest, Researcher
-from ..schemas import DeadlineInterestOut
-from ..deps import get_current_user
-from ..models import User
+from ..models import Deadline, DeadlineInterest, Researcher, User
+from ..schemas import DeadlineCreate, DeadlineOut, DeadlineInterestOut
+from ..deps import get_current_user, require_professor, require_dashboard
 from ..slug import slugify
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
@@ -22,19 +22,16 @@ OPENAI_MAX_TOKENS = int(os.getenv("OPENAI_MAX_TOKENS", "4096"))
 router = APIRouter(prefix="/deadlines", tags=["deadlines"])
 
 
-def _to_out(db: Session, interest: DeadlineInterest) -> DeadlineInterestOut:
+def _interest_out(db: Session, interest: DeadlineInterest) -> DeadlineInterestOut:
     photo = None
     thumb = None
     profile_slug = None
     u = interest.user
     if not u:
         return DeadlineInterestOut(
-            deadline_key=interest.deadline_key,
+            deadline_id=interest.deadline_id,
             user_id=interest.user_id,
             user_name="",
-            user_photo_url=None,
-            user_photo_thumb_url=None,
-            profile_slug=None,
         )
     if u.researcher:
         photo = u.researcher.photo_url
@@ -49,7 +46,7 @@ def _to_out(db: Session, interest: DeadlineInterest) -> DeadlineInterestOut:
     if profile_slug is None and u.nome:
         profile_slug = slugify(u.nome)
     return DeadlineInterestOut(
-        deadline_key=interest.deadline_key,
+        deadline_id=interest.deadline_id,
         user_id=interest.user_id,
         user_name=u.nome,
         user_photo_url=photo,
@@ -58,30 +55,93 @@ def _to_out(db: Session, interest: DeadlineInterest) -> DeadlineInterestOut:
     )
 
 
-@router.get("/interests", response_model=list[DeadlineInterestOut])
-def list_interests(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    interests = (
-        db.query(DeadlineInterest)
-        .options(joinedload(DeadlineInterest.user).joinedload(User.researcher))
-        .all()
-    )
-    return [_to_out(db, i) for i in interests]
+# ── CRUD Deadlines ────────────────────────────────────────────────────────────
 
-
-@router.post("/{key:path}/interest", status_code=204)
-def toggle_interest(
-    key: str,
+@router.get("/", response_model=list[DeadlineOut])
+def list_deadlines(
+    institution_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    existing = db.query(DeadlineInterest).filter_by(deadline_key=key, user_id=current_user.id).first()
-    if existing:
-        db.delete(existing)
-    else:
-        db.add(DeadlineInterest(deadline_key=key, user_id=current_user.id))
+    q = db.query(Deadline)
+    if institution_id is not None:
+        q = q.filter(Deadline.institution_id == institution_id)
+    return q.order_by(Deadline.date).all()
+
+
+@router.post("/", response_model=DeadlineOut, status_code=201)
+def create_deadline(
+    data: DeadlineCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    d = Deadline(
+        label=data.label,
+        url=data.url,
+        date=data.date,
+        institution_id=data.institution_id,
+    )
+    db.add(d)
+    db.commit()
+    db.refresh(d)
+    return d
+
+
+@router.delete("/{deadline_id}", status_code=204)
+def delete_deadline(
+    deadline_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_professor),
+):
+    d = db.query(Deadline).filter(Deadline.id == deadline_id).first()
+    if not d:
+        raise HTTPException(status_code=404, detail="Deadline não encontrado")
+    db.delete(d)
     db.commit()
     return Response(status_code=204)
 
+
+# ── Interests ─────────────────────────────────────────────────────────────────
+
+@router.get("/interests", response_model=list[DeadlineInterestOut])
+def list_interests(
+    institution_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    q = (
+        db.query(DeadlineInterest)
+        .options(
+            joinedload(DeadlineInterest.user).joinedload(User.researcher),
+            joinedload(DeadlineInterest.deadline),
+        )
+    )
+    if institution_id is not None:
+        q = q.join(Deadline).filter(Deadline.institution_id == institution_id)
+    return [_interest_out(db, i) for i in q.all()]
+
+
+@router.post("/{deadline_id}/interest", status_code=204)
+def toggle_interest(
+    deadline_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    d = db.query(Deadline).filter(Deadline.id == deadline_id).first()
+    if not d:
+        raise HTTPException(status_code=404, detail="Deadline não encontrado")
+    existing = db.query(DeadlineInterest).filter_by(
+        deadline_id=deadline_id, user_id=current_user.id
+    ).first()
+    if existing:
+        db.delete(existing)
+    else:
+        db.add(DeadlineInterest(deadline_id=deadline_id, user_id=current_user.id))
+    db.commit()
+    return Response(status_code=204)
+
+
+# ── Extract from URL ──────────────────────────────────────────────────────────
 
 class ExtractUrlRequest(BaseModel):
     url: str
@@ -103,7 +163,6 @@ def extract_deadline_from_url(
 
     headers = {"User-Agent": "Mozilla/5.0 (compatible; AlumnusBot/1.0)"}
 
-    # 1. HEAD para verificar status antes de baixar
     try:
         head = httpx.head(body.url, timeout=10, follow_redirects=True, headers=headers)
         if head.status_code >= 400:
@@ -118,32 +177,24 @@ def extract_deadline_from_url(
                 502: "O servidor da página está com problemas. Tente novamente mais tarde (502).",
                 503: "O servidor da página está indisponível no momento (503).",
             }
-            msg = messages.get(
-                head.status_code,
-                f"A página retornou um erro inesperado (código {head.status_code}).",
-            )
+            msg = messages.get(head.status_code, f"A página retornou um erro inesperado (código {head.status_code}).")
             raise HTTPException(status_code=422, detail=msg)
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(status_code=422, detail="Não foi possível alcançar a URL. Verifique sua conexão ou tente novamente.")
+        raise HTTPException(status_code=422, detail="Não foi possível alcançar a URL.")
 
-    # 2. Busca o HTML completo
     try:
         resp = httpx.get(body.url, timeout=15, follow_redirects=True, headers=headers)
         resp.raise_for_status()
     except Exception:
-        raise HTTPException(status_code=422, detail="Erro ao baixar o conteúdo da página. Tente novamente.")
+        raise HTTPException(status_code=422, detail="Erro ao baixar o conteúdo da página.")
 
-    # 2. Extrai texto relevante com BeautifulSoup
     soup = BeautifulSoup(resp.text, "html.parser")
     for tag in soup(["script", "style", "nav", "footer", "header"]):
         tag.decompose()
-    text = soup.get_text(separator="\n", strip=True)
-    # Limita para não estourar tokens
-    text = text[:12_000]
+    text = soup.get_text(separator="\n", strip=True)[:12_000]
 
-    # 3. Chama OpenAI para extrair os deadlines
     client = OpenAI(api_key=OPENAI_API_KEY)
     system_prompt = (
         "Você é um assistente que extrai prazos (deadlines) de chamadas para submissão de artigos "
@@ -151,11 +202,10 @@ def extract_deadline_from_url(
         "Retorne APENAS um array JSON (sem markdown, sem código, sem explicação) com os deadlines encontrados. "
         "Cada item deve ter os campos: "
         "\"label\" (nome da conferência/evento + ano, ex: \"ICSE 2026\"), "
-        "\"date\" (data no formato YYYY-MM-DD — use o prazo de submissão de artigos completos ou abstracts), "
+        "\"date\" (data no formato YYYY-MM-DD), "
         "\"url\" (a URL original fornecida pelo usuário). "
         "Se não encontrar nenhum deadline, retorne []. "
-        "Priorize o prazo de submissão de papers completos (full papers). "
-        "Se houver múltiplos prazos relevantes (ex: abstract + full paper), inclua ambos com labels distintos."
+        "Priorize o prazo de submissão de papers completos (full papers)."
     )
     try:
         completion = client.chat.completions.create(

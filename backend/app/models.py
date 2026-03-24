@@ -105,7 +105,6 @@ class Researcher(Base):
     group      = relationship("ResearchGroup", back_populates="researchers")
     user       = relationship("User", primaryjoin="User.researcher_id == Researcher.id", foreign_keys="[User.researcher_id]", uselist=False, viewonly=True)
 
-    works      = relationship("Work", back_populates="researcher", cascade="all, delete-orphan")
     notes      = relationship("Note", back_populates="researcher", cascade="all, delete-orphan")
 
     @property
@@ -148,20 +147,6 @@ class Note(Base):
     researcher = relationship("Researcher", back_populates="notes")
     created_by = relationship("User", foreign_keys=[created_by_id])
 
-
-class Work(Base):
-    __tablename__ = "works"
-
-    id            = Column(Integer, primary_key=True, index=True)
-    researcher_id = Column(Integer, ForeignKey("researchers.id"), nullable=False)
-    title         = Column(String(500), nullable=False)
-    type          = Column(String(50), nullable=False)
-    description   = Column(Text, nullable=True)
-    year          = Column(Integer, nullable=True)
-    url           = Column(String(500), nullable=True)
-    created_at    = Column(DateTime, default=datetime.utcnow)
-
-    researcher = relationship("Researcher", back_populates="works")
 
 
 class User(Base):
@@ -259,17 +244,32 @@ class TipVote(Base):
     user  = relationship("User", foreign_keys=[user_id])
 
 
+class Deadline(Base):
+    __tablename__ = "deadlines"
+
+    id             = Column(Integer, primary_key=True, index=True)
+    label          = Column(String(255), nullable=False)
+    url            = Column(Text, nullable=False)
+    date           = Column(Date, nullable=False)
+    institution_id = Column(Integer, ForeignKey("institutions.id", ondelete="CASCADE"), nullable=True)
+    created_at     = Column(DateTime, default=datetime.utcnow)
+
+    institution = relationship("Institution", foreign_keys=[institution_id])
+    interests   = relationship("DeadlineInterest", back_populates="deadline", cascade="all, delete-orphan")
+
+
 class DeadlineInterest(Base):
     __tablename__ = "deadline_interests"
 
-    id           = Column(Integer, primary_key=True, index=True)
-    deadline_key = Column(String(200), nullable=False)
-    user_id      = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    created_at   = Column(DateTime, default=datetime.utcnow)
+    id          = Column(Integer, primary_key=True, index=True)
+    deadline_id = Column(Integer, ForeignKey("deadlines.id", ondelete="CASCADE"), nullable=False)
+    user_id     = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at  = Column(DateTime, default=datetime.utcnow)
 
-    user = relationship("User", foreign_keys=[user_id])
+    deadline = relationship("Deadline", back_populates="interests")
+    user     = relationship("User", foreign_keys=[user_id])
 
-    __table_args__ = (UniqueConstraint("deadline_key", "user_id"),)
+    __table_args__ = (UniqueConstraint("deadline_id", "user_id", name="deadline_interests_key"),)
 
 
 class TipComment(Base):

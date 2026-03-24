@@ -12,6 +12,7 @@ import {
 } from '../api';
 import { getTokenPayload, isDashboardRole } from '../auth';
 import { useAppLayout } from '../components/AppLayout';
+import Toast from '../components/Toast';
 
 function renderFormatted(text) {
   const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_)/g);
@@ -258,6 +259,7 @@ export default function ManualPage() {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState('');
   const payload = getTokenPayload();
   const canModerateManual = isDashboardRole(payload?.role);
   const authUserId = payload?.sub != null ? Number(payload.sub) : null;
@@ -277,17 +279,20 @@ export default function ManualPage() {
     setQuestion('');
     setAnswer('');
     setSaving(false);
+    setToast('Entrada adicionada com sucesso');
     load(currentInstitution?.id);
   }
 
   async function handleDelete(id) {
     if (!confirm('Remover esta entrada?')) return;
     await deleteTip(id);
-    load();
+    setToast('Entrada removida');
+    load(currentInstitution?.id);
   }
 
   return (
     <div className="min-h-full bg-gray-50">
+      <Toast message={toast} onClose={() => setToast('')} />
       <main className="max-w-2xl mx-auto py-8 px-4 space-y-6">
         <section className="bg-white rounded-xl shadow-sm border p-6">
             <h2 className="text-base font-semibold text-gray-800 mb-4">Nova entrada</h2>

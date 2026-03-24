@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Outlet, useOutletContext, useNavigate, Link, useLocation } from 'react-router-dom';
 import Sidebar, { SidebarRail } from './Sidebar';
-import { getGraph, getResearchers, getInstitutions, getMyEmails } from '../api';
+import { getGraph, getResearchers, getInstitutions, getMyEmails, updateMyProfile } from '../api';
 import { removeToken, getTokenPayload, getMe } from '../auth';
 
 function slugify(nome) {
@@ -184,6 +184,11 @@ export default function AppLayout() {
   const [institutions, setInstitutions] = useState([]);
   const [currentInstitution, setCurrentInstitution] = useState(null);
   const [profileTopbar, setProfileTopbar] = useState(null);
+  const [changePwOpen, setChangePwOpen] = useState(false);
+  const [changePwNew, setChangePwNew] = useState('');
+  const [changePwConfirm, setChangePwConfirm] = useState('');
+  const [changePwError, setChangePwError] = useState('');
+  const [changePwSaving, setChangePwSaving] = useState(false);
   const settingsRef = useRef(null);
   const currentInstIdRef = useRef(null);
   const navigate = useNavigate();
@@ -192,8 +197,29 @@ export default function AppLayout() {
 
   const loadData = useCallback(async () => {
     const instId = currentInstIdRef.current;
-    const [graphData, researchersData] = await Promise.all([getGraph(instId), getResearchers(instId)]);
-    setResearchers(researchersData || []);
+    const [graphData, researchersData] = await Promise.all([getGraph(instId), getResearchers(instId, true)]);
+    // Include professor nodes in the researchers list so they appear in BoxView,
+    // @ mentions, sidebar count, etc.
+    const professorEntries = (graphData?.nodes || [])
+      .filter(n => n.data?.status === 'professor')
+      .map(n => ({
+        id: n.id,
+        nome: n.data.name,
+        status: 'professor',
+        ativo: true,
+        _isProfessor: true,
+        email: null,
+        group_id: null,
+        orientador_id: null,
+        photo_url: n.data.photoUrl || null,
+        photo_thumb_url: n.data.photoUrl || null,
+        registered: true,
+        matricula: null,
+        curso: null,
+        enrollment_date: null,
+        observacoes: null,
+      }));
+    setResearchers([...professorEntries, ...(researchersData || [])]);
     setNodes(
       (graphData?.nodes || []).map((n) => ({
         ...n,
@@ -268,6 +294,19 @@ export default function AppLayout() {
     window.location.href = '/';
   }
 
+  async function handleChangePassword(e) {
+    e.preventDefault();
+    if (changePwNew.length < 6) { setChangePwError('A senha deve ter ao menos 6 caracteres'); return; }
+    if (changePwNew !== changePwConfirm) { setChangePwError('As senhas não coincidem'); return; }
+    setChangePwSaving(true);
+    setChangePwError('');
+    await updateMyProfile({ password: changePwNew });
+    setChangePwSaving(false);
+    setChangePwOpen(false);
+    setChangePwNew('');
+    setChangePwConfirm('');
+  }
+
   const payload = getTokenPayload();
   const userName =
     (currentUser?.nome && String(currentUser.nome).trim())
@@ -315,7 +354,7 @@ export default function AppLayout() {
     if (p === '/app' || p === '/app/') return { title: 'Grupo', icon: 'grupo' };
     if (p === '/app/manual') return { title: 'Manual de Sobrevivência', icon: 'manual' };
     if (p === '/app/reminders') return { title: 'Lembretes', icon: 'reminders' };
-    if (p === '/app/deadlines') return { title: 'Deadlines', icon: 'deadlines' };
+    if (p === '/app/deadlines') return { title: 'Próximos deadlines', icon: 'deadlines' };
     if (p === '/app/admin') return { title: 'Dashboard', icon: 'admin' };
     return null;
   }, [pathname]);
@@ -504,7 +543,6 @@ export default function AppLayout() {
                           {currentInstitution?.name || 'Instituição'}
                         </button>
                       )}
-                      <div className="border-t mx-2 my-1" />
                     </>
                   )}
                   {profileSlug && (

@@ -30,8 +30,13 @@ export const updateMyProfile   = (data) => request('/users/me', { method: 'PATCH
 export const updateUserProfile = (userId, data) => request(`/users/${userId}`, { method: 'PATCH', body: JSON.stringify(data) });
 
 // Researchers
-export const getResearchers = (institutionId) =>
-  request(`/researchers/${institutionId ? `?institution_id=${institutionId}` : ''}`);
+export const getResearchers = (institutionId, ativo) => {
+  const params = new URLSearchParams();
+  if (institutionId) params.set('institution_id', institutionId);
+  if (ativo !== undefined) params.set('ativo', ativo);
+  const qs = params.toString();
+  return request(`/researchers/${qs ? `?${qs}` : ''}`);
+};
 export const createResearcher = (data) => request('/researchers/', { method: 'POST', body: JSON.stringify(data) });
 export const updateResearcher = (id, data) => request(`/researchers/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const deleteResearcher = (id) => request(`/researchers/${id}`, { method: 'DELETE' });
@@ -64,14 +69,10 @@ export async function createNote(researcherId, text, file) {
   return res.json();
 }
 
-// Works
+// Researcher
 export const getResearcher = (id) => request(`/researchers/${id}`);
 export const getResearcherUser = (researcherId) => request(`/researchers/${researcherId}/user`);
 export const getResearcherBySlug = (slug) => request(`/researchers/by-slug/${slug}`);
-export const getWorks = (researcherId) => request(`/researchers/${researcherId}/works`);
-export const createWork = (researcherId, data) => request(`/researchers/${researcherId}/works`, { method: 'POST', body: JSON.stringify(data) });
-export const updateWork = (workId, data) => request(`/works/${workId}`, { method: 'PUT', body: JSON.stringify(data) });
-export const deleteWork = (workId) => request(`/works/${workId}`, { method: 'DELETE' });
 
 // Reminders
 export const getReminders = (institutionId) =>
@@ -128,9 +129,18 @@ export const addTipComment = (entryId, text) => request(`/tips/${entryId}/commen
 export const deleteTipComment = (commentId) => request(`/tips/comments/${commentId}`, { method: 'DELETE' });
 
 // Deadlines
-export const getDeadlineInterests = () => request('/deadlines/interests');
-export const toggleDeadlineInterest = (key) => request(`/deadlines/${encodeURIComponent(key)}/interest`, { method: 'POST' });
-export const extractDeadlineFromUrl = (url) => request('/deadlines/extract-url', { method: 'POST', body: JSON.stringify({ url }) });
+export const getDeadlines = (institutionId) =>
+  request(`/deadlines/${institutionId ? `?institution_id=${institutionId}` : ''}`);
+export const createDeadline = (data) =>
+  request('/deadlines/', { method: 'POST', body: JSON.stringify(data) });
+export const deleteDeadline = (id) =>
+  request(`/deadlines/${id}`, { method: 'DELETE' });
+export const getDeadlineInterests = (institutionId) =>
+  request(`/deadlines/interests${institutionId ? `?institution_id=${institutionId}` : ''}`);
+export const toggleDeadlineInterest = (deadlineId) =>
+  request(`/deadlines/${deadlineId}/interest`, { method: 'POST' });
+export const extractDeadlineFromUrl = (url) =>
+  request('/deadlines/extract-url', { method: 'POST', body: JSON.stringify({ url }) });
 
 // Upload
 export async function uploadPhoto(file) {

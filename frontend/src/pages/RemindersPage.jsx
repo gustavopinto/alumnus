@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAppLayout } from '../components/AppLayout';
 import { getReminders, createReminder, deleteReminder } from '../api';
+import Toast from '../components/Toast';
 import { canDeleteReminder, creatorDisplayName } from '../reminderAccess';
 import { invalidMentions, renderWithMentions } from '../mentionUtils.jsx';
 
@@ -108,6 +109,7 @@ export default function RemindersPage() {
     : [];
 
   const [mentionError, setMentionError] = useState('');
+  const [toast, setToast] = useState('');
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -123,6 +125,7 @@ export default function RemindersPage() {
     setText('');
     setDueDate(todayIso());
     setSaving(false);
+    setToast('Lembrete adicionado');
     load();
   }
 
@@ -131,8 +134,9 @@ export default function RemindersPage() {
     try {
       await deleteReminder(id);
       await load();
+      setToast('Lembrete removido');
     } catch (e) {
-      alert(e?.message || 'Não foi possível remover');
+      setToast('Não foi possível remover');
     }
   }
 
@@ -142,6 +146,7 @@ export default function RemindersPage() {
 
   return (
     <div className="min-h-full bg-gray-50">
+      <Toast message={toast} onClose={() => setToast('')} />
       <main className="max-w-2xl mx-auto py-8 px-4 space-y-6">
         <section className="bg-white rounded-xl shadow-sm border p-6">
           <form onSubmit={handleSubmit} className="space-y-3">

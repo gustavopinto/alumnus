@@ -26,8 +26,9 @@ function IconGrid() {
   );
 }
 
-export default function Legend({ hiddenStatuses, onToggleStatus, viewMode, onToggleView, researchers = [] }) {
+export default function Legend({ hiddenStatuses, onToggleStatus, viewMode, onToggleView, researchers = [], nodeStatuses }) {
   const activeStatuses = new Set(researchers.filter(r => r.ativo).map(r => r.status));
+  if (nodeStatuses) nodeStatuses.forEach(s => activeStatuses.add(s));
   const items = ALL_ITEMS.filter(item => activeStatuses.has(item.status));
   return (
     <div className="absolute top-4 right-4 bg-white rounded-lg shadow-md px-4 py-3 z-10 border border-gray-100 max-w-[11rem]">

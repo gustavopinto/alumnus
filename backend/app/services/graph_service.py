@@ -1,8 +1,9 @@
 import logging
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from ..models import GraphLayout, Professor, Relationship, Researcher
+from ..models import GraphLayout, Professor, ProfessorInstitution, Relationship, Researcher
 from ..schemas import LayoutUpdate
 from ..slug import slugify
 
@@ -22,18 +23,27 @@ def build_graph_payload(db: Session, institution_id: int | None = None) -> dict:
     researchers_q = db.query(Researcher).filter(Researcher.ativo == True)
 
     if institution_id is not None:
-        from ..models import ResearchGroup, ProfessorGroup
-        prof_ids = db.query(ProfessorGroup.professor_id).filter(
-            ProfessorGroup.institution_id == institution_id
+        from ..models import ResearchGroup
+        prof_ids = db.query(ProfessorInstitution.professor_id).filter(
+            ProfessorInstitution.institution_id == institution_id
         ).subquery()
         professors_q = professors_q.filter(Professor.id.in_(prof_ids))
         group_ids = db.query(ResearchGroup.id).filter(
             ResearchGroup.institution_id == institution_id
         ).subquery()
-        researchers_q = researchers_q.filter(Researcher.group_id.in_(group_ids))
+        # Include researchers by group membership OR by orientador being in the institution
+        researchers_q = researchers_q.filter(
+            or_(
+                Researcher.group_id.in_(group_ids),
+                Researcher.orientador_id.in_(prof_ids),
+            )
+        )
 
-    professors    = professors_q.all()
-    researchers   = researchers_q.all()
+    professors  = professors_q.all()
+    # Superadmin users are invisible to all profiles
+    professors  = [p for p in professors if not (p.user and p.user.role == 'superadmin')]
+    researchers = researchers_q.all()
+    researchers = [r for r in researchers if not (r.user and r.user.role == 'superadmin')]
     relationships = db.query(Relationship).all()
 
     layout    = db.query(GraphLayout).filter(GraphLayout.name == "default").first()
@@ -42,9 +52,11 @@ def build_graph_payload(db: Session, institution_id: int | None = None) -> dict:
     nodes = []
 
     # Nós de professores — id prefixado com "p"
+    prof_positions: dict[int, dict] = {}
     for p in professors:
         node_id = f"p{p.id}"
         pos = positions.get(node_id, {"x": 400, "y": 100})
+        prof_positions[p.id] = pos
         nodes.append({
             "id": node_id,
             "type": "researcher",
@@ -62,7 +74,12 @@ def build_graph_payload(db: Session, institution_id: int | None = None) -> dict:
     active_researcher_ids = {r.id for r in researchers}
     for r in researchers:
         node_id = str(r.id)
-        pos = positions.get(node_id, {"x": r.id * 100, "y": r.id * 80})
+        if r.orientador_id and r.orientador_id in prof_positions:
+            ppos = prof_positions[r.orientador_id]
+            default_pos = {"x": ppos["x"] + 60 + (r.id % 6) * 80, "y": ppos["y"] + 100 + (r.id % 4) * 70}
+        else:
+            default_pos = {"x": r.id * 100, "y": r.id * 80}
+        pos = positions.get(node_id, default_pos)
         nodes.append({
             "id": node_id,
             "type": "researcher",

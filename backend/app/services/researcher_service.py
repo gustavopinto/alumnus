@@ -1,8 +1,9 @@
 import logging
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
-from ..models import Professor, ProfessorGroup, ResearchGroup, Researcher, User
+from ..models import Professor, ProfessorInstitution, ResearchGroup, Researcher, User
 from ..schemas import ResearcherCreate, ResearcherUpdate
 from ..slug import slugify
 
@@ -28,8 +29,19 @@ def list_all(db: Session, ativo: bool | None, institution_id: int | None = None)
         group_ids = db.query(ResearchGroup.id).filter(
             ResearchGroup.institution_id == institution_id
         ).subquery()
-        q = q.filter(Researcher.group_id.in_(group_ids))
-    return q.order_by(Researcher.nome).all()
+        prof_ids = db.query(ProfessorInstitution.professor_id).filter(
+            ProfessorInstitution.institution_id == institution_id
+        ).subquery()
+        # Include by group membership OR by orientador being in the institution
+        q = q.filter(
+            or_(
+                Researcher.group_id.in_(group_ids),
+                Researcher.orientador_id.in_(prof_ids),
+            )
+        )
+    results = q.order_by(Researcher.nome).all()
+    # Superadmin users are invisible to all profiles
+    return [r for r in results if not (r.user and r.user.role == 'superadmin')]
 
 
 def create(db: Session, data: ResearcherCreate) -> Researcher:

@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAppLayout } from '../components/AppLayout';
-import { getResearcherBySlug, updateResearcher, updateUserProfile, uploadPhoto, getNotes, createNote, deleteNote, getResearcherUser, getDeadlineInterests } from '../api';
-import { DEADLINES, slugify } from '../deadlines';
+import { getResearcherBySlug, updateResearcher, updateUserProfile, uploadPhoto, getNotes, createNote, deleteNote, getResearcherUser, getDeadlineInterests, getDeadlines } from '../api';
+import { slugify } from '../deadlines';
 import { getTokenPayload } from '../auth';
 import { modKey, isModEnter } from '../platform';
 import Toast from '../components/Toast';
@@ -145,7 +145,7 @@ function NotesSection({ researcherId, canAdd, isProfessor, currentUserId, resear
 
   async function load() {
     const data = await getNotes(researcherId);
-    setNotes(data);
+    setNotes(Array.isArray(data) ? data : []);
   }
 
   useEffect(() => { load(); }, [researcherId]);
@@ -283,6 +283,9 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, onSaved }) {
   const [twitterError, setTwitterError] = useState('');
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoPreview, setPhotoPreview] = useState(user?.photo_url || null);
   const [pendingPhotoUrl, setPendingPhotoUrl] = useState(null);
@@ -331,6 +334,15 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, onSaved }) {
     setInstagramError(igErr);
     setTwitterError(twErr);
     if (igErr || twErr) return;
+    if (newPassword && newPassword !== confirmPassword) {
+      setPasswordError('As senhas não coincidem');
+      return;
+    }
+    if (newPassword && newPassword.length < 6) {
+      setPasswordError('A senha deve ter ao menos 6 caracteres');
+      return;
+    }
+    setPasswordError('');
     setSaving(true);
     if (user) {
       await updateUserProfile(user.id, {
@@ -346,12 +358,15 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, onSaved }) {
         ...(pendingPhotoUrl
           ? { photo_url: pendingPhotoUrl, photo_thumb_url: pendingPhotoThumbUrl || null }
           : {}),
+        ...(newPassword ? { password: newPassword } : {}),
       });
     }
     setSaving(false);
     setEditing(false);
     setPendingPhotoUrl(null);
     setPendingPhotoThumbUrl(null);
+    setNewPassword('');
+    setConfirmPassword('');
     setToast('Perfil salvo com sucesso');
     onSaved();
   }
@@ -363,6 +378,9 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, onSaved }) {
     setPendingPhotoThumbUrl(null);
     setInstagramError('');
     setTwitterError('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError('');
   }
 
   const links = [
@@ -535,6 +553,27 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, onSaved }) {
               onChange={set('interesses')}
             />
           </div>
+          <div className="border-t pt-3 space-y-2">
+            <label className="block text-xs font-medium text-gray-500">Nova senha (opcional)</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <input
+                type="password"
+                placeholder="Nova senha"
+                value={newPassword}
+                onChange={e => { setNewPassword(e.target.value); setPasswordError(''); }}
+                className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                minLength={6}
+              />
+              <input
+                type="password"
+                placeholder="Confirmar nova senha"
+                value={confirmPassword}
+                onChange={e => { setConfirmPassword(e.target.value); setPasswordError(''); }}
+                className="border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+            {passwordError && <p className="text-xs text-red-500">{passwordError}</p>}
+          </div>
           <div className="flex gap-2">
             <button type="submit" disabled={saving} className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
               {saving ? 'Salvando...' : 'Salvar'}
@@ -628,7 +667,7 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, onSaved }) {
 
 export default function ResearcherPage() {
   const { slug } = useParams();
-  const { setProfileTopbar, researchers = [] } = useAppLayout();
+  const { setProfileTopbar, researchers = [], currentInstitution } = useAppLayout();
   const [researcher, setResearcher] = useState(null);
   const [researcherUser, setResearcherUser] = useState(null);
   const [myDeadlines, setMyDeadlines] = useState([]);
@@ -642,12 +681,12 @@ export default function ResearcherPage() {
 
   async function load() {
     const r = await getResearcherBySlug(slug);
-    const [u, allInterests] = await Promise.all([getResearcherUser(r.id), getDeadlineInterests()]);
+    const [u, allInterests, allDeadlines] = await Promise.all([getResearcherUser(r.id), getDeadlineInterests(currentInstitution?.id), getDeadlines(currentInstitution?.id)]);
     setResearcher(r);
     setResearcherUser(u);
-    if (u && allInterests) {
-      const keys = allInterests.filter(i => i.user_id === u.id).map(i => i.deadline_key);
-      setMyDeadlines(DEADLINES.filter(d => keys.includes(d.label)));
+    if (u && allInterests && allDeadlines) {
+      const ids = new Set(allInterests.filter(i => i.user_id === u.id).map(i => i.deadline_id));
+      setMyDeadlines(allDeadlines.filter(d => ids.has(d.id)));
     }
   }
 
@@ -710,6 +749,17 @@ export default function ResearcherPage() {
       )}
 
       <main className="max-w-3xl mx-auto py-8 px-4 space-y-6">
+        {isOwnProfile && researcherUser && !researcherUser.bio && !researcherUser.whatsapp && !researcherUser.interesses && !researcherUser.lattes_url && !researcherUser.scholar_url && (
+          <div className="bg-amber-50 border border-amber-300 rounded-xl px-5 py-4 flex items-start gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <p className="text-sm font-semibold text-amber-800">Nenhuma informação de perfil cadastrada.</p>
+              <p className="text-xs text-amber-700 mt-0.5">Clique em "Editar" no seu perfil para adicionar suas informações.</p>
+            </div>
+          </div>
+        )}
         <ProfileSection researcher={researcher} user={researcherUser} canEdit={canEdit} isProfessor={isProfessor} onSaved={load} />
         {myDeadlines.length > 0 && (
           <section className="bg-white rounded-xl border shadow-sm p-5 space-y-3">
@@ -717,7 +767,7 @@ export default function ResearcherPage() {
             <div className="flex flex-wrap gap-2">
               {myDeadlines.map(d => (
                 <a
-                  key={d.label}
+                  key={d.id}
                   href={d.url}
                   target="_blank"
                   rel="noreferrer"

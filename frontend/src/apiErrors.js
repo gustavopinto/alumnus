@@ -8,7 +8,7 @@ export function formatApiDetail(data) {
   if (Array.isArray(d)) {
     return d
       .map((item) => {
-        if (item && typeof item === 'object' && item.msg) return String(item.msg);
+        if (item && typeof item === 'object' && item.msg) return String(item.msg).replace(/^Value error,\s*/i, '');
         return String(item);
       })
       .filter(Boolean)

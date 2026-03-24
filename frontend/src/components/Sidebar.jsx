@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ResearcherForm from './ResearcherForm';
-import { deleteResearcher, getProfessors, getGroups, updateGroup, getReminders, createReminder, updateReminder, deleteReminder } from '../api';
+import { deleteResearcher, getProfessors, getGroups, updateGroup, getReminders, createReminder, updateReminder, deleteReminder, getDeadlines } from '../api';
 import { canDeleteReminder, creatorDisplayName, isReminderFromSomeoneElse } from '../reminderAccess';
 import { invalidMentions, renderWithMentions } from '../mentionUtils.jsx';
 import { isModEnter } from '../platform';
-import { DEADLINES, daysUntil } from '../deadlines';
+import { daysUntil } from '../deadlines';
 
 function slugify(nome) {
   return (nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -442,7 +442,9 @@ const INSTITUTION_ICON = (
 
 /** Barra estreita com ícones quando o menu principal está recolhido */
 export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshKey = 0, currentUser = null, role = null, isAdmin = false, currentInstitution = null }) {
-  const upcomingDeadlines = DEADLINES.filter(d => daysUntil(d.date) >= 0);
+  const [railDeadlines, setRailDeadlines] = useState([]);
+  useEffect(() => { getDeadlines(currentInstitution?.id).then(d => setRailDeadlines(d || [])).catch(() => {}); }, [currentInstitution]);
+  const upcomingDeadlines = railDeadlines.filter(d => daysUntil(d.date) >= 0);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 h-full bg-gray-100">
@@ -531,6 +533,8 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
   const [groupLabel, setGroupLabel] = useState('Grupo');
   const [renamingGroup, setRenamingGroup] = useState(false);
   const [renameInput, setRenameInput] = useState('');
+  const [sidebarDeadlines, setSidebarDeadlines] = useState([]);
+  useEffect(() => { getDeadlines(currentInstitution?.id).then(d => setSidebarDeadlines(d || [])).catch(() => {}); }, [currentInstitution]);
   useEffect(() => {
     if (isAdmin) {
       getProfessors().then(data => setProfessors(data || [])).catch(() => {});
@@ -577,7 +581,7 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
     );
   }
 
-  const upcomingDeadlines = DEADLINES.filter(d => daysUntil(d.date) >= 0);
+  const upcomingDeadlines = sidebarDeadlines.filter(d => daysUntil(d.date) >= 0);
 
   return (
     <div className="p-4 space-y-2 overflow-y-auto h-full">
@@ -626,7 +630,7 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
           {researchers.map((s) => (
             <li key={s.id} className="flex items-center justify-between rounded px-1 py-1 text-sm hover:bg-gray-50">
               <Link to={`/app/profile/${slugify(s.nome)}`} className="flex-1 truncate hover:text-blue-600">{s.nome}</Link>
-              {(role === 'professor' || isAdmin) && (
+              {(role === 'professor' || isAdmin) && !s._isProfessor && (
                 <span className="flex gap-1 shrink-0 ml-1">
                   <button onClick={() => handleEdit(s)} title="Editar" className="text-blue-500 hover:text-blue-700 p-0.5">
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -650,15 +654,15 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
       <RemindersDropdown refreshKey={remindersRefreshKey} currentUser={currentUser} researchers={researchers} institutionId={currentInstitution?.id ?? null} />
 
       {/* Deadlines */}
-      <Dropdown label="Deadlines" icon={CALENDAR_ICON} badge={upcomingDeadlines.length} linkTo="/app/deadlines">
+      <Dropdown label="Próximos deadlines" icon={CALENDAR_ICON} badge={upcomingDeadlines.length} linkTo="/app/deadlines" disabled={sidebarDeadlines.length <= 1}>
         {(() => {
-          const pastDeadlines = DEADLINES.filter(d => daysUntil(d.date) < 0).sort((a, b) => new Date(b.date) - new Date(a.date));
+          const pastDeadlines = sidebarDeadlines.filter(d => daysUntil(d.date) < 0).sort((a, b) => new Date(b.date) - new Date(a.date));
           return (
             <ul className="space-y-1.5">
               {upcomingDeadlines.map((d) => {
                 const days = daysUntil(d.date);
                 return (
-                  <li key={d.label} className="rounded px-1 py-1">
+                  <li key={d.id} className="rounded px-1 py-1">
                     <a href={d.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-600 hover:underline block truncate">{d.label}</a>
                     <span className={`text-xs ${days <= 14 ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
                       {days === 0 ? 'Hoje!' : `${days}d`} · {new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR')}
@@ -668,7 +672,7 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
               })}
               {pastDeadlines.length > 0 && <li className="border-t my-1" />}
               {pastDeadlines.map((d) => (
-                <li key={d.label} className="rounded px-1 py-1 opacity-40">
+                <li key={d.id} className="rounded px-1 py-1 opacity-40">
                   <a href={d.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-600 hover:underline block truncate">{d.label}</a>
                   <span className="text-xs text-gray-400">Encerrado · {new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
                 </li>
