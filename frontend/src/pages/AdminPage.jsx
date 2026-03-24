@@ -220,6 +220,11 @@ export default function AdminPage() {
             <div>
               <h2 className="text-base font-semibold text-gray-800">Usuários</h2>
               <p className="text-sm text-gray-500 mt-0.5">{users.length} usuário{users.length !== 1 ? 's' : ''} cadastrado{users.length !== 1 ? 's' : ''}</p>
+              {!isSuperadmin && (
+                <p className="text-xs text-indigo-600 mt-1">
+                  Exibindo apenas usuários das instituições às quais você está vinculado.
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {isProfessor && (

@@ -1,6 +1,6 @@
 import logging
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from ..models import Professor, ProfessorGroup, ProfessorInstitution, ResearchGroup, Researcher, User
@@ -29,12 +29,12 @@ def list_all(db: Session, ativo: bool | None, institution_id: int | None = None)
     if ativo is not None:
         q = q.filter(Researcher.ativo == ativo)
     if institution_id is not None:
-        group_ids = db.query(ResearchGroup.id).filter(
+        group_ids = select(ResearchGroup.id).where(
             ResearchGroup.institution_id == institution_id
-        ).subquery()
-        prof_ids = db.query(ProfessorInstitution.professor_id).filter(
+        )
+        prof_ids = select(ProfessorInstitution.professor_id).where(
             ProfessorInstitution.institution_id == institution_id
-        ).subquery()
+        )
         # Include by group membership OR by orientador being in the institution
         q = q.filter(
             or_(

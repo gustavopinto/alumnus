@@ -84,8 +84,10 @@ export default function InstitutionPage() {
       const pi = await addMyEmail(newEmail.trim());
       setNewEmail('');
       await load();
-      if (pi?.institution_id) setSelectedInstId(pi.institution_id);
-      if (refreshInstitutions) refreshInstitutions();
+      if (pi?.institution_id) {
+        setSelectedInstId(pi.institution_id);
+        if (refreshInstitutions) refreshInstitutions(pi.institution_id);
+      }
     } catch {
       setEmailError('Erro ao adicionar email');
     } finally {
@@ -114,7 +116,7 @@ export default function InstitutionPage() {
         setNewInstEmail('');
         setSelectedInstId(inst.id);
         await load();
-        if (refreshInstitutions) refreshInstitutions();
+        if (refreshInstitutions) refreshInstitutions(inst.id);
       } else {
         setNewInstError(inst?.detail || 'Erro ao criar instituição');
       }

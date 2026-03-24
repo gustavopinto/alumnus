@@ -242,18 +242,18 @@ export default function AppLayout() {
     localStorage.setItem('selectedInstId', String(inst.id));
   }
 
-  const refreshInstitutions = useCallback(async () => {
+  const refreshInstitutions = useCallback(async (selectId = null) => {
     const u = currentUserRef.current;
     if (!u) return;
     if (u.role === 'superadmin') {
       const list = await getInstitutions().catch(() => []);
       if (Array.isArray(list) && list.length > 0) {
         setInstitutions(list);
-        setCurrentInstitution(prev => {
-          if (prev && list.find(i => i.id === prev.id)) return prev;
-          return { id: list[0].id, name: list[0].name };
-        });
-        setInstitutionName(n => n || list[0].name);
+        const target = selectId ? list.find(i => i.id === selectId) : null;
+        const chosen = target || list.find(i => i.id === (localStorage.getItem('selectedInstId') ? Number(localStorage.getItem('selectedInstId')) : null)) || list[0];
+        setCurrentInstitution({ id: chosen.id, name: chosen.name });
+        setInstitutionName(chosen.name);
+        if (target) localStorage.setItem('selectedInstId', String(target.id));
       }
     } else if (u.role === 'professor') {
       const list = await getMyEmails().catch(() => []);
@@ -263,11 +263,11 @@ export default function AppLayout() {
           .map(e => ({ id: e.institution_id, name: e.institution_name }))
           .filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true; });
         setInstitutions(inst);
-        setCurrentInstitution(prev => {
-          if (prev && inst.find(i => i.id === prev.id)) return prev;
-          return inst[0];
-        });
-        setInstitutionName(n => n || inst[0].name);
+        const target = selectId ? inst.find(i => i.id === selectId) : null;
+        const chosen = target || inst.find(i => i.id === (localStorage.getItem('selectedInstId') ? Number(localStorage.getItem('selectedInstId')) : null)) || inst[0];
+        setCurrentInstitution(chosen);
+        setInstitutionName(chosen.name);
+        if (target) localStorage.setItem('selectedInstId', String(target.id));
       }
     }
   }, []);

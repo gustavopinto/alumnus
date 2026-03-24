@@ -1,6 +1,6 @@
 import logging
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from ..models import GraphLayout, Professor, ProfessorInstitution, Relationship, Researcher
@@ -24,13 +24,13 @@ def build_graph_payload(db: Session, institution_id: int | None = None) -> dict:
 
     if institution_id is not None:
         from ..models import ResearchGroup
-        prof_ids = db.query(ProfessorInstitution.professor_id).filter(
+        prof_ids = select(ProfessorInstitution.professor_id).where(
             ProfessorInstitution.institution_id == institution_id
-        ).subquery()
+        )
         professors_q = professors_q.filter(Professor.id.in_(prof_ids))
-        group_ids = db.query(ResearchGroup.id).filter(
+        group_ids = select(ResearchGroup.id).where(
             ResearchGroup.institution_id == institution_id
-        ).subquery()
+        )
         # Include researchers by group membership OR by orientador being in the institution (only when no group)
         researchers_q = researchers_q.filter(
             or_(

@@ -45,43 +45,132 @@ def _count_groups(db: Session, current: User | None) -> int:
     ).scalar()
 
 
+def _accessible_institution_ids(db: Session, current: User | None) -> set[int] | None:
+    """
+    Superadmin: sem restrição (None).
+    Professor: instituições às quais está vinculado.
+    """
+    if current is None or _is_superadmin(current):
+        return None
+    professor = professor_service.get_by_user(db, current)
+    if not professor:
+        return set()
+
+    institution_ids = {
+        int(pi.institution_id)
+        for pi in (professor.professor_institutions or [])
+        if pi.institution_id is not None
+    }
+    # Fallback para bases antigas onde vínculo está só em professor_groups.
+    institution_ids.update(
+        int(pg.institution_id)
+        for pg in (professor.professor_groups or [])
+        if pg.institution_id is not None
+    )
+    return institution_ids
+
+
 def _stats_global(db: Session, hide_superadmin_count: bool, current: User = None) -> dict:
     """Estatísticas globais; se hide_superadmin_count, não expõe quantidade de superadmins."""
-    if hide_superadmin_count:
-        role_counts = (
-            db.query(User.role, func.count(User.id))
-            .filter(User.role != "superadmin")
-            .group_by(User.role)
-            .all()
-        )
-        by_role = {role: cnt for role, cnt in role_counts}
-        users_by_role = {
-            "superadmin": 0,
-            "professor":  by_role.get("professor", 0),
-            "student":    by_role.get("student", 0),
-        }
-    else:
-        role_counts = db.query(User.role, func.count(User.id)).group_by(User.role).all()
-        by_role = {role: cnt for role, cnt in role_counts}
-        users_by_role = {
-            "superadmin": by_role.get("superadmin", 0),
-            "professor":  by_role.get("professor", 0),
-            "student":    by_role.get("student", 0),
-        }
+    institution_ids = _accessible_institution_ids(db, current)
 
-    researchers, pending = db.query(
-        func.count(Researcher.id).filter(Researcher.ativo.is_(True)),
-        func.count(Researcher.id).filter(Researcher.ativo.is_(True), Researcher.registered.is_(False)),
-    ).one()
+    if institution_ids is None:
+        if hide_superadmin_count:
+            role_counts = (
+                db.query(User.role, func.count(User.id))
+                .filter(User.role != "superadmin")
+                .group_by(User.role)
+                .all()
+            )
+            by_role = {role: cnt for role, cnt in role_counts}
+            users_by_role = {
+                "superadmin": 0,
+                "professor":  by_role.get("professor", 0),
+                "student":    by_role.get("student", 0),
+            }
+        else:
+            role_counts = db.query(User.role, func.count(User.id)).group_by(User.role).all()
+            by_role = {role: cnt for role, cnt in role_counts}
+            users_by_role = {
+                "superadmin": by_role.get("superadmin", 0),
+                "professor":  by_role.get("professor", 0),
+                "student":    by_role.get("student", 0),
+            }
+        researchers, pending = db.query(
+            func.count(Researcher.id).filter(Researcher.ativo.is_(True)),
+            func.count(Researcher.id).filter(Researcher.ativo.is_(True), Researcher.registered.is_(False)),
+        ).one()
+        total_reminders = db.query(func.count(Reminder.id)).scalar()
+        total_tips = db.query(func.count(Tip.id)).scalar()
+        total_notes = db.query(func.count(Note.id)).scalar()
+    else:
+        if not institution_ids:
+            users_by_role = {"superadmin": 0, "professor": 0, "student": 0}
+            researchers = 0
+            pending = 0
+            total_reminders = 0
+            total_tips = 0
+            total_notes = 0
+        else:
+            # Usuários visíveis por instituição:
+            # - Professores com vínculo em professor_institutions
+            # - Alunos (e superadmin com perfil de pesquisador) pelo grupo do pesquisador
+            visible_users = (
+                db.query(User.id, User.role)
+                .outerjoin(Professor, Professor.id == User.professor_id)
+                .outerjoin(ProfessorInstitution, ProfessorInstitution.professor_id == Professor.id)
+                .outerjoin(Researcher, Researcher.id == User.researcher_id)
+                .outerjoin(ResearchGroup, ResearchGroup.id == Researcher.group_id)
+                .filter(
+                    or_(
+                        ProfessorInstitution.institution_id.in_(institution_ids),
+                        ResearchGroup.institution_id.in_(institution_ids),
+                    )
+                )
+                .distinct()
+                .all()
+            )
+            users_by_role = {"superadmin": 0, "professor": 0, "student": 0}
+            for _, role in visible_users:
+                if role == "superadmin":
+                    continue
+                users_by_role[role] = users_by_role.get(role, 0) + 1
+
+            researchers, pending = db.query(
+                func.count(Researcher.id).filter(
+                    Researcher.ativo.is_(True),
+                    Researcher.group_id.isnot(None),
+                    Researcher.group.has(ResearchGroup.institution_id.in_(institution_ids)),
+                ),
+                func.count(Researcher.id).filter(
+                    Researcher.ativo.is_(True),
+                    Researcher.registered.is_(False),
+                    Researcher.group_id.isnot(None),
+                    Researcher.group.has(ResearchGroup.institution_id.in_(institution_ids)),
+                ),
+            ).one()
+            total_reminders = db.query(func.count(Reminder.id)).filter(
+                Reminder.institution_id.in_(institution_ids)
+            ).scalar()
+            total_tips = db.query(func.count(Tip.id)).filter(
+                Tip.institution_id.in_(institution_ids)
+            ).scalar()
+            total_notes = db.query(func.count(Note.id)).join(
+                Researcher, Researcher.id == Note.researcher_id
+            ).join(
+                ResearchGroup, ResearchGroup.id == Researcher.group_id
+            ).filter(
+                ResearchGroup.institution_id.in_(institution_ids)
+            ).scalar()
 
     return {
         "users_by_role":        users_by_role,
         "total_researchers":    researchers,
         "total_pending":        pending,
         "total_groups":         _count_groups(db, current),
-        "total_reminders":      db.query(func.count(Reminder.id)).scalar(),
-        "total_tips":           db.query(func.count(Tip.id)).scalar(),
-        "total_notes":          db.query(func.count(Note.id)).scalar(),
+        "total_reminders":      total_reminders,
+        "total_tips":           total_tips,
+        "total_notes":          total_notes,
     }
 
 
@@ -148,6 +237,7 @@ def list_users(db: Session = Depends(get_db), current: User = Depends(require_da
         joinedload(User.researcher).joinedload(Researcher.group).joinedload(ResearchGroup.institution),
         joinedload(User.professor).joinedload(Professor.professor_institutions).joinedload(ProfessorInstitution.institution),
     ]
+    institution_ids = _accessible_institution_ids(db, current)
 
     if _is_superadmin(current):
         users = (
@@ -156,29 +246,53 @@ def list_users(db: Session = Depends(get_db), current: User = Depends(require_da
             .all()
         )
     else:
-        # Professor/admin: todos, exceto superadmin "puro" (sem perfil de pesquisador).
-        # Orientadores costumam estar como superadmin após migrações; com researcher_id entram na lista.
-        users = (
-            db.query(User)
-            .options(*eager_opts)
-            .filter(
-                or_(
-                    User.role != "superadmin",
-                    and_(User.role == "superadmin", User.researcher_id.isnot(None)),
+        if not institution_ids:
+            users = []
+        else:
+            # Professor/admin:
+            # - apenas usuários das instituições vinculadas ao professor atual
+            # - exclui superadmin "puro" (sem researcher)
+            users = (
+                db.query(User)
+                .options(*eager_opts)
+                .outerjoin(Professor, Professor.id == User.professor_id)
+                .outerjoin(ProfessorInstitution, ProfessorInstitution.professor_id == Professor.id)
+                .outerjoin(Researcher, Researcher.id == User.researcher_id)
+                .outerjoin(ResearchGroup, ResearchGroup.id == Researcher.group_id)
+                .filter(
+                    or_(
+                        ProfessorInstitution.institution_id.in_(institution_ids),
+                        ResearchGroup.institution_id.in_(institution_ids),
+                    )
                 )
+                .filter(
+                    or_(
+                        User.role != "superadmin",
+                        and_(User.role == "superadmin", User.researcher_id.isnot(None)),
+                    )
+                )
+                .distinct()
+                .all()
             )
-            .all()
-        )
 
-    pending = (
+    pending_query = (
         db.query(Researcher)
         .options(joinedload(Researcher.group).joinedload(ResearchGroup.institution))
         .filter(
             Researcher.ativo.is_(True),
             Researcher.registered.is_(False),
         )
-        .all()
     )
+    if institution_ids is not None:
+        if not institution_ids:
+            pending = []
+        else:
+            pending = pending_query.filter(
+                Researcher.group_id.isnot(None),
+                Researcher.group.has(ResearchGroup.institution_id.in_(institution_ids)),
+            ).all()
+    else:
+        pending = pending_query.all()
 
     def _user_sort_key(u: User) -> tuple:
         role_rank = _ADMIN_USER_LIST_ROLE_ORDER.get(u.role, 99)

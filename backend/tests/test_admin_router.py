@@ -21,7 +21,14 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.deps import require_dashboard, require_superadmin
 from app.database import get_db
-from app.models import User, Researcher
+from app.models import (
+    User,
+    Researcher,
+    Institution,
+    Professor,
+    ProfessorInstitution,
+    ResearchGroup,
+)
 
 from .conftest import make_user, make_researcher, make_reminder
 
@@ -156,6 +163,102 @@ class TestListUsers:
         assert resp.status_code == 200
         emails = [u["email"] for u in resp.json()]
         assert "saresearch@univ.edu.br" in emails
+
+    def test_professor_sees_only_users_from_linked_institutions(self, professor_client):
+        client, acting_user, db = professor_client
+
+        prof = Professor(nome="Prof Dashboard")
+        db.add(prof)
+        db.flush()
+        acting_user.professor_id = prof.id
+
+        inst_a = Institution(name="Inst A", domain="insta.edu.br")
+        inst_b = Institution(name="Inst B", domain="instb.edu.br")
+        db.add_all([inst_a, inst_b])
+        db.flush()
+
+        db.add(
+            ProfessorInstitution(
+                professor_id=prof.id,
+                institution_id=inst_a.id,
+                institutional_email="prof@insta.edu.br",
+            )
+        )
+
+        # Aluno da instituição vinculada (deve aparecer)
+        group_a = ResearchGroup(name="GA", institution_id=inst_a.id)
+        db.add(group_a)
+        db.flush()
+        res_a = Researcher(nome="Aluno A", status="mestrado", email="alunoa@insta.edu.br", group_id=group_a.id, ativo=True, registered=True)
+        db.add(res_a)
+        db.flush()
+        make_user(db, email="alunoa@insta.edu.br", nome="Aluno A", role="student", researcher_id=res_a.id)
+
+        # Aluno de outra instituição (não deve aparecer)
+        group_b = ResearchGroup(name="GB", institution_id=inst_b.id)
+        db.add(group_b)
+        db.flush()
+        res_b = Researcher(nome="Aluno B", status="mestrado", email="alunob@instb.edu.br", group_id=group_b.id, ativo=True, registered=True)
+        db.add(res_b)
+        db.flush()
+        make_user(db, email="alunob@instb.edu.br", nome="Aluno B", role="student", researcher_id=res_b.id)
+
+        db.commit()
+
+        resp = client.get("/admin/users")
+        assert resp.status_code == 200
+        emails = [u["email"] for u in resp.json()]
+        assert "alunoa@insta.edu.br" in emails
+        assert "alunob@instb.edu.br" not in emails
+
+    def test_professor_with_multiple_institutions_sees_both(self, professor_client):
+        client, acting_user, db = professor_client
+
+        prof = Professor(nome="Prof Multi")
+        db.add(prof)
+        db.flush()
+        acting_user.professor_id = prof.id
+
+        inst_a = Institution(name="Inst M1", domain="m1.edu.br")
+        inst_b = Institution(name="Inst M2", domain="m2.edu.br")
+        db.add_all([inst_a, inst_b])
+        db.flush()
+
+        db.add_all(
+            [
+                ProfessorInstitution(
+                    professor_id=prof.id,
+                    institution_id=inst_a.id,
+                    institutional_email="prof.m1@m1.edu.br",
+                ),
+                ProfessorInstitution(
+                    professor_id=prof.id,
+                    institution_id=inst_b.id,
+                    institutional_email="prof.m2@m2.edu.br",
+                ),
+            ]
+        )
+
+        group_a = ResearchGroup(name="GM1", institution_id=inst_a.id)
+        group_b = ResearchGroup(name="GM2", institution_id=inst_b.id)
+        db.add_all([group_a, group_b])
+        db.flush()
+
+        res_a = Researcher(nome="Aluno M1", status="mestrado", email="aluno.m1@m1.edu.br", group_id=group_a.id, ativo=True, registered=True)
+        res_b = Researcher(nome="Aluno M2", status="mestrado", email="aluno.m2@m2.edu.br", group_id=group_b.id, ativo=True, registered=True)
+        db.add_all([res_a, res_b])
+        db.flush()
+
+        make_user(db, email="aluno.m1@m1.edu.br", nome="Aluno M1", role="student", researcher_id=res_a.id)
+        make_user(db, email="aluno.m2@m2.edu.br", nome="Aluno M2", role="student", researcher_id=res_b.id)
+
+        db.commit()
+
+        resp = client.get("/admin/users")
+        assert resp.status_code == 200
+        emails = [u["email"] for u in resp.json()]
+        assert "aluno.m1@m1.edu.br" in emails
+        assert "aluno.m2@m2.edu.br" in emails
 
     def test_response_sorted_superadmin_first(self, superadmin_client):
         client, sa, db = superadmin_client
