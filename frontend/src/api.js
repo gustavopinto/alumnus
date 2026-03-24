@@ -117,15 +117,15 @@ export async function markReminderNotificationRead(id) {
   if (!res.ok) throw new Error('mark read failed');
 }
 
-// Manual
-export const getManualEntries = (institutionId) =>
-  request(`/manual/${institutionId ? `?institution_id=${institutionId}` : ''}`);
-export const createManualEntry = (data, institutionId) =>
-  request('/manual/', { method: 'POST', body: JSON.stringify({ ...data, institution_id: institutionId || null }) });
-export const deleteManualEntry = (id) => request(`/manual/${id}`, { method: 'DELETE' });
-export const toggleManualVote = (entryId) => request(`/manual/${entryId}/vote`, { method: 'POST' });
-export const addManualComment = (entryId, text) => request(`/manual/${entryId}/comments`, { method: 'POST', body: JSON.stringify({ text }) });
-export const deleteManualComment = (commentId) => request(`/manual/comments/${commentId}`, { method: 'DELETE' });
+// Tips
+export const getTips = (institutionId) =>
+  request(`/tips/${institutionId ? `?institution_id=${institutionId}` : ''}`);
+export const createTip = (data, institutionId) =>
+  request('/tips/', { method: 'POST', body: JSON.stringify({ ...data, institution_id: institutionId || null }) });
+export const deleteTip = (id) => request(`/tips/${id}`, { method: 'DELETE' });
+export const toggleTipVote = (entryId) => request(`/tips/${entryId}/vote`, { method: 'POST' });
+export const addTipComment = (entryId, text) => request(`/tips/${entryId}/comments`, { method: 'POST', body: JSON.stringify({ text }) });
+export const deleteTipComment = (commentId) => request(`/tips/comments/${commentId}`, { method: 'DELETE' });
 
 // Deadlines
 export const getDeadlineInterests = () => request('/deadlines/interests');

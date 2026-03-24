@@ -6,44 +6,44 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import User
 from ..schemas import (
-    ManualEntryCreate,
-    ManualEntryOut,
-    ManualCommentCreate,
-    ManualCommentOut,
+    TipCreate,
+    TipOut,
+    TipCommentCreate,
+    TipCommentOut,
 )
 from ..deps import get_current_user, is_privileged
-from ..services import manual_service
+from ..services import tip_service
 
-router = APIRouter(prefix="/manual", tags=["manual"])
+router = APIRouter(prefix="/tips", tags=["tips"])
 
 
-@router.get("/", response_model=list[ManualEntryOut])
-def list_entries(
+@router.get("/", response_model=list[TipOut])
+def list_tips(
     institution_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    entries = manual_service.list_entries_ordered(db, institution_id)
-    return [ManualEntryOut.from_orm_with_context(e, current_user.id) for e in entries]
+    entries = tip_service.list_tips(db, institution_id)
+    return [TipOut.from_orm_with_context(e, current_user.id) for e in entries]
 
 
-@router.post("/", response_model=ManualEntryOut)
-def create_entry(
-    data: ManualEntryCreate,
+@router.post("/", response_model=TipOut)
+def create_tip(
+    data: TipCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    entry = manual_service.create_entry(db, data, current_user.id)
-    return ManualEntryOut.from_orm_with_context(entry, current_user.id)
+    entry = tip_service.create_tip(db, data, current_user.id)
+    return TipOut.from_orm_with_context(entry, current_user.id)
 
 
 @router.delete("/{entry_id}")
-def delete_entry(
+def delete_tip(
     entry_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    entry = manual_service.get_entry(db, entry_id)
+    entry = tip_service.get_tip(db, entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
     is_author = entry.author_id is not None and entry.author_id == current_user.id
@@ -52,7 +52,7 @@ def delete_entry(
             status_code=403,
             detail="Só o autor ou um moderador (professor, admin ou superadmin) pode remover a entrada",
         )
-    manual_service.delete_entry(db, entry)
+    tip_service.delete_tip(db, entry)
     return {"status": "ok"}
 
 
@@ -62,34 +62,34 @@ def toggle_vote(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    entry = manual_service.get_entry(db, entry_id)
+    entry = tip_service.get_tip(db, entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
-    voted, vote_count = manual_service.toggle_vote(db, entry, current_user.id)
+    voted, vote_count = tip_service.toggle_vote(db, entry, current_user.id)
     return {"voted": voted, "vote_count": vote_count}
 
 
-@router.post("/{entry_id}/comments", response_model=ManualCommentOut)
+@router.post("/{entry_id}/comments", response_model=TipCommentOut)
 def add_comment(
     entry_id: int,
-    data: ManualCommentCreate,
+    data: TipCommentCreate,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    entry = manual_service.get_entry(db, entry_id)
+    entry = tip_service.get_tip(db, entry_id)
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
-    comment = manual_service.add_comment(db, entry_id, data.text, current_user.id)
-    return ManualCommentOut.from_orm_with_author(comment)
+    comment = tip_service.add_comment(db, entry_id, data.text, current_user.id)
+    return TipCommentOut.from_orm_with_author(comment)
 
 
 @router.delete("/comments/{comment_id}")
-def delete_comment(
+def delete_tip_comment(
     comment_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    comment = manual_service.get_comment(db, comment_id)
+    comment = tip_service.get_tip_comment(db, comment_id)
     if not comment:
         raise HTTPException(status_code=404, detail="Comment not found")
     is_author = comment.author_id is not None and comment.author_id == current_user.id
@@ -98,5 +98,5 @@ def delete_comment(
             status_code=403,
             detail="Só o autor ou um moderador (professor, admin ou superadmin) pode remover o comentário",
         )
-    manual_service.delete_comment(db, comment)
+    tip_service.delete_tip_comment(db, comment)
     return {"status": "ok"}

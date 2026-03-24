@@ -7,8 +7,8 @@ function slugify(nome) {
     .toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
 }
 import {
-  getManualEntries, createManualEntry, deleteManualEntry,
-  toggleManualVote, addManualComment, deleteManualComment,
+  getTips, createTip, deleteTip,
+  toggleTipVote, addTipComment, deleteTipComment,
 } from '../api';
 import { getTokenPayload, isDashboardRole } from '../auth';
 import { useAppLayout } from '../components/AppLayout';
@@ -89,7 +89,7 @@ function EntryCard({ entry, authUserId, canModerate, onVote, onDelete, onComment
 
   async function handleVote(e) {
     e.stopPropagation();
-    const result = await toggleManualVote(entry.id);
+    const result = await toggleTipVote(entry.id);
     if (result) {
       setVoted(result.voted);
       setVoteCount(result.vote_count);
@@ -101,14 +101,14 @@ function EntryCard({ entry, authUserId, canModerate, onVote, onDelete, onComment
     e.preventDefault();
     if (!commentText.trim()) return;
     setSubmitting(true);
-    await addManualComment(entry.id, commentText.trim());
+    await addTipComment(entry.id, commentText.trim());
     setCommentText('');
     setSubmitting(false);
     onCommentAdded();
   }
 
   async function handleDeleteComment(commentId) {
-    await deleteManualComment(commentId);
+    await deleteTipComment(commentId);
     onCommentDeleted();
   }
 
@@ -263,7 +263,7 @@ export default function ManualPage() {
   const authUserId = payload?.sub != null ? Number(payload.sub) : null;
 
   async function load(instId) {
-    const data = await getManualEntries(instId);
+    const data = await getTips(instId);
     setEntries(data || []);
   }
 
@@ -273,7 +273,7 @@ export default function ManualPage() {
     e.preventDefault();
     if (!question.trim() || !answer.trim()) return;
     setSaving(true);
-    await createManualEntry({ question: question.trim(), answer: answer.trim() }, currentInstitution?.id);
+    await createTip({ question: question.trim(), answer: answer.trim() }, currentInstitution?.id);
     setQuestion('');
     setAnswer('');
     setSaving(false);
@@ -282,7 +282,7 @@ export default function ManualPage() {
 
   async function handleDelete(id) {
     if (!confirm('Remover esta entrada?')) return;
-    await deleteManualEntry(id);
+    await deleteTip(id);
     load();
   }
 

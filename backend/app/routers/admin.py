@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
 from ..deps import require_dashboard, require_superadmin, require_professor
-from ..models import User, Researcher, Reminder, ManualEntry, Note
+from ..models import User, Researcher, Reminder, Tip, Note
 from ..plan import clear_plan, ensure_professor_plan_defaults
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -66,7 +66,7 @@ def _stats_global(db: Session, hide_superadmin_count: bool) -> dict:
         "total_researchers":    researchers,
         "total_pending":        pending,
         "total_reminders":      db.query(func.count(Reminder.id)).scalar(),
-        "total_manual_entries": db.query(func.count(ManualEntry.id)).scalar(),
+        "total_manual_entries": db.query(func.count(Tip.id)).scalar(),
         "total_notes":          db.query(func.count(Note.id)).scalar(),
     }
 

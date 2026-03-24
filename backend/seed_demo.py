@@ -19,7 +19,7 @@ def run():
     with Session() as db:
         from app.models import (
             Researcher, User, Note, Work, Reminder,
-            ManualEntry, Relationship, GraphLayout
+            Tip, Relationship, GraphLayout
         )
 
         # ── IDs existentes ───────────────────────────────────────────────
@@ -344,8 +344,8 @@ def run():
         add_reminder(marina_uid, 'Reunião com parceiro industrial (TerraCloud) — apresentação de resultados', today + timedelta(days=14), False)
         add_reminder(marina_uid, 'Solicitar renovação de bolsas CAPES para 2025', today + timedelta(days=20), False)
 
-        # ── MANUAL ENTRIES ─────────────────────────────────────────────────
-        existing_manual = {e.question for e in db.query(ManualEntry).all()}
+        # ── TIPS ───────────────────────────────────────────────────────────
+        existing_manual = {e.question for e in db.query(Tip).all()}
         manual_entries = [
             ('Como funciona o processo de qualificação no PPGCC?',
              'A qualificação ocorre até o 18º mês para mestrado e 30º mês para doutorado. O aluno entrega uma proposta escrita (20-40 páginas) e apresenta para uma banca de 3 membros. É necessária aprovação por maioria. Em caso de reprovação, há uma segunda chance em 60 dias.\n\nDocumentos necessários:\n- Proposta de pesquisa atualizada\n- Relatório de atividades\n- Comprovante de publicações (se houver)\n\nNão deixe para a última hora — agende a banca com pelo menos 30 dias de antecedência.', 1),
@@ -368,7 +368,7 @@ def run():
 
         for i, (q, a, pos) in enumerate(manual_entries):
             if q not in existing_manual:
-                db.add(ManualEntry(question=q, answer=a, position=pos + 10,
+                db.add(Tip(question=q, answer=a, position=pos + 10,
                                    author_id=prof1_uid,
                                    created_at=datetime.utcnow() - timedelta(days=30 - i)))
 
@@ -402,7 +402,7 @@ def run():
         print(f'  Works: {db.query(Work).count()}')
         print(f'  Notes: {db.query(Note).count()}')
         print(f'  Reminders: {db.query(Reminder).count()}')
-        print(f'  Manual entries: {db.query(ManualEntry).count()}')
+        print(f'  Tips: {db.query(Tip).count()}')
         print(f'  Relationships: {db.query(Relationship).count()}')
 
 if __name__ == '__main__':
