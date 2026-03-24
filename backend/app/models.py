@@ -252,9 +252,11 @@ class Deadline(Base):
     url            = Column(Text, nullable=False)
     date           = Column(Date, nullable=False)
     institution_id = Column(Integer, ForeignKey("institutions.id", ondelete="CASCADE"), nullable=True)
+    created_by_id  = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at     = Column(DateTime, default=datetime.utcnow)
 
     institution = relationship("Institution", foreign_keys=[institution_id])
+    created_by  = relationship("User", foreign_keys=[created_by_id])
     interests   = relationship("DeadlineInterest", back_populates="deadline", cascade="all, delete-orphan")
 
 

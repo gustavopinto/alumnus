@@ -27,7 +27,7 @@ function todayIso() {
 }
 
 export default function RemindersPage() {
-  const { refreshSidebarReminders, currentUser, researchers = [], currentInstitution } = useAppLayout();
+  const { refreshSidebarReminders, remindersRefreshKey = 0, currentUser, researchers = [], currentInstitution } = useAppLayout();
   const creatorOpts = { viewerName: currentUser?.nome };
   const [reminders, setReminders] = useState([]);
   const [text, setText] = useState('');
@@ -40,10 +40,9 @@ export default function RemindersPage() {
   const load = useCallback(async () => {
     const data = await getReminders(currentInstitution?.id);
     setReminders(data || []);
-    refreshSidebarReminders?.();
-  }, [refreshSidebarReminders, currentInstitution]);
+  }, [currentInstitution]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load, remindersRefreshKey]);
 
 
   useEffect(() => {
@@ -126,14 +125,14 @@ export default function RemindersPage() {
     setDueDate(todayIso());
     setSaving(false);
     setToast('Lembrete adicionado');
-    load();
+    refreshSidebarReminders?.();
   }
 
   async function handleDelete(id) {
     if (!confirm('Remover lembrete?')) return;
     try {
       await deleteReminder(id);
-      await load();
+      refreshSidebarReminders?.();
       setToast('Lembrete removido');
     } catch (e) {
       setToast('Não foi possível remover');

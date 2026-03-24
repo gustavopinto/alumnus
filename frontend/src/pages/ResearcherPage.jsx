@@ -6,7 +6,7 @@ import { slugify } from '../deadlines';
 import { getTokenPayload } from '../auth';
 import { modKey, isModEnter } from '../platform';
 import Toast from '../components/Toast';
-import { renderWithMentions } from '../mentionUtils.jsx';
+import { renderWithMentions, invalidMentions } from '../mentionUtils.jsx';
 
 const STATUS_LABELS = { graduacao: 'Graduação', mestrado: 'Mestrado', doutorado: 'Doutorado', postdoc: 'Pós-doc', professor: 'Professor' };
 const STATUS_COLORS = { graduacao: '#3B82F6', mestrado: '#F59E0B', doutorado: '#10B981', postdoc: '#06B6D4', professor: '#7C3AED' };
@@ -77,6 +77,15 @@ function extractApiErrorMessage(detail) {
   return '';
 }
 
+const LATTES_RE = /^https?:\/\/lattes\.cnpq\.br\/\d{16}$/;
+
+function validateLattesForm(value) {
+  const t = (value || '').trim();
+  if (!t) return '';
+  if (!LATTES_RE.test(t)) return 'URL inválida. Use o formato: http://lattes.cnpq.br/1234567890123456';
+  return '';
+}
+
 function validateInstagramForm(value) {
   const t = (value || '').trim();
   if (!t) return '';
@@ -138,6 +147,9 @@ function NotesSection({ researcherId, canAdd, isProfessor, currentUserId, resear
   const [file, setFile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
+  const [mentionSearch, setMentionSearch] = useState(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [mentionError, setMentionError] = useState('');
   const fileRef = useRef();
   const textareaRef = useRef();
 
@@ -156,6 +168,44 @@ function NotesSection({ researcherId, canAdd, isProfessor, currentUserId, resear
     }, 0);
   }
 
+  function handleTextChange(e) {
+    const val = e.target.value;
+    setText(val);
+    const pos = e.target.selectionStart;
+    const before = val.slice(0, pos);
+    const match = before.match(/@([\w-]*)$/);
+    if (match) {
+      setMentionSearch({ start: match.index, query: match[1].toLowerCase() });
+      setMentionIndex(0);
+    } else {
+      setMentionSearch(null);
+    }
+  }
+
+  function insertMention(slug) {
+    const el = textareaRef.current;
+    if (!el || !mentionSearch) return;
+    const pos = el.selectionStart;
+    const before = text.slice(0, mentionSearch.start);
+    const after = text.slice(pos);
+    const newText = before + '@' + slug + ' ' + after;
+    setText(newText);
+    setMentionSearch(null);
+    setMentionIndex(0);
+    requestAnimationFrame(() => {
+      const newPos = before.length + slug.length + 2;
+      el.setSelectionRange(newPos, newPos);
+      el.focus();
+    });
+  }
+
+  const mentionSuggestions = mentionSearch !== null
+    ? researchers.filter(r =>
+        r.nome.toLowerCase().includes(mentionSearch.query) ||
+        slugify(r.nome).includes(mentionSearch.query)
+      ).slice(0, 6)
+    : [];
+
   async function load() {
     const data = await getNotes(researcherId);
     setNotes(Array.isArray(data) ? data : []);
@@ -166,6 +216,9 @@ function NotesSection({ researcherId, canAdd, isProfessor, currentUserId, resear
   async function handleSubmit(e) {
     e.preventDefault();
     if (!text.trim()) return;
+    const bad = invalidMentions(text.trim(), researchers);
+    if (bad.length > 0) { setMentionError(`Menção não encontrada: ${bad.join(', ')}`); return; }
+    setMentionError('');
     setSaving(true);
     await createNote(researcherId, text, file);
     setText('');
@@ -201,7 +254,7 @@ function NotesSection({ researcherId, canAdd, isProfessor, currentUserId, resear
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-2">
-        <div className="border rounded-lg focus-within:ring-2 focus-within:ring-blue-400">
+        <div className={`relative border rounded-lg focus-within:ring-2 ${mentionError ? 'border-red-400 focus-within:ring-red-300' : mentionSuggestions.length > 0 ? 'border-blue-400 ring-2 ring-blue-200' : 'focus-within:ring-blue-400'}`}>
           <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 border-b rounded-t-lg">
             <button type="button" onClick={() => wrapFormat('**', '**')}
               className="w-6 h-6 flex items-center justify-center rounded text-sm font-bold text-gray-700 hover:bg-gray-200 transition-colors" title="Negrito">B</button>
@@ -209,22 +262,41 @@ function NotesSection({ researcherId, canAdd, isProfessor, currentUserId, resear
               className="w-6 h-6 flex items-center justify-center rounded text-sm italic text-gray-700 hover:bg-gray-200 transition-colors" title="Itálico">I</button>
             <button type="button" onClick={() => wrapFormat('_', '_')}
               className="w-6 h-6 flex items-center justify-center rounded text-sm underline text-gray-700 hover:bg-gray-200 transition-colors" title="Sublinhado">S</button>
-            <span className="text-xs text-gray-400 ml-1">Selecione o texto e clique no estilo</span>
+            <span className="text-xs text-gray-400 ml-1">Selecione o texto e clique no estilo · @ para mencionar</span>
           </div>
           <textarea
             ref={textareaRef}
             className="w-full px-3 py-2 text-sm h-24 resize-none focus:outline-none rounded-b-lg"
-            placeholder="Nova anotação..."
+            placeholder="Nova anotação... (@ para mencionar alguém)"
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => { handleTextChange(e); setMentionError(''); }}
             onKeyDown={(e) => {
-              if (isModEnter(e)) {
-                e.preventDefault();
-                handleSubmit(e);
-              }
+              if (isModEnter(e)) { e.preventDefault(); handleSubmit(e); return; }
+              if (!mentionSuggestions.length) return;
+              if (e.key === 'Escape') { e.preventDefault(); setMentionSearch(null); }
+              else if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIndex(i => (i + 1) % mentionSuggestions.length); }
+              else if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIndex(i => (i - 1 + mentionSuggestions.length) % mentionSuggestions.length); }
+              else if (e.key === 'Enter') { e.preventDefault(); insertMention(slugify(mentionSuggestions[mentionIndex].nome)); }
             }}
           />
+          {mentionSuggestions.length > 0 && (
+            <div className="absolute left-0 right-0 top-full mt-0.5 bg-white border rounded-lg shadow-lg z-50 py-1">
+              {mentionSuggestions.map((r, i) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onMouseDown={e => { e.preventDefault(); insertMention(slugify(r.nome)); }}
+                  onMouseEnter={() => setMentionIndex(i)}
+                  className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 ${i === mentionIndex ? 'bg-blue-50 text-blue-700' : 'hover:bg-blue-50 hover:text-blue-700'}`}
+                >
+                  <span className="font-medium">{r.nome}</span>
+                  <span className="text-xs text-gray-400">@{slugify(r.nome)}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+        {mentionError && <p className="text-xs text-red-500">{mentionError}</p>}
         <div className="flex items-center gap-3">
           <label className="text-sm text-gray-500 cursor-pointer hover:text-blue-600 flex items-center gap-1">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -292,6 +364,7 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, isOwnProfile, 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(() => buildProfileForm(user));
   const [whatsappError, setWhatsappError] = useState('');
+  const [lattesError, setLattesError] = useState('');
   const [instagramError, setInstagramError] = useState('');
   const [twitterError, setTwitterError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -344,11 +417,13 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, isOwnProfile, 
     setSaveError('');
     const digits = form.whatsapp.replace(/\D/g, '');
     if (form.whatsapp && digits.length < 10) { setWhatsappError('Número inválido'); return; }
+    const ltErr = validateLattesForm(form.lattes_url);
     const igErr = validateInstagramForm(form.instagram_url);
     const twErr = validateTwitterForm(form.twitter_url);
+    setLattesError(ltErr);
     setInstagramError(igErr);
     setTwitterError(twErr);
-    if (igErr || twErr) return;
+    if (ltErr || igErr || twErr) return;
     if (newPassword && newPassword !== confirmPassword) {
       setPasswordError('As senhas não coincidem');
       return;
@@ -523,8 +598,18 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, isOwnProfile, 
             />
             {whatsappError && <p className="text-xs text-red-500 mt-0.5">{whatsappError}</p>}
           </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Lattes</label>
+            <input
+              type="url"
+              className={`w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 ${lattesError ? 'border-red-400' : ''}`}
+              placeholder="http://lattes.cnpq.br/1234567890123456"
+              value={form.lattes_url}
+              onChange={e => { set('lattes_url')(e); setLattesError(validateLattesForm(e.target.value)); }}
+            />
+            {lattesError && <p className="text-xs text-red-500 mt-0.5">{lattesError}</p>}
+          </div>
           {[
-            { key: 'lattes_url', label: 'Lattes', placeholder: 'http://lattes.cnpq.br/...' },
             { key: 'scholar_url', label: 'Google Scholar', placeholder: 'https://scholar.google.com/...' },
             { key: 'linkedin_url', label: 'LinkedIn', placeholder: 'https://linkedin.com/in/...' },
             { key: 'github_url', label: 'GitHub', placeholder: 'https://github.com/...' },

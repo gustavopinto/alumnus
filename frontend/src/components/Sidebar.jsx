@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ResearcherForm from './ResearcherForm';
-import { deleteResearcher, getProfessors, getGroups, updateGroup, getReminders, createReminder, updateReminder, deleteReminder, getDeadlines, getTips } from '../api';
+import { deleteResearcher, getProfessors, getGroups, updateGroup, getReminders, createReminder, updateReminder, deleteReminder, getDeadlines, deleteDeadline, getTips } from '../api';
 import { canDeleteReminder, creatorDisplayName, isReminderFromSomeoneElse } from '../reminderAccess';
 import { invalidMentions, renderWithMentions } from '../mentionUtils.jsx';
 import { isModEnter } from '../platform';
@@ -16,7 +16,7 @@ function today() {
   return new Date().toISOString().split('T')[0];
 }
 
-function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, researchers = [], institutionId = null }) {
+function RemindersDropdown({ rail = false, refreshKey = 0, onRefresh = null, currentUser = null, researchers = [], institutionId = null }) {
   const [open, setOpen] = useState(false);
   const [showOld, setShowOld] = useState(false);
   const [reminders, setReminders] = useState([]);
@@ -98,7 +98,7 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, r
       if (result && result.id) {
         setText('');
         setDate('');
-        load();
+        onRefresh ? onRefresh() : load();
       } else {
         setError('Erro ao adicionar lembrete');
       }
@@ -118,7 +118,7 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, r
     setError('');
     try {
       await deleteReminder(id);
-      await load();
+      onRefresh ? onRefresh() : await load();
     } catch (e) {
       setError(e?.message || 'Não foi possível remover');
     }
@@ -513,7 +513,7 @@ export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshK
   );
 }
 
-export default function Sidebar({ researchers, onRefresh, role, isAdmin = false, remindersRefreshKey = 0, deadlinesRefreshKey = 0, tipsRefreshKey = 0, currentUser = null, currentInstitution = null, institutions = [] }) {
+export default function Sidebar({ researchers, onRefresh, onRefreshReminders = null, onRefreshDeadlines = null, role, isAdmin = false, remindersRefreshKey = 0, deadlinesRefreshKey = 0, tipsRefreshKey = 0, currentUser = null, currentInstitution = null, institutions = [] }) {
   const [view, setView] = useState('list');
   const [editResearcher, setEditResearcher] = useState(null);
   const [professors, setProfessors] = useState([]);
@@ -631,30 +631,57 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
       )}
 
       {/* Lembretes */}
-      <RemindersDropdown refreshKey={remindersRefreshKey} currentUser={currentUser} researchers={researchers} institutionId={currentInstitution?.id ?? null} />
+      <RemindersDropdown refreshKey={remindersRefreshKey} onRefresh={onRefreshReminders} currentUser={currentUser} researchers={researchers} institutionId={currentInstitution?.id ?? null} />
 
       {/* Deadlines */}
       <Dropdown label="Próximos deadlines" icon={CALENDAR_ICON} badge={upcomingDeadlines.length} linkTo="/app/deadlines" disabled={sidebarDeadlines.length <= 1}>
         {(() => {
           const pastDeadlines = sidebarDeadlines.filter(d => daysUntil(d.date) < 0).sort((a, b) => new Date(b.date) - new Date(a.date));
+          const canDeleteDeadline = (d) => isAdmin || d.created_by_id === currentUser?.id;
+          async function handleDeleteDeadline(id) {
+            try {
+              await deleteDeadline(id);
+              onRefreshDeadlines?.();
+            } catch {}
+          }
           return (
             <ul className="space-y-1.5">
               {upcomingDeadlines.map((d) => {
                 const days = daysUntil(d.date);
                 return (
-                  <li key={d.id} className="rounded px-1 py-1">
-                    <a href={d.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-600 hover:underline block truncate">{d.label}</a>
-                    <span className={`text-xs ${days <= 14 ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
-                      {days === 0 ? 'Hoje!' : `${days}d`} · {new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR')}
-                    </span>
+                  <li key={d.id} className="group rounded px-1 py-1 flex items-start gap-1">
+                    <div className="flex-1 min-w-0">
+                      <a href={d.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-600 hover:underline block truncate">{d.label}</a>
+                      <span className={`text-xs ${days <= 14 ? 'text-red-500 font-semibold' : 'text-gray-400'}`}>
+                        {days === 0 ? 'Hoje!' : `${days}d`} · {new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                      </span>
+                    </div>
+                    {canDeleteDeadline(d) && (
+                      <button type="button" onClick={() => handleDeleteDeadline(d.id)}
+                        className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-colors shrink-0 mt-0.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
                   </li>
                 );
               })}
               {pastDeadlines.length > 0 && <li className="border-t my-1" />}
               {pastDeadlines.map((d) => (
-                <li key={d.id} className="rounded px-1 py-1 opacity-40">
-                  <a href={d.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-600 hover:underline block truncate">{d.label}</a>
-                  <span className="text-xs text-gray-400">Encerrado · {new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                <li key={d.id} className="group rounded px-1 py-1 flex items-start gap-1 opacity-40">
+                  <div className="flex-1 min-w-0">
+                    <a href={d.url} target="_blank" rel="noreferrer" className="text-sm font-medium text-blue-600 hover:underline block truncate">{d.label}</a>
+                    <span className="text-xs text-gray-400">Encerrado · {new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                  </div>
+                  {canDeleteDeadline(d) && (
+                    <button type="button" onClick={() => handleDeleteDeadline(d.id)}
+                      className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-colors shrink-0 mt-0.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

@@ -23,9 +23,6 @@ router = APIRouter(prefix="/deadlines", tags=["deadlines"])
 
 
 def _interest_out(db: Session, interest: DeadlineInterest) -> DeadlineInterestOut:
-    photo = None
-    thumb = None
-    profile_slug = None
     u = interest.user
     if not u:
         return DeadlineInterestOut(
@@ -33,15 +30,15 @@ def _interest_out(db: Session, interest: DeadlineInterest) -> DeadlineInterestOu
             user_id=interest.user_id,
             user_name="",
         )
+    # Photo is stored on User; fall back to researcher name for profile slug
+    photo = u.photo_url
+    thumb = u.photo_thumb_url or photo
+    profile_slug = None
     if u.researcher:
-        photo = u.researcher.photo_url
-        thumb = u.researcher.photo_thumb_url or photo
         profile_slug = slugify(u.researcher.nome)
     elif u.researcher_id is not None:
         r = db.query(Researcher).filter(Researcher.id == u.researcher_id).first()
         if r:
-            photo = r.photo_url
-            thumb = r.photo_thumb_url or photo
             profile_slug = slugify(r.nome)
     if profile_slug is None and u.nome:
         profile_slug = slugify(u.nome)
@@ -80,6 +77,7 @@ def create_deadline(
         url=data.url,
         date=data.date,
         institution_id=data.institution_id,
+        created_by_id=current_user.id,
     )
     db.add(d)
     db.commit()
@@ -91,11 +89,15 @@ def create_deadline(
 def delete_deadline(
     deadline_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_professor),
+    current_user: User = Depends(get_current_user),
 ):
     d = db.query(Deadline).filter(Deadline.id == deadline_id).first()
     if not d:
         raise HTTPException(status_code=404, detail="Deadline não encontrado")
+    is_admin = current_user.role in ("professor", "superadmin")
+    is_creator = d.created_by_id == current_user.id
+    if not is_admin and not is_creator:
+        raise HTTPException(status_code=403, detail="Sem permissão para remover este deadline")
     db.delete(d)
     db.commit()
     return Response(status_code=204)

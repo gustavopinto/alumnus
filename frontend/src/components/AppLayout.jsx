@@ -400,6 +400,8 @@ export default function AppLayout() {
       refreshSidebarReminders,
       refreshSidebarDeadlines,
       refreshSidebarTips,
+      remindersRefreshKey,
+      deadlinesRefreshKey,
       updateGraphNodePosition,
       currentUser,
       setProfileTopbar,
@@ -408,7 +410,7 @@ export default function AppLayout() {
       institutions,
       refreshInstitutions,
     }),
-    [sidebarOpen, setSidebarOpenPersist, researchers, loadData, nodes, edges, refreshSidebarReminders, refreshSidebarDeadlines, refreshSidebarTips, updateGraphNodePosition, currentUser, currentInstitution, institutions, refreshInstitutions],
+    [sidebarOpen, setSidebarOpenPersist, researchers, loadData, nodes, edges, refreshSidebarReminders, refreshSidebarDeadlines, refreshSidebarTips, remindersRefreshKey, deadlinesRefreshKey, updateGraphNodePosition, currentUser, currentInstitution, institutions, refreshInstitutions],
   );
 
   const { pathname } = useLocation();
@@ -473,6 +475,8 @@ export default function AppLayout() {
               <Sidebar
                 researchers={researchers}
                 onRefresh={loadData}
+                onRefreshReminders={refreshSidebarReminders}
+                onRefreshDeadlines={refreshSidebarDeadlines}
                 role={payload?.role}
                 isAdmin={['professor','superadmin'].includes(payload?.role)}
                 remindersRefreshKey={remindersRefreshKey}

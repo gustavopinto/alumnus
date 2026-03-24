@@ -28,7 +28,7 @@ function Avatar({ name, photoUrl, size = 7 }) {
 }
 
 export default function DeadlinesPage() {
-  const { currentInstitution, refreshSidebarDeadlines } = useAppLayout();
+  const { currentInstitution, refreshSidebarDeadlines, deadlinesRefreshKey = 0 } = useAppLayout();
   const [deadlines, setDeadlines] = useState([]);
   const [interests, setInterests] = useState([]);
   const [showPast, setShowPast] = useState(false);
@@ -64,7 +64,7 @@ export default function DeadlinesPage() {
     setInterests(iv || []);
   }, []);
 
-  useEffect(() => { load(currentInstitution?.id); }, [load, currentInstitution]);
+  useEffect(() => { load(currentInstitution?.id); }, [load, currentInstitution, deadlinesRefreshKey]);
 
   async function handleToggle(deadlineId) {
     if (loading) return;
@@ -83,6 +83,7 @@ export default function DeadlinesPage() {
     await deleteDeadline(deadlineId);
     await load(currentInstitution?.id);
     refreshSidebarDeadlines?.();
+    setToast('Deadline removido');
   }
 
   async function handleAddManual(e) {
@@ -143,9 +144,6 @@ export default function DeadlinesPage() {
     const urgent = !isPast && days <= 14;
     const myInterest = interests.some(i => i.deadline_id === d.id && myUserId != null && Number(i.user_id) === myUserId);
     const interested = interests.filter(i => i.deadline_id === d.id);
-    const myEntry = myUserId != null ? interested.find(i => Number(i.user_id) === myUserId) : null;
-    const myPic = myEntry ? (myEntry.user_photo_thumb_url || myEntry.user_photo_url) : null;
-
     return (
       <div key={d.id} className={`relative bg-white rounded-xl border shadow-sm p-4 flex flex-col gap-3 transition-opacity ${isPast ? 'opacity-60' : ''}`}>
         {interested.length > 0 && (
@@ -203,7 +201,6 @@ export default function DeadlinesPage() {
                            : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700'
               }`}
             >
-              {myInterest && myPic && <img src={myPic} alt="" className="w-5 h-5 rounded-full object-cover border border-green-200 shrink-0" />}
               <span>{myInterest ? '✓ Quero mandar' : 'Quero mandar'}</span>
             </button>
           )}

@@ -6,6 +6,7 @@ from pydantic import BaseModel, field_validator
 
 _INSTAGRAM_HANDLE = re.compile(r"^[A-Za-z0-9._]{1,30}$")
 _TWITTER_HANDLE = re.compile(r"^[A-Za-z0-9_]{1,15}$")
+_LATTES_URL = re.compile(r"^https?://lattes\.cnpq\.br/\d{16}$")
 
 
 # --- Institution ---
@@ -250,6 +251,18 @@ class UserProfileUpdate(BaseModel):
     bio:             Optional[str] = None
     password:        Optional[str] = None
 
+    @field_validator("lattes_url")
+    @classmethod
+    def validate_lattes_url(cls, v):
+        if v is None or (isinstance(v, str) and not v.strip()):
+            return None
+        s = str(v).strip()
+        if not _LATTES_URL.match(s):
+            raise ValueError(
+                "Lattes: use o formato http://lattes.cnpq.br/1234567890123456 (16 dígitos)"
+            )
+        return s
+
     @field_validator("instagram_url")
     @classmethod
     def validate_instagram_handle(cls, v):
@@ -383,6 +396,7 @@ class DeadlineOut(BaseModel):
     url: str
     date: date
     institution_id: Optional[int] = None
+    created_by_id: Optional[int] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
