@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
 from ..deps import require_dashboard, require_superadmin, require_professor
-from ..models import User, Researcher, Reminder, Tip, TipComment, Note, ResearchGroup, ProfessorGroup
+from ..models import User, Researcher, Reminder, Tip, TipComment, Note, ResearchGroup, ProfessorGroup, Professor, ProfessorInstitution
 from ..services import professor_service
 from ..plan import clear_plan, ensure_professor_plan_defaults
 
@@ -97,6 +97,18 @@ def get_stats(db: Session = Depends(get_db), current: User = Depends(require_das
 
 @router.get("/users")
 def list_users(db: Session = Depends(get_db), current: User = Depends(require_dashboard)):
+    def _institutions_for_user(u: User) -> list:
+        if u.professor:
+            return [pi.institution.name for pi in u.professor.professor_institutions if pi.institution]
+        if u.researcher and u.researcher.group and u.researcher.group.institution:
+            return [u.researcher.group.institution.name]
+        return []
+
+    def _institutions_for_pending(r: Researcher) -> list:
+        if r.group and r.group.institution:
+            return [r.group.institution.name]
+        return []
+
     def _serialize_user(u: User) -> dict:
         return {
             "id": u.id,
@@ -112,6 +124,7 @@ def list_users(db: Session = Depends(get_db), current: User = Depends(require_da
             "last_login": u.last_login,
             "created_at": u.created_at,
             "pending": False,
+            "institutions": _institutions_for_user(u),
         }
 
     def _serialize_pending(r: Researcher) -> dict:
@@ -128,20 +141,26 @@ def list_users(db: Session = Depends(get_db), current: User = Depends(require_da
             "whatsapp": None,
             "photo_url": None,
             "pending": True,
+            "institutions": _institutions_for_pending(r),
         }
+
+    eager_opts = [
+        joinedload(User.researcher).joinedload(Researcher.group).joinedload(ResearchGroup.institution),
+        joinedload(User.professor).joinedload(Professor.professor_institutions).joinedload(ProfessorInstitution.institution),
+    ]
 
     if _is_superadmin(current):
         users = (
             db.query(User)
-            .options(joinedload(User.researcher))
+            .options(*eager_opts)
             .all()
         )
     else:
-        # Professor/admin: todos, exceto superadmin “puro” (sem perfil de pesquisador).
+        # Professor/admin: todos, exceto superadmin "puro" (sem perfil de pesquisador).
         # Orientadores costumam estar como superadmin após migrações; com researcher_id entram na lista.
         users = (
             db.query(User)
-            .options(joinedload(User.researcher))
+            .options(*eager_opts)
             .filter(
                 or_(
                     User.role != "superadmin",
@@ -151,10 +170,15 @@ def list_users(db: Session = Depends(get_db), current: User = Depends(require_da
             .all()
         )
 
-    pending = db.query(Researcher).filter(
-        Researcher.ativo.is_(True),
-        Researcher.registered.is_(False),
-    ).all()
+    pending = (
+        db.query(Researcher)
+        .options(joinedload(Researcher.group).joinedload(ResearchGroup.institution))
+        .filter(
+            Researcher.ativo.is_(True),
+            Researcher.registered.is_(False),
+        )
+        .all()
+    )
 
     def _user_sort_key(u: User) -> tuple:
         role_rank = _ADMIN_USER_LIST_ROLE_ORDER.get(u.role, 99)

@@ -254,7 +254,7 @@ function EntryCard({ entry, authUserId, canModerate, onVote, onDelete, onComment
 }
 
 export default function ManualPage() {
-  const { currentInstitution } = useAppLayout();
+  const { currentInstitution, refreshSidebarTips } = useAppLayout();
   const [entries, setEntries] = useState([]);
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
@@ -281,6 +281,7 @@ export default function ManualPage() {
     setSaving(false);
     setToast('Entrada adicionada com sucesso');
     load(currentInstitution?.id);
+    refreshSidebarTips?.();
   }
 
   async function handleDelete(id) {
@@ -288,6 +289,7 @@ export default function ManualPage() {
     await deleteTip(id);
     setToast('Entrada removida');
     load(currentInstitution?.id);
+    refreshSidebarTips?.();
   }
 
   return (

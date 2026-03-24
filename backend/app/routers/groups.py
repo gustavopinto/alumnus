@@ -23,16 +23,23 @@ def _group_out(group: ResearchGroup) -> dict:
 @router.get("/", response_model=list[ResearchGroupOut])
 def list_my_groups(
     db: Session = Depends(get_db),
-    current: User = Depends(require_professor),
+    current: User = Depends(get_current_user),
 ):
-    """Lista os grupos do professor logado. Superadmin lista todos."""
+    """Lista os grupos do professor logado. Superadmin lista todos. Aluno retorna seu próprio grupo."""
     if current.role == "superadmin":
         groups = db.query(ResearchGroup).order_by(ResearchGroup.name).all()
-    else:
+    elif current.role == "professor":
         professor = professor_service.get_by_user(db, current)
         if not professor:
             return []
         groups = group_service.list_professor_groups(db, professor)
+    else:
+        # Student: retorna apenas o grupo ao qual pertence
+        if current.researcher and current.researcher.group_id:
+            group = group_service.get_group_by_id(db, current.researcher.group_id)
+            groups = [group] if group else []
+        else:
+            groups = []
     return [_group_out(g) for g in groups]
 
 

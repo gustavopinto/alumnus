@@ -28,7 +28,7 @@ function Avatar({ name, photoUrl, size = 7 }) {
 }
 
 export default function DeadlinesPage() {
-  const { currentInstitution } = useAppLayout();
+  const { currentInstitution, refreshSidebarDeadlines } = useAppLayout();
   const [deadlines, setDeadlines] = useState([]);
   const [interests, setInterests] = useState([]);
   const [showPast, setShowPast] = useState(false);
@@ -49,7 +49,7 @@ export default function DeadlinesPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [addLabel, setAddLabel] = useState('');
   const [addUrl, setAddUrl] = useState('');
-  const [addDate, setAddDate] = useState('');
+  const [addDate, setAddDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState('');
 
@@ -82,6 +82,7 @@ export default function DeadlinesPage() {
     if (!confirm('Remover este deadline?')) return;
     await deleteDeadline(deadlineId);
     await load(currentInstitution?.id);
+    refreshSidebarDeadlines?.();
   }
 
   async function handleAddManual(e) {
@@ -91,9 +92,10 @@ export default function DeadlinesPage() {
     setAddError('');
     try {
       await createDeadline({ label: addLabel.trim(), url: addUrl.trim(), date: addDate, institution_id: currentInstitution?.id });
-      setAddLabel(''); setAddUrl(''); setAddDate(''); setAddOpen(false);
+      setAddLabel(''); setAddUrl(''); setAddDate(new Date().toISOString().split('T')[0]); setAddOpen(false);
       setToast('Deadline adicionado');
       await load(currentInstitution?.id);
+      refreshSidebarDeadlines?.();
     } catch { setAddError('Erro ao adicionar deadline'); }
     finally { setAddSaving(false); }
   }
@@ -105,6 +107,7 @@ export default function DeadlinesPage() {
       setExtracted(prev => prev.filter((_, i) => i !== idx));
       setToast('Deadline adicionado');
       await load(currentInstitution?.id);
+      refreshSidebarDeadlines?.();
     } catch (e) { console.error(e); }
     finally { setSaving(s => ({ ...s, [idx]: false })); }
   }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getAdminStats, getAdminUsers, updateUserRole, deleteUser, deletePendingResearcher, bulkDeleteUsers, createResearcher } from '../api';
 import { getTokenPayload } from '../auth';
+import { useAppLayout } from '../components/AppLayout';
 import Toast from '../components/Toast';
 
 const ROLE_LABELS = { superadmin: 'Superadmin', professor: 'Professor', student: 'Aluno' };
@@ -37,6 +38,7 @@ function slugify(nome) {
 
 export default function AdminPage() {
   const navigate = useNavigate();
+  const { institutions = [] } = useAppLayout();
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [editingId, setEditingId] = useState(undefined);
@@ -49,6 +51,7 @@ export default function AdminPage() {
   const [newStudentNome, setNewStudentNome] = useState('');
   const [newStudentEmail, setNewStudentEmail] = useState('');
   const [newStudentStatus, setNewStudentStatus] = useState('mestrado');
+  const [newStudentInstId, setNewStudentInstId] = useState('');
   const [addingStudent, setAddingStudent] = useState(false);
   const [addStudentError, setAddStudentError] = useState('');
   const [inviteLink, setInviteLink] = useState('');
@@ -85,6 +88,12 @@ export default function AdminPage() {
   }
 
   useEffect(() => { load(); }, []);
+
+  useEffect(() => {
+    if (institutions.length > 0 && !newStudentInstId) {
+      setNewStudentInstId(String(institutions[0].id));
+    }
+  }, [institutions]); // eslint-disable-line
 
   function rowKey(u) {
     return u.pending ? `r-${u.researcher_id}` : `u-${u.id}`;
@@ -148,7 +157,8 @@ export default function AdminPage() {
     setAddStudentError('');
     try {
       const myPayload = getTokenPayload();
-      const r = await createResearcher({ nome: newStudentNome.trim(), email: newStudentEmail.trim(), status: newStudentStatus, orientador_id: myPayload?.professor_id || null });
+      const instId = newStudentInstId ? Number(newStudentInstId) : null;
+      const r = await createResearcher({ nome: newStudentNome.trim(), email: newStudentEmail.trim(), status: newStudentStatus, orientador_id: myPayload?.professor_id || null, institution_id: instId });
       if (r?.id) {
         const token = btoa(newStudentEmail.trim());
         const url = `${window.location.origin}/entrar?tab=cadastro&token=${token}`;
@@ -156,6 +166,7 @@ export default function AdminPage() {
         setNewStudentNome('');
         setNewStudentEmail('');
         setNewStudentStatus('mestrado');
+        setNewStudentInstId(institutions.length > 0 ? String(institutions[0].id) : '');
         load();
       } else {
         setAddStudentError(r?.detail || 'Erro ao cadastrar aluno');
@@ -282,6 +293,21 @@ export default function AdminPage() {
                       <option value="doutorado">Doutorado</option>
                       <option value="postdoc">Pós-doc</option>
                     </select>
+                    {institutions.length === 1 ? (
+                      <span className="flex items-center px-3 py-2 text-sm text-gray-600 border rounded-lg bg-gray-50">
+                        {institutions[0].name}
+                      </span>
+                    ) : institutions.length > 1 ? (
+                      <select
+                        value={newStudentInstId}
+                        onChange={e => setNewStudentInstId(e.target.value)}
+                        className="border rounded-lg px-3 py-2 text-sm"
+                      >
+                        {institutions.map(i => (
+                          <option key={i.id} value={i.id}>{i.name}</option>
+                        ))}
+                      </select>
+                    ) : null}
                   </div>
                   {addStudentError && <p className="text-xs text-red-500">{addStudentError}</p>}
                   <div className="flex gap-2">
@@ -308,6 +334,7 @@ export default function AdminPage() {
                   <th className="px-4 py-3">Nome</th>
                   <th className="px-4 py-3">Email</th>
                   <th className="px-4 py-3">Perfil</th>
+                  <th className="px-4 py-3">Instituição</th>
                   <th className="px-4 py-3">WhatsApp</th>
                   <th className="px-4 py-3">Último acesso</th>
                   <th className="px-4 py-3">Ações</th>
@@ -385,6 +412,15 @@ export default function AdminPage() {
                           )}
                         </div>
                       )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {(u.institutions || []).map(name => (
+                          <span key={name} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            {name}
+                          </span>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-gray-500">
                       {u.whatsapp

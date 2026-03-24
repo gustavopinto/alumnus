@@ -3,7 +3,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from ..institutional_email import extract_domain, is_public_email_domain
-from ..models import Institution, Professor, ProfessorInstitution
+from ..models import Institution, Professor, ProfessorInstitution, ProfessorGroup, ResearchGroup
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +70,22 @@ def add_institutional_email(
         institutional_email=email,
     )
     db.add(pi)
+    # Auto-create a group for this institution+professor if none exists
+    existing_pg = db.query(ProfessorGroup).filter(
+        ProfessorGroup.professor_id == professor.id,
+        ProfessorGroup.institution_id == institution.id,
+    ).first()
+    if not existing_pg:
+        group = ResearchGroup(name=f"Grupo {institution.name}", institution_id=institution.id)
+        db.add(group)
+        db.flush()
+        pg = ProfessorGroup(
+            professor_id=professor.id,
+            group_id=group.id,
+            role_in_group="coordinator",
+            institution_id=institution.id,
+        )
+        db.add(pg)
     db.commit()
     db.refresh(pi)
     logger.info("ProfessorInstitution added: professor=%s email=%s", professor.id, email)

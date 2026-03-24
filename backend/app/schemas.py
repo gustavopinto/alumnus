@@ -90,6 +90,7 @@ class ResearcherCreate(BaseModel):
     orientador_id: Optional[int] = None  # FK → professors.id
     group_id: Optional[int] = None
     observacoes: Optional[str] = None
+    institution_id: Optional[int] = None
 
 
 class ResearcherUpdate(BaseModel):

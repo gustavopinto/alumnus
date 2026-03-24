@@ -1,23 +1,26 @@
 import logging
 
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from ..models import Professor, ProfessorInstitution, ResearchGroup, Researcher, User
+from ..models import Professor, ProfessorGroup, ProfessorInstitution, ResearchGroup, Researcher, User
 from ..schemas import ResearcherCreate, ResearcherUpdate
 from ..slug import slugify
 
 logger = logging.getLogger(__name__)
 
 
-def _resolve_group_id(db: Session, orientador_id: int | None) -> int | None:
+def _resolve_group_id(db: Session, orientador_id: int | None, institution_id: int | None = None) -> int | None:
     """Dado um professor orientador, retorna o group_id do seu grupo principal (coordinator)."""
     if orientador_id is None:
         return None
-    pg = db.query(ProfessorGroup).filter(
+    q = db.query(ProfessorGroup).filter(
         ProfessorGroup.professor_id == orientador_id,
         ProfessorGroup.role_in_group == "coordinator",
-    ).first()
+    )
+    if institution_id is not None:
+        q = q.filter(ProfessorGroup.institution_id == institution_id)
+    pg = q.first()
     return pg.group_id if pg else None
 
 
@@ -36,7 +39,7 @@ def list_all(db: Session, ativo: bool | None, institution_id: int | None = None)
         q = q.filter(
             or_(
                 Researcher.group_id.in_(group_ids),
-                Researcher.orientador_id.in_(prof_ids),
+                and_(Researcher.group_id.is_(None), Researcher.orientador_id.in_(prof_ids)),
             )
         )
     results = q.order_by(Researcher.nome).all()
@@ -46,9 +49,14 @@ def list_all(db: Session, ativo: bool | None, institution_id: int | None = None)
 
 def create(db: Session, data: ResearcherCreate) -> Researcher:
     payload = data.model_dump()
+    institution_id = payload.pop("institution_id", None)
     # Auto-resolve group_id from orientador if not explicitly provided
-    if payload.get("group_id") is None and payload.get("orientador_id") is not None:
-        payload["group_id"] = _resolve_group_id(db, payload["orientador_id"])
+    if payload.get("group_id") is None:
+        if payload.get("orientador_id") is not None:
+            payload["group_id"] = _resolve_group_id(db, payload["orientador_id"], institution_id)
+        elif institution_id is not None:
+            group = db.query(ResearchGroup).filter(ResearchGroup.institution_id == institution_id).first()
+            payload["group_id"] = group.id if group else None
     researcher = Researcher(**payload)
     db.add(researcher)
     db.commit()

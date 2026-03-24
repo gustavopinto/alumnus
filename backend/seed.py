@@ -17,7 +17,12 @@ from passlib.context import CryptContext
 
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-SENHA = os.getenv("SEED_PASSWORD", "ghlp1234")
+SENHA            = os.getenv("SEED_PASSWORD",      "ghlp1234")
+ADMIN_EMAIL      = os.getenv("SEED_ADMIN_EMAIL",   "admin@ufpa.br")
+PROFESSOR_EMAIL  = os.getenv("SEED_PROF_EMAIL",    "gpinto@ufpa.br")
+PROFESSOR_NOME   = os.getenv("SEED_PROF_NOME",     "Gustavo Pinto")
+RESEARCHER_EMAIL = os.getenv("SEED_RES_EMAIL",     "gp@ufpa.br")
+RESEARCHER_NOME  = os.getenv("SEED_RES_NOME",      "Gustavo P.")
 
 SCHEMA_FILE = Path(__file__).parent / "migrations" / "000_schema.sql"
 
@@ -45,37 +50,34 @@ def reset_schema(cur):
 
 def seed_users(cur):
     h = pwd_ctx.hash(SENHA)
-    domain = "ufpa.br"
-    inst_name = "UFPA"
 
-    # Institution
+    # Institution — derivada do email do professor
+    domain    = PROFESSOR_EMAIL.split("@")[-1]
+    inst_name = domain.split(".")[0].upper()
     cur.execute(
-        "INSERT INTO institutions (name, domain) VALUES (%s,%s) ON CONFLICT (domain) DO NOTHING RETURNING id",
+        "INSERT INTO institutions (name, domain) VALUES (%s,%s) RETURNING id",
         (inst_name, domain),
     )
-    row = cur.fetchone()
-    if not row:
-        cur.execute("SELECT id FROM institutions WHERE domain = %s", (domain,))
-        row = cur.fetchone()
-    institution_id = row[0]
+    institution_id = cur.fetchone()[0]
+    print(f"  institution    {inst_name} ({domain})  id={institution_id}")
 
     # Professor
     cur.execute(
         "INSERT INTO professors (nome, ativo) VALUES (%s, TRUE) RETURNING id",
-        ("Gustavo Pinto",),
+        (PROFESSOR_NOME,),
     )
     professor_id = cur.fetchone()[0]
 
     # ProfessorInstitution
     cur.execute(
         "INSERT INTO professor_institutions (professor_id, institution_id, institutional_email) VALUES (%s,%s,%s)",
-        (professor_id, institution_id, "gpinto@ufpa.br"),
+        (professor_id, institution_id, PROFESSOR_EMAIL),
     )
 
     # ResearchGroup
     cur.execute(
         "INSERT INTO research_groups (name, institution_id) VALUES (%s,%s) RETURNING id",
-        ("Grupo de Gustavo Pinto", institution_id),
+        (f"Grupo {inst_name}", institution_id),
     )
     group_id = cur.fetchone()[0]
 
@@ -85,11 +87,11 @@ def seed_users(cur):
         (professor_id, group_id, "coordinator", institution_id),
     )
 
-    # Researcher (para gp@ufpa.br)
+    # Researcher
     cur.execute(
         """INSERT INTO researchers (nome, status, email, group_id, orientador_id, ativo, registered)
            VALUES (%s,%s,%s,%s,%s,TRUE,TRUE) RETURNING id""",
-        ("Gustavo P.", "mestrado", "gp@ufpa.br", group_id, professor_id),
+        (RESEARCHER_NOME, "mestrado", RESEARCHER_EMAIL, group_id, professor_id),
     )
     researcher_id = cur.fetchone()[0]
 
@@ -101,9 +103,9 @@ def seed_users(cur):
 
     # Users
     users = [
-        ("admin@ufpa.br",  "Admin",         "superadmin", True,  None,          None),
-        ("gpinto@ufpa.br", "Gustavo Pinto", "professor",  False, professor_id,  None),
-        ("gp@ufpa.br",     "Gustavo P.",    "student",    False, None,          researcher_id),
+        (ADMIN_EMAIL,      "Admin",          "superadmin", True,  None,         None),
+        (PROFESSOR_EMAIL,  PROFESSOR_NOME,   "professor",  False, professor_id, None),
+        (RESEARCHER_EMAIL, RESEARCHER_NOME,  "student",    False, None,         researcher_id),
     ]
     for email, nome, role, is_admin, prof_id, res_id in users:
         cur.execute(

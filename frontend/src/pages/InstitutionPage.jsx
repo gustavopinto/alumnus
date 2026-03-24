@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { getMyEmails, addMyEmail, removeMyEmail, getGroups, createGroup, updateGroup, getInstitutions, createInstitution } from '../api';
+import { getMyEmails, addMyEmail, removeMyEmail, getGroups, updateGroup, getInstitutions, createInstitution } from '../api';
+import { useAppLayout } from '../components/AppLayout';
 import { getTokenPayload } from '../auth';
 import { isModEnter } from '../platform';
 
 export default function InstitutionPage() {
+  const { refreshInstitutions } = useAppLayout();
   const payload = getTokenPayload();
   const isSuperadmin = payload?.role === 'superadmin';
   const isProfessor = payload?.role === 'professor' || isSuperadmin;
@@ -26,12 +28,6 @@ export default function InstitutionPage() {
   const [newInstError, setNewInstError] = useState('');
   const [addingInst, setAddingInst] = useState(false);
 
-  const [showNewGroup, setShowNewGroup] = useState(false);
-  const [newGroupName, setNewGroupName] = useState('');
-  const [newGroupInst, setNewGroupInst] = useState('');
-  const [groupError, setGroupError] = useState('');
-  const [creatingGroup, setCreatingGroup] = useState(false);
-
   const [editGroupId, setEditGroupId] = useState(null);
   const [editGroupName, setEditGroupName] = useState('');
   const [editGroupError, setEditGroupError] = useState('');
@@ -47,11 +43,11 @@ export default function InstitutionPage() {
     if (isSuperadmin) {
       const inst = Array.isArray(second) ? second : [];
       setInstitutions(inst);
-      if (inst.length > 0 && !selectedInstId) setSelectedInstId(inst[0].id);
+      setSelectedInstId(prev => prev || (inst.length > 0 ? inst[0].id : null));
     } else {
       const em = Array.isArray(second) ? second : [];
       setEmails(em);
-      if (em.length > 0 && !selectedInstId) setSelectedInstId(em[0].institution_id);
+      setSelectedInstId(prev => prev || (em.length > 0 ? em[0].institution_id : null));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuperadmin, isProfessor]);
@@ -89,6 +85,7 @@ export default function InstitutionPage() {
       setNewEmail('');
       await load();
       if (pi?.institution_id) setSelectedInstId(pi.institution_id);
+      if (refreshInstitutions) refreshInstitutions();
     } catch {
       setEmailError('Erro ao adicionar email');
     } finally {
@@ -117,6 +114,7 @@ export default function InstitutionPage() {
         setNewInstEmail('');
         setSelectedInstId(inst.id);
         await load();
+        if (refreshInstitutions) refreshInstitutions();
       } else {
         setNewInstError(inst?.detail || 'Erro ao criar instituição');
       }
@@ -124,24 +122,6 @@ export default function InstitutionPage() {
       setNewInstError('Erro ao criar instituição');
     } finally {
       setAddingInst(false);
-    }
-  }
-
-  async function handleCreateGroup(e) {
-    e.preventDefault();
-    if (!newGroupName.trim() || !newGroupInst) return;
-    setCreatingGroup(true);
-    setGroupError('');
-    try {
-      await createGroup(newGroupName.trim(), Number(newGroupInst));
-      setNewGroupName('');
-      setNewGroupInst('');
-      setShowNewGroup(false);
-      await load();
-    } catch {
-      setGroupError('Erro ao criar grupo');
-    } finally {
-      setCreatingGroup(false);
     }
   }
 
@@ -287,14 +267,6 @@ export default function InstitutionPage() {
               <span className="ml-1 text-blue-600 normal-case font-normal">· {selectedInst.name}</span>
             )}
           </h2>
-          {isProfessor && (
-            <button
-              onClick={() => { setShowNewGroup(v => !v); setGroupError(''); }}
-              className="text-xs text-blue-600 hover:text-blue-800"
-            >
-              {showNewGroup ? 'Cancelar' : '+ Novo grupo'}
-            </button>
-          )}
         </div>
 
         {filteredGroups.length === 0 ? (
@@ -338,50 +310,6 @@ export default function InstitutionPage() {
           </ul>
         )}
 
-        {showNewGroup && (
-          <form onSubmit={handleCreateGroup} className="bg-gray-50 border rounded-lg p-4 space-y-3">
-            <p className="text-sm font-medium text-gray-700">Novo grupo</p>
-            <input
-              autoFocus
-              required
-              placeholder="Nome do grupo"
-              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-              value={newGroupName}
-              onChange={e => setNewGroupName(e.target.value)}
-            />
-            <select
-              required
-              className="w-full border rounded-lg px-3 py-2 text-sm"
-              value={newGroupInst}
-              onChange={e => setNewGroupInst(e.target.value)}
-            >
-              <option value="">Selecionar instituição…</option>
-              {instOptions.map(inst => (
-                <option key={inst.id} value={inst.id}>{inst.name}</option>
-              ))}
-            </select>
-            {instOptions.length === 0 && (
-              <p className="text-xs text-amber-600">Adicione um email institucional antes de criar um grupo.</p>
-            )}
-            {groupError && <p className="text-xs text-red-500">{groupError}</p>}
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={creatingGroup || instOptions.length === 0}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
-              >
-                Criar
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowNewGroup(false)}
-                className="bg-gray-200 px-4 py-2 rounded-lg text-sm hover:bg-gray-300"
-              >
-                Cancelar
-              </button>
-            </div>
-          </form>
-        )}
       </section>
     </div>
   );

@@ -77,7 +77,6 @@ export const getResearcherBySlug = (slug) => request(`/researchers/by-slug/${slu
 // Reminders
 export const getReminders = (institutionId) =>
   request(`/reminders/${institutionId ? `?institution_id=${institutionId}` : ''}`);
-export const getReminderUnreadCount = () => request('/reminders/notifications/unread-count');
 export const createReminder = (data, institutionId) =>
   request('/reminders/', { method: 'POST', body: JSON.stringify({ ...data, institution_id: institutionId || null }) });
 export const updateReminder = (id, data) => request(`/reminders/${id}`, { method: 'PUT', body: JSON.stringify(data) });
@@ -102,20 +101,6 @@ export async function deleteReminder(id) {
     }
     throw new Error(msg);
   }
-}
-
-export async function markReminderNotificationRead(id) {
-  const token = getToken();
-  const res = await fetch(`${BASE}/reminders/${id}/mark-notification-read`, {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (res.status === 401) {
-    removeToken();
-    window.location.href = '/entrar';
-    return;
-  }
-  if (!res.ok) throw new Error('mark read failed');
 }
 
 // Tips

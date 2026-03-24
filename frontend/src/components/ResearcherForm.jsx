@@ -3,9 +3,9 @@ import { createResearcher, updateResearcher } from '../api';
 import Toast from './Toast';
 import { modKey, isModEnter } from '../platform';
 
-const EMPTY = { nome: '', status: 'graduacao', email: '', observacoes: '', orientador_id: '', matricula: '', curso: '', enrollment_date: '' };
+const EMPTY = { nome: '', status: 'graduacao', email: '', observacoes: '', orientador_id: '', matricula: '', curso: '', enrollment_date: '', institution_id: '' };
 
-export default function ResearcherForm({ researcher, professors = [], onSaved, onCancel }) {
+export default function ResearcherForm({ researcher, professors = [], institutions = [], onSaved, onCancel }) {
   const [form, setForm] = useState(EMPTY);
   const [toast, setToast] = useState('');
 
@@ -20,11 +20,18 @@ export default function ResearcherForm({ researcher, professors = [], onSaved, o
         matricula: researcher.matricula || '',
         curso: researcher.curso || '',
         enrollment_date: researcher.enrollment_date || '',
+        institution_id: researcher.institution_id || '',
       });
     } else {
       setForm(EMPTY);
     }
   }, [researcher]);
+
+  useEffect(() => {
+    if (!researcher && institutions.length === 1) {
+      setForm(prev => ({ ...prev, institution_id: String(institutions[0].id) }));
+    }
+  }, [institutions, researcher]);
 
   const set = (key) => (e) => setForm({ ...form, [key]: e.target.value });
 
@@ -33,6 +40,7 @@ export default function ResearcherForm({ researcher, professors = [], onSaved, o
     const payload = {
       ...form,
       orientador_id: form.orientador_id ? Number(form.orientador_id) : null,
+      institution_id: form.institution_id ? Number(form.institution_id) : null,
     };
     if (researcher) {
       await updateResearcher(researcher.id, payload);
@@ -67,6 +75,17 @@ export default function ResearcherForm({ researcher, professors = [], onSaved, o
           <option key={p.id} value={p.id}>{p.nome}</option>
         ))}
       </select>
+
+      {!researcher && institutions.length > 0 && (
+        institutions.length === 1 ? (
+          <p className="text-xs text-gray-500 px-1">Instituição: <span className="font-medium text-gray-700">{institutions[0].name}</span></p>
+        ) : (
+          <select className="w-full border rounded px-3 py-2 text-sm" value={form.institution_id} onChange={set('institution_id')}>
+            <option value="">Selecionar instituição…</option>
+            {institutions.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+          </select>
+        )
+      )}
 
       <div className="flex gap-2">
         <input className="flex-1 border rounded px-3 py-2 text-sm" placeholder="Matrícula" value={form.matricula} onChange={set('matricula')} />

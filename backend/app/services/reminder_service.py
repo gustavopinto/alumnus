@@ -1,27 +1,11 @@
 import logging
-import re
 
 from sqlalchemy.orm import Session, joinedload
 
-from ..models import Reminder, User, Researcher
+from ..models import Reminder, User
 from ..schemas import ReminderCreate, ReminderOut, ReminderUpdate
-from ..slug import slugify
 
 logger = logging.getLogger(__name__)
-
-
-def _extract_mention_slugs(text: str) -> set[str]:
-    return set(re.findall(r'@([\w-]+)', text))
-
-
-def _find_users_for_mentions(db: Session, slugs: set[str]) -> list[User]:
-    if not slugs:
-        return []
-    researchers = db.query(Researcher).all()
-    matched_ids = {r.id for r in researchers if slugify(r.nome) in slugs}
-    if not matched_ids:
-        return []
-    return db.query(User).filter(User.researcher_id.in_(matched_ids)).all()
 
 
 
@@ -84,26 +68,6 @@ def create(
     db.commit()
     db.refresh(reminder)
     logger.info("Reminder created: id=%s", reminder.id)
-
-    # Create a copy for each mentioned user (@slug)
-    if created_by_id is not None:
-        slugs = _extract_mention_slugs(data.text)
-        if slugs:
-            mentioned_users = _find_users_for_mentions(db, slugs)
-            copies = 0
-            for u in mentioned_users:
-                if u.id != created_by_id:
-                    db.add(Reminder(
-                        text=data.text,
-                        due_date=data.due_date or None,
-                        created_by_id=created_by_id,
-                        institution_id=data.institution_id,
-                    ))
-                    copies += 1
-            if copies:
-                db.commit()
-                logger.info("Reminder %s: created %s mention copies", reminder.id, copies)
-
     return reminder
 
 

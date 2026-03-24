@@ -177,8 +177,9 @@ export default function AppLayout() {
   const [edges, setEdges] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('sidebarOpen') !== 'false');
   const [remindersRefreshKey, setRemindersRefreshKey] = useState(0);
+  const [deadlinesRefreshKey, setDeadlinesRefreshKey] = useState(0);
+  const [tipsRefreshKey, setTipsRefreshKey] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [institutionSubOpen, setInstitutionSubOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [institutionName, setInstitutionName] = useState(null);
   const [institutions, setInstitutions] = useState([]);
@@ -191,6 +192,7 @@ export default function AppLayout() {
   const [changePwSaving, setChangePwSaving] = useState(false);
   const settingsRef = useRef(null);
   const currentInstIdRef = useRef(null);
+  const currentUserRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => { currentInstIdRef.current = currentInstitution?.id ?? null; }, [currentInstitution]);
@@ -237,18 +239,53 @@ export default function AppLayout() {
   function handleSetCurrentInstitution(inst) {
     setCurrentInstitution(inst);
     setInstitutionName(inst.name);
+    localStorage.setItem('selectedInstId', String(inst.id));
   }
+
+  const refreshInstitutions = useCallback(async () => {
+    const u = currentUserRef.current;
+    if (!u) return;
+    if (u.role === 'superadmin') {
+      const list = await getInstitutions().catch(() => []);
+      if (Array.isArray(list) && list.length > 0) {
+        setInstitutions(list);
+        setCurrentInstitution(prev => {
+          if (prev && list.find(i => i.id === prev.id)) return prev;
+          return { id: list[0].id, name: list[0].name };
+        });
+        setInstitutionName(n => n || list[0].name);
+      }
+    } else if (u.role === 'professor') {
+      const list = await getMyEmails().catch(() => []);
+      if (Array.isArray(list) && list.length > 0) {
+        const seen = new Set();
+        const inst = list
+          .map(e => ({ id: e.institution_id, name: e.institution_name }))
+          .filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true; });
+        setInstitutions(inst);
+        setCurrentInstitution(prev => {
+          if (prev && inst.find(i => i.id === prev.id)) return prev;
+          return inst[0];
+        });
+        setInstitutionName(n => n || inst[0].name);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     getMe().then((u) => {
       if (u) {
         setCurrentUser(u);
+        currentUserRef.current = u;
+        const savedInstId = localStorage.getItem('selectedInstId') ? Number(localStorage.getItem('selectedInstId')) : null;
         if (u.role === 'superadmin') {
           getInstitutions().then(list => {
             if (Array.isArray(list) && list.length > 0) {
               setInstitutions(list);
-              setInstitutionName(list[0].name);
-              setCurrentInstitution({ id: list[0].id, name: list[0].name });
+              const preferred = savedInstId ? list.find(i => i.id === savedInstId) : null;
+              const inst = preferred || list[0];
+              setInstitutionName(inst.name);
+              setCurrentInstitution({ id: inst.id, name: inst.name });
             }
           }).catch(() => {});
         } else if (u.role === 'professor') {
@@ -259,8 +296,10 @@ export default function AppLayout() {
                 .map(e => ({ id: e.institution_id, name: e.institution_name }))
                 .filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true; });
               setInstitutions(inst);
-              setInstitutionName(inst[0].name);
-              setCurrentInstitution(inst[0]);
+              const preferred = savedInstId ? inst.find(i => i.id === savedInstId) : null;
+              const selected = preferred || inst[0];
+              setInstitutionName(selected.name);
+              setCurrentInstitution(selected);
             }
           }).catch(() => {});
         }
@@ -270,6 +309,12 @@ export default function AppLayout() {
 
   const refreshSidebarReminders = useCallback(() => {
     setRemindersRefreshKey((k) => k + 1);
+  }, []);
+  const refreshSidebarDeadlines = useCallback(() => {
+    setDeadlinesRefreshKey((k) => k + 1);
+  }, []);
+  const refreshSidebarTips = useCallback(() => {
+    setTipsRefreshKey((k) => k + 1);
   }, []);
 
   // Fecha dropdown ao clicar fora
@@ -335,13 +380,16 @@ export default function AppLayout() {
       graphNodes: nodes,
       graphEdges: edges,
       refreshSidebarReminders,
+      refreshSidebarDeadlines,
+      refreshSidebarTips,
       currentUser,
       setProfileTopbar,
       currentInstitution,
       setCurrentInstitution: handleSetCurrentInstitution,
       institutions,
+      refreshInstitutions,
     }),
-    [sidebarOpen, setSidebarOpenPersist, researchers, loadData, nodes, edges, refreshSidebarReminders, currentUser, currentInstitution, institutions],
+    [sidebarOpen, setSidebarOpenPersist, researchers, loadData, nodes, edges, refreshSidebarReminders, refreshSidebarDeadlines, refreshSidebarTips, currentUser, currentInstitution, institutions, refreshInstitutions],
   );
 
   const { pathname } = useLocation();
@@ -379,9 +427,27 @@ export default function AppLayout() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <h1 className="text-base font-bold text-blue-700 group-hover:text-blue-800 leading-tight">Alumnus</h1>
-                  <p className="text-xs text-gray-500 leading-tight">{institutionName || 'Rede de pesquisa'}</p>
+                  {institutions.length <= 1 && (
+                    <p className="text-xs text-gray-500 leading-tight">{institutionName || 'Rede de pesquisa'}</p>
+                  )}
                 </div>
               </Link>
+              {institutions.length > 1 && (
+                <div className="mt-1 pl-9">
+                  <select
+                    value={currentInstitution?.id || ''}
+                    onChange={e => {
+                      const inst = institutions.find(i => i.id === Number(e.target.value));
+                      if (inst) handleSetCurrentInstitution(inst);
+                    }}
+                    className="w-full text-xs text-gray-700 border rounded-md px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-300 bg-white"
+                  >
+                    {institutions.map(inst => (
+                      <option key={inst.id} value={inst.id}>{inst.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="mt-2 pl-9">
                 <SidebarTrialHint user={currentUser} />
               </div>
@@ -393,8 +459,11 @@ export default function AppLayout() {
                 role={payload?.role}
                 isAdmin={['professor','superadmin'].includes(payload?.role)}
                 remindersRefreshKey={remindersRefreshKey}
+                deadlinesRefreshKey={deadlinesRefreshKey}
+                tipsRefreshKey={tipsRefreshKey}
                 currentUser={currentUser}
                 currentInstitution={currentInstitution}
+                institutions={institutions}
               />
             </div>
             <div className="shrink-0 py-2.5 px-4 border-t border-gray-200/80 bg-white">
@@ -491,58 +560,16 @@ export default function AppLayout() {
                         </svg>
                         Dashboard
                       </button>
-                      {institutions.length > 1 ? (
-                        <div className="relative">
-                          <button
-                            type="button"
-                            onClick={() => setInstitutionSubOpen(o => !o)}
-                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 justify-between"
-                          >
-                            <div className="flex items-center gap-2.5">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                              </svg>
-                              {currentInstitution?.name || 'Instituição'}
-                            </div>
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          </button>
-                          {institutionSubOpen && (
-                            <div className="absolute right-full top-0 w-44 bg-white border rounded-xl shadow-lg z-50 py-1">
-                              {institutions.map(inst => (
-                                <button
-                                  key={inst.id}
-                                  type="button"
-                                  onClick={() => { handleSetCurrentInstitution(inst); setSettingsOpen(false); setInstitutionSubOpen(false); }}
-                                  className={`w-full flex items-center px-4 py-2.5 text-sm ${currentInstitution?.id === inst.id ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:bg-gray-50'}`}
-                                >
-                                  {inst.name}
-                                </button>
-                              ))}
-                              <div className="border-t mx-2 my-1" />
-                              <button
-                                type="button"
-                                onClick={() => { setSettingsOpen(false); setInstitutionSubOpen(false); navigate('/app/institutions'); }}
-                                className="w-full flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-                              >
-                                Gerenciar
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => { setSettingsOpen(false); navigate('/app/institutions'); }}
-                          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                          </svg>
-                          {currentInstitution?.name || 'Instituição'}
-                        </button>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => { setSettingsOpen(false); navigate('/app/institutions'); }}
+                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        Instituição
+                      </button>
                     </>
                   )}
                   {profileSlug && (

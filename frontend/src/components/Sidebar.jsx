@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ResearcherForm from './ResearcherForm';
-import { deleteResearcher, getProfessors, getGroups, updateGroup, getReminders, createReminder, updateReminder, deleteReminder, getDeadlines } from '../api';
+import { deleteResearcher, getProfessors, getGroups, updateGroup, getReminders, createReminder, updateReminder, deleteReminder, getDeadlines, getTips } from '../api';
 import { canDeleteReminder, creatorDisplayName, isReminderFromSomeoneElse } from '../reminderAccess';
 import { invalidMentions, renderWithMentions } from '../mentionUtils.jsx';
 import { isModEnter } from '../platform';
@@ -330,7 +330,7 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, r
   );
 }
 
-function Dropdown({ label, icon, badge, children, rail = false, linkTo, onLabelClick, disabled = false }) {
+function Dropdown({ label, icon, badge, alwaysBadge = false, children, rail = false, linkTo, onLabelClick, disabled = false }) {
   const [open, setOpen] = useState(false);
   const ref = useRef();
 
@@ -358,7 +358,7 @@ function Dropdown({ label, icon, badge, children, rail = false, linkTo, onLabelC
           >
             {icon}
             <span className="flex-1 text-left truncate">{label}</span>
-            {badge != null && badge > 0 && (
+            {badge != null && (alwaysBadge || badge > 0) && (
               <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 leading-none shrink-0">{badge}</span>
             )}
           </Link>
@@ -525,7 +525,7 @@ export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshK
   );
 }
 
-export default function Sidebar({ researchers, onRefresh, role, isAdmin = false, remindersRefreshKey = 0, currentUser = null, currentInstitution = null }) {
+export default function Sidebar({ researchers, onRefresh, role, isAdmin = false, remindersRefreshKey = 0, deadlinesRefreshKey = 0, tipsRefreshKey = 0, currentUser = null, currentInstitution = null, institutions = [] }) {
   const [view, setView] = useState('list');
   const [editResearcher, setEditResearcher] = useState(null);
   const [professors, setProfessors] = useState([]);
@@ -534,19 +534,25 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
   const [renamingGroup, setRenamingGroup] = useState(false);
   const [renameInput, setRenameInput] = useState('');
   const [sidebarDeadlines, setSidebarDeadlines] = useState([]);
-  useEffect(() => { getDeadlines(currentInstitution?.id).then(d => setSidebarDeadlines(d || [])).catch(() => {}); }, [currentInstitution]);
+  useEffect(() => { getDeadlines(currentInstitution?.id).then(d => setSidebarDeadlines(d || [])).catch(() => {}); }, [currentInstitution, deadlinesRefreshKey]);
+  const [sidebarTipCount, setSidebarTipCount] = useState(0);
+  useEffect(() => { getTips(currentInstitution?.id).then(d => setSidebarTipCount(Array.isArray(d) ? d.length : 0)).catch(() => {}); }, [currentInstitution, tipsRefreshKey]);
   useEffect(() => {
     if (isAdmin) {
       getProfessors().then(data => setProfessors(data || [])).catch(() => {});
-      getGroups().then(data => {
-        const groups = Array.isArray(data) ? data : [];
-        if (groups.length > 0) {
-          setCurrentGroup(groups[0]);
-          setGroupLabel(groups[0].name);
-        }
-      }).catch(() => {});
     }
-  }, [isAdmin]);
+    getGroups().then(data => {
+      const groups = Array.isArray(data) ? data : [];
+      const filtered = currentInstitution
+        ? groups.filter(g => g.institution_id === currentInstitution.id)
+        : groups;
+      const first = filtered[0] || groups[0] || null;
+      if (first) {
+        setCurrentGroup(first);
+        setGroupLabel(first.name);
+      }
+    }).catch(() => {});
+  }, [isAdmin, currentInstitution]);
 
   function handleEdit(s) { setEditResearcher(s); setView('researcher-form'); }
 
@@ -575,7 +581,7 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
   if (view === 'researcher-form') {
     return (
       <div className="p-4">
-        <ResearcherForm researcher={editResearcher} professors={professors} onSaved={handleSaved}
+        <ResearcherForm researcher={editResearcher} professors={professors} institutions={institutions} onSaved={handleSaved}
           onCancel={() => { setView('list'); setEditResearcher(null); }} />
       </div>
     );
@@ -623,7 +629,7 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
         icon={GROUP_ICON}
         badge={researchers.length}
         linkTo="/app"
-        onLabelClick={() => { setRenameInput(groupLabel); setRenamingGroup(true); }}
+        onLabelClick={isAdmin ? () => { setRenameInput(groupLabel); setRenamingGroup(true); } : undefined}
         disabled={researchers.length === 0}
       >
         <ul className="space-y-1">
@@ -688,7 +694,10 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
         className="w-full flex items-center gap-2 bg-white border rounded-lg px-3 py-2 text-sm text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors"
       >
         {BOOK_ICON}
-        <span>Manual de Sobrevivência</span>
+        <span className="flex-1">Manual de Sobrevivência</span>
+        {sidebarTipCount > 0 && (
+          <span className="bg-blue-600 text-white text-xs rounded-full px-1.5 py-0.5 leading-none shrink-0">{sidebarTipCount}</span>
+        )}
       </Link>
 
     </div>

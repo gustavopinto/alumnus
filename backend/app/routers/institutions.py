@@ -30,6 +30,11 @@ def create_institution(
         raise HTTPException(status_code=422, detail=INSTITUTIONAL_EMAIL_HELP_PT)
     domain = extract_domain(data.email)
     inst = institution_service.get_or_create_institution(db, domain)
+    from ..models import ResearchGroup
+    existing_group = db.query(ResearchGroup).filter(ResearchGroup.institution_id == inst.id).first()
+    if not existing_group:
+        group = ResearchGroup(name=f"Grupo {inst.name}", institution_id=inst.id)
+        db.add(group)
     db.commit()
     db.refresh(inst)
     return inst
