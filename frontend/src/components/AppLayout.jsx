@@ -379,7 +379,11 @@ export default function AppLayout() {
   const firstName = userName.split(' ')[0];
 
   const myResearcher = researchers.find(r => r.id === payload?.researcher_id);
-  const profileSlug = myResearcher ? slugify(myResearcher.nome) : null;
+  const profileSlug = myResearcher
+    ? slugify(myResearcher.nome)
+    : payload?.professor_id
+      ? slugify(userName)
+      : null;
 
   const updateGraphNodePosition = useCallback((nodeId, position) => {
     setNodes(prev => prev.map(n => n.id === nodeId ? { ...n, position } : n));
@@ -463,9 +467,7 @@ export default function AppLayout() {
                   </select>
                 </div>
               )}
-              <div className="mt-2 pl-9">
-                <SidebarTrialHint user={currentUser} />
-              </div>
+
             </div>
             <div className="flex-1 min-h-0 min-w-0 overflow-y-auto">
               <Sidebar
@@ -512,7 +514,7 @@ export default function AppLayout() {
       <div className="flex-1 min-h-0 min-w-0 flex flex-col">
         {/* Topbar */}
         <header
-          className={`shrink-0 bg-white border-b flex items-center justify-between px-4 gap-3 z-30 ${
+          className={`relative shrink-0 bg-white border-b flex items-center justify-between px-4 gap-3 z-30 ${
             profileTopbar ? 'min-h-[3.25rem] py-1.5' : 'h-12'
           }`}
         >
@@ -540,10 +542,22 @@ export default function AppLayout() {
             ) : null}
           </div>
 
+          {/* Centro: trial hint */}
+          <div className="absolute left-1/2 -translate-x-1/2">
+            <SidebarTrialHint user={currentUser} />
+          </div>
+
           {/* Direita: saudação + configurações */}
           <div className="flex items-center gap-2">
             <span className="hidden sm:block text-sm text-gray-400">
-              {greeting()}, <span className="font-medium text-gray-600">{firstName}</span>
+              {greeting()},{' '}
+              {profileSlug ? (
+                <Link to={`/app/profile/${profileSlug}`} className="font-medium text-gray-600 hover:text-blue-600 transition-colors">
+                  {firstName}
+                </Link>
+              ) : (
+                <span className="font-medium text-gray-600">{firstName}</span>
+              )}
             </span>
             {/* Configurações */}
             <div className="relative" ref={settingsRef}>
