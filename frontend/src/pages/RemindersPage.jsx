@@ -26,7 +26,7 @@ function todayIso() {
 }
 
 export default function RemindersPage() {
-  const { refreshSidebarReminders, currentUser, researchers = [] } = useAppLayout();
+  const { refreshSidebarReminders, currentUser, researchers = [], currentInstitution } = useAppLayout();
   const creatorOpts = { viewerName: currentUser?.nome };
   const [reminders, setReminders] = useState([]);
   const [text, setText] = useState('');
@@ -37,10 +37,10 @@ export default function RemindersPage() {
   const textareaRef = useRef();
 
   const load = useCallback(async () => {
-    const data = await getReminders();
+    const data = await getReminders(currentInstitution?.id);
     setReminders(data || []);
     refreshSidebarReminders?.();
-  }, [refreshSidebarReminders]);
+  }, [refreshSidebarReminders, currentInstitution]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -119,7 +119,7 @@ export default function RemindersPage() {
     }
     setMentionError('');
     setSaving(true);
-    await createReminder({ text, due_date: dueDate || null });
+    await createReminder({ text, due_date: dueDate || null }, currentInstitution?.id);
     setText('');
     setDueDate(todayIso());
     setSaving(false);

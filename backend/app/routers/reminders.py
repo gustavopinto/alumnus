@@ -1,7 +1,7 @@
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -16,11 +16,12 @@ router = APIRouter(prefix="/reminders", tags=["reminders"])
 
 @router.get("/", response_model=list[ReminderOut])
 def list_reminders(
+    institution_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user),
 ):
     viewer_id = current_user.id if current_user else None
-    return reminder_service.list_reminders_out(db, viewer_id)
+    return reminder_service.list_reminders_out(db, viewer_id, institution_id)
 
 
 @router.get("/notifications/unread-count")

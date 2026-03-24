@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -16,8 +18,12 @@ router = APIRouter(prefix="/manual", tags=["manual"])
 
 
 @router.get("/", response_model=list[ManualEntryOut])
-def list_entries(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    entries = manual_service.list_entries_ordered(db)
+def list_entries(
+    institution_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    entries = manual_service.list_entries_ordered(db, institution_id)
     return [ManualEntryOut.from_orm_with_context(e, current_user.id) for e in entries]
 
 

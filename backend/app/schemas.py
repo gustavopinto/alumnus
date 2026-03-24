@@ -309,6 +309,7 @@ class UserProfileUpdate(BaseModel):
 class ReminderCreate(BaseModel):
     text: str
     due_date: Optional[date] = None
+    institution_id: Optional[int] = None
 
 
 class ReminderUpdate(BaseModel):
@@ -325,6 +326,7 @@ class ReminderOut(BaseModel):
     created_at: datetime
     created_by_id: Optional[int] = None
     created_by_name: Optional[str] = None
+    institution_id: Optional[int] = None
 
     model_config = {"from_attributes": True}
 
@@ -335,15 +337,16 @@ class LayoutUpdate(BaseModel):
     positions: dict  # {researcher_id: {x, y}}
 
 
-# --- Manual ---
+# --- Tips ---
 
-class ManualEntryCreate(BaseModel):
+class TipCreate(BaseModel):
     question: str
     answer: str
     position: Optional[int] = 0
+    institution_id: Optional[int] = None
 
 
-class ManualCommentOut(BaseModel):
+class TipCommentOut(BaseModel):
     id: int
     entry_id: int
     text: str
@@ -360,7 +363,7 @@ class ManualCommentOut(BaseModel):
         return obj
 
 
-class ManualEntryOut(BaseModel):
+class TipOut(BaseModel):
     id: int
     question: str
     answer: str
@@ -369,8 +372,9 @@ class ManualEntryOut(BaseModel):
     position: int
     vote_count: int = 0
     user_voted: bool = False
-    comments: list[ManualCommentOut] = []
+    comments: list[TipCommentOut] = []
     created_at: datetime
+    institution_id: Optional[int] = None
 
     model_config = {"from_attributes": True}
 
@@ -380,11 +384,11 @@ class ManualEntryOut(BaseModel):
         obj.author_name = entry.author.nome if entry.author else None
         obj.vote_count = len(entry.votes)
         obj.user_voted = any(v.user_id == current_user_id for v in entry.votes)
-        obj.comments = [ManualCommentOut.from_orm_with_author(c) for c in entry.comments]
+        obj.comments = [TipCommentOut.from_orm_with_author(c) for c in entry.comments]
         return obj
 
 
-class ManualCommentCreate(BaseModel):
+class TipCommentCreate(BaseModel):
     text: str
 
 

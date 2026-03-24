@@ -11,6 +11,7 @@ import {
   toggleManualVote, addManualComment, deleteManualComment,
 } from '../api';
 import { getTokenPayload, isDashboardRole } from '../auth';
+import { useAppLayout } from '../components/AppLayout';
 
 function renderFormatted(text) {
   const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_)/g);
@@ -252,6 +253,7 @@ function EntryCard({ entry, authUserId, canModerate, onVote, onDelete, onComment
 }
 
 export default function ManualPage() {
+  const { currentInstitution } = useAppLayout();
   const [entries, setEntries] = useState([]);
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
@@ -260,22 +262,22 @@ export default function ManualPage() {
   const canModerateManual = isDashboardRole(payload?.role);
   const authUserId = payload?.sub != null ? Number(payload.sub) : null;
 
-  async function load() {
-    const data = await getManualEntries();
+  async function load(instId) {
+    const data = await getManualEntries(instId);
     setEntries(data || []);
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(currentInstitution?.id); }, [currentInstitution]);
 
   async function handleSubmit(e) {
     e.preventDefault();
     if (!question.trim() || !answer.trim()) return;
     setSaving(true);
-    await createManualEntry({ question: question.trim(), answer: answer.trim() });
+    await createManualEntry({ question: question.trim(), answer: answer.trim() }, currentInstitution?.id);
     setQuestion('');
     setAnswer('');
     setSaving(false);
-    load();
+    load(currentInstitution?.id);
   }
 
   async function handleDelete(id) {

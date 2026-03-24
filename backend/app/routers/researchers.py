@@ -2,7 +2,7 @@ import logging
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -17,8 +17,12 @@ router = APIRouter(prefix="/researchers", tags=["researchers"])
 
 
 @router.get("/", response_model=list[ResearcherOut])
-def list_researchers(ativo: bool | None = None, db: Session = Depends(get_db)):
-    return researcher_service.list_all(db, ativo)
+def list_researchers(
+    ativo: bool | None = None,
+    institution_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+):
+    return researcher_service.list_all(db, ativo, institution_id)
 
 
 @router.post("/", response_model=ResearcherOut, status_code=201)

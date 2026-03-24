@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { getMyEmails, addMyEmail, removeMyEmail, getGroups, createGroup, updateGroup, getInstitutions } from '../api';
+import { useSearchParams } from 'react-router-dom';
+import { getMyEmails, addMyEmail, removeMyEmail, getGroups, createGroup, updateGroup, getInstitutions, createInstitution } from '../api';
 import { getTokenPayload } from '../auth';
 
 export default function InstitutionPage() {
@@ -7,15 +8,22 @@ export default function InstitutionPage() {
   const isSuperadmin = payload?.role === 'superadmin';
   const isProfessor = payload?.role === 'professor' || isSuperadmin;
 
+  const [searchParams] = useSearchParams();
+  const instParam = searchParams.get('inst') ? Number(searchParams.get('inst')) : null;
+
   const [emails, setEmails] = useState([]);
   const [groups, setGroups] = useState([]);
   const [institutions, setInstitutions] = useState([]); // superadmin: all institutions
 
-  const [selectedInstId, setSelectedInstId] = useState(null);
+  const [selectedInstId, setSelectedInstId] = useState(instParam);
 
   const [newEmail, setNewEmail] = useState('');
   const [emailError, setEmailError] = useState('');
   const [addingEmail, setAddingEmail] = useState(false);
+
+  const [newInstEmail, setNewInstEmail] = useState('');
+  const [newInstError, setNewInstError] = useState('');
+  const [addingInst, setAddingInst] = useState(false);
 
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
@@ -48,6 +56,10 @@ export default function InstitutionPage() {
   }, [isSuperadmin, isProfessor]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (instParam) setSelectedInstId(instParam);
+  }, [instParam]);
 
   // Professor: institutions derived from their emails
   const myInstitutions = emails.map(e => ({
@@ -90,6 +102,27 @@ export default function InstitutionPage() {
       await load();
     } catch {
       alert('Mantenha ao menos um email institucional.');
+    }
+  }
+
+  async function handleCreateInstitution(e) {
+    e.preventDefault();
+    if (!newInstEmail.trim()) return;
+    setAddingInst(true);
+    setNewInstError('');
+    try {
+      const inst = await createInstitution(newInstEmail.trim());
+      if (inst?.id) {
+        setNewInstEmail('');
+        setSelectedInstId(inst.id);
+        await load();
+      } else {
+        setNewInstError(inst?.detail || 'Erro ao criar instituição');
+      }
+    } catch {
+      setNewInstError('Erro ao criar instituição');
+    } finally {
+      setAddingInst(false);
     }
   }
 
@@ -217,9 +250,7 @@ export default function InstitutionPage() {
       {isSuperadmin && (
         <section className="space-y-3">
           <h2 className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Instituições cadastradas</h2>
-          {institutions.length === 0 ? (
-            <p className="text-sm text-gray-400">Nenhuma instituição cadastrada.</p>
-          ) : (
+          {institutions.length > 0 && (
             <ul className="space-y-2">
               {institutions.map((inst) => (
                 <li
@@ -235,6 +266,25 @@ export default function InstitutionPage() {
               ))}
             </ul>
           )}
+
+          <form onSubmit={handleCreateInstitution} className="flex gap-2">
+            <input
+              type="email"
+              placeholder="Email institucional (ex: nome@unicamp.br)"
+              className="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+              value={newInstEmail}
+              onChange={e => setNewInstEmail(e.target.value)}
+            />
+            <button
+              type="submit"
+              disabled={addingInst}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50 shrink-0"
+            >
+              Adicionar
+            </button>
+          </form>
+          {newInstError && <p className="text-xs text-red-500">{newInstError}</p>}
+          <p className="text-xs text-gray-400">O nome da instituição é extraído automaticamente do domínio do email.</p>
         </section>
       )}
 

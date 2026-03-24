@@ -2,7 +2,7 @@ import logging
 
 from sqlalchemy.orm import Session
 
-from ..models import Professor, ProfessorGroup, Researcher, User
+from ..models import Professor, ProfessorGroup, ResearchGroup, Researcher, User
 from ..schemas import ResearcherCreate, ResearcherUpdate
 from ..slug import slugify
 
@@ -20,10 +20,15 @@ def _resolve_group_id(db: Session, orientador_id: int | None) -> int | None:
     return pg.group_id if pg else None
 
 
-def list_all(db: Session, ativo: bool | None) -> list[Researcher]:
+def list_all(db: Session, ativo: bool | None, institution_id: int | None = None) -> list[Researcher]:
     q = db.query(Researcher)
     if ativo is not None:
         q = q.filter(Researcher.ativo == ativo)
+    if institution_id is not None:
+        group_ids = db.query(ResearchGroup.id).filter(
+            ResearchGroup.institution_id == institution_id
+        ).subquery()
+        q = q.filter(Researcher.group_id.in_(group_ids))
     return q.order_by(Researcher.nome).all()
 
 

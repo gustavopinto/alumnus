@@ -30,7 +30,8 @@ export const updateMyProfile   = (data) => request('/users/me', { method: 'PATCH
 export const updateUserProfile = (userId, data) => request(`/users/${userId}`, { method: 'PATCH', body: JSON.stringify(data) });
 
 // Researchers
-export const getResearchers = () => request('/researchers/');
+export const getResearchers = (institutionId) =>
+  request(`/researchers/${institutionId ? `?institution_id=${institutionId}` : ''}`);
 export const createResearcher = (data) => request('/researchers/', { method: 'POST', body: JSON.stringify(data) });
 export const updateResearcher = (id, data) => request(`/researchers/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export const deleteResearcher = (id) => request(`/researchers/${id}`, { method: 'DELETE' });
@@ -42,7 +43,8 @@ export const updateRelationship = (id, data) => request(`/relationships/${id}`, 
 export const deleteRelationship = (id) => request(`/relationships/${id}`, { method: 'DELETE' });
 
 // Graph
-export const getGraph = () => request('/graph/');
+export const getGraph = (institutionId) =>
+  request(`/graph/${institutionId ? `?institution_id=${institutionId}` : ''}`);
 export const updateLayout = (positions) => request('/graph/layout', { method: 'PUT', body: JSON.stringify({ positions }) });
 
 // Notes
@@ -72,9 +74,11 @@ export const updateWork = (workId, data) => request(`/works/${workId}`, { method
 export const deleteWork = (workId) => request(`/works/${workId}`, { method: 'DELETE' });
 
 // Reminders
-export const getReminders = () => request('/reminders/');
+export const getReminders = (institutionId) =>
+  request(`/reminders/${institutionId ? `?institution_id=${institutionId}` : ''}`);
 export const getReminderUnreadCount = () => request('/reminders/notifications/unread-count');
-export const createReminder = (data) => request('/reminders/', { method: 'POST', body: JSON.stringify(data) });
+export const createReminder = (data, institutionId) =>
+  request('/reminders/', { method: 'POST', body: JSON.stringify({ ...data, institution_id: institutionId || null }) });
 export const updateReminder = (id, data) => request(`/reminders/${id}`, { method: 'PUT', body: JSON.stringify(data) });
 export async function deleteReminder(id) {
   const token = getToken();
@@ -114,8 +118,10 @@ export async function markReminderNotificationRead(id) {
 }
 
 // Manual
-export const getManualEntries = () => request('/manual/');
-export const createManualEntry = (data) => request('/manual/', { method: 'POST', body: JSON.stringify(data) });
+export const getManualEntries = (institutionId) =>
+  request(`/manual/${institutionId ? `?institution_id=${institutionId}` : ''}`);
+export const createManualEntry = (data, institutionId) =>
+  request('/manual/', { method: 'POST', body: JSON.stringify({ ...data, institution_id: institutionId || null }) });
 export const deleteManualEntry = (id) => request(`/manual/${id}`, { method: 'DELETE' });
 export const toggleManualVote = (entryId) => request(`/manual/${entryId}/vote`, { method: 'POST' });
 export const addManualComment = (entryId, text) => request(`/manual/${entryId}/comments`, { method: 'POST', body: JSON.stringify({ text }) });
@@ -142,6 +148,7 @@ export async function uploadPhoto(file) {
 
 // Institutions
 export const getInstitutions = () => request('/institutions/');
+export const createInstitution = (email) => request('/institutions/', { method: 'POST', body: JSON.stringify({ email }) });
 export const getMyEmails = () => request('/institutions/my-emails');
 export const addMyEmail = (email) => request('/institutions/my-emails', { method: 'POST', body: JSON.stringify({ email }) });
 export const removeMyEmail = (piId) => request(`/institutions/my-emails/${piId}`, { method: 'DELETE' });

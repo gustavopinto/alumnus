@@ -16,7 +16,7 @@ function today() {
   return new Date().toISOString().split('T')[0];
 }
 
-function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, researchers = [] }) {
+function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, researchers = [], institutionId = null }) {
   const [open, setOpen] = useState(false);
   const [showOld, setShowOld] = useState(false);
   const [reminders, setReminders] = useState([]);
@@ -32,9 +32,9 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, r
   const navigate = useNavigate();
 
   const load = useCallback(async () => {
-    const data = await getReminders();
+    const data = await getReminders(institutionId);
     setReminders(data || []);
-  }, []);
+  }, [institutionId]);
 
   useEffect(() => { load(); }, [refreshKey, load]);
 
@@ -94,7 +94,7 @@ function RemindersDropdown({ rail = false, refreshKey = 0, currentUser = null, r
     setSaving(true);
     setError('');
     try {
-      const result = await createReminder({ text: text.trim(), due_date: date });
+      const result = await createReminder({ text: text.trim(), due_date: date }, institutionId);
       if (result && result.id) {
         setText('');
         setDate('');
@@ -354,7 +354,7 @@ function Dropdown({ label, icon, badge, children, rail = false, linkTo, onLabelC
           <Link
             to={linkTo}
             className="flex items-center gap-2 flex-1 px-3 py-2 hover:bg-blue-50 hover:text-blue-700 transition-colors min-w-0"
-            onDoubleClick={(e) => { if (onLabelClick) { e.preventDefault(); setOpen(true); onLabelClick(); } }}
+            onDoubleClick={(e) => { if (onLabelClick) { e.preventDefault(); onLabelClick(); } }}
           >
             {icon}
             <span className="flex-1 text-left truncate">{label}</span>
@@ -441,7 +441,7 @@ const INSTITUTION_ICON = (
 );
 
 /** Barra estreita com ícones quando o menu principal está recolhido */
-export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshKey = 0, currentUser = null, role = null, isAdmin = false }) {
+export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshKey = 0, currentUser = null, role = null, isAdmin = false, currentInstitution = null }) {
   const upcomingDeadlines = DEADLINES.filter(d => daysUntil(d.date) >= 0);
 
   return (
@@ -470,18 +470,6 @@ export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshK
           </Link>
         )}
 
-        {isAdmin && (
-          <Link
-            to="/app/institutions"
-            title="Instituição"
-            className="w-11 h-11 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors shrink-0"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-          </Link>
-        )}
-
         <Link
           to="/app"
           title="Grupo — ir para o grafo"
@@ -495,7 +483,7 @@ export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshK
           )}
         </Link>
 
-        <RemindersDropdown rail refreshKey={remindersRefreshKey} currentUser={currentUser} />
+        <RemindersDropdown rail refreshKey={remindersRefreshKey} currentUser={currentUser} institutionId={currentInstitution?.id ?? null} />
 
         <Link
           to="/app/deadlines"
@@ -535,7 +523,7 @@ export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshK
   );
 }
 
-export default function Sidebar({ researchers, onRefresh, role, isAdmin = false, remindersRefreshKey = 0, currentUser = null }) {
+export default function Sidebar({ researchers, onRefresh, role, isAdmin = false, remindersRefreshKey = 0, currentUser = null, currentInstitution = null }) {
   const [view, setView] = useState('list');
   const [editResearcher, setEditResearcher] = useState(null);
   const [professors, setProfessors] = useState([]);
@@ -543,7 +531,6 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
   const [groupLabel, setGroupLabel] = useState('Grupo');
   const [renamingGroup, setRenamingGroup] = useState(false);
   const [renameInput, setRenameInput] = useState('');
-
   useEffect(() => {
     if (isAdmin) {
       getProfessors().then(data => setProfessors(data || [])).catch(() => {});
@@ -608,18 +595,25 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
         </Link>
       )}
 
-      {/* Instituição */}
-      {isAdmin && (
-        <Link
-          to="/app/institutions"
-          className="w-full flex items-center gap-2 bg-white border rounded-lg px-3 py-2 text-sm text-gray-700 shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 transition-colors"
-        >
-          {INSTITUTION_ICON}
-          <span>Instituição</span>
-        </Link>
-      )}
 
       {/* Grupo */}
+      {renamingGroup ? (
+        <div className="w-full flex items-center gap-1 bg-white border rounded-lg px-2 py-1.5 shadow-sm">
+          {GROUP_ICON}
+          <input
+            autoFocus
+            className="flex-1 border rounded px-2 py-1 text-sm min-w-0"
+            value={renameInput}
+            onChange={e => setRenameInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') handleRenameGroup();
+              if (e.key === 'Escape') setRenamingGroup(false);
+            }}
+          />
+          <button onClick={handleRenameGroup} className="text-xs bg-blue-600 text-white rounded px-2 py-1 hover:bg-blue-700 shrink-0">OK</button>
+          <button onClick={() => setRenamingGroup(false)} className="text-xs text-gray-400 hover:text-gray-600 px-1 shrink-0">✕</button>
+        </div>
+      ) : (
       <Dropdown
         label={groupLabel}
         icon={GROUP_ICON}
@@ -628,35 +622,6 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
         onLabelClick={() => { setRenameInput(groupLabel); setRenamingGroup(true); }}
         disabled={researchers.length === 0}
       >
-        {renamingGroup && (
-          <div className="mb-2 pb-2 border-b">
-            <p className="text-xs text-gray-500 mb-1">Renomear grupo</p>
-            <div className="flex gap-1">
-              <input
-                autoFocus
-                className="flex-1 border rounded px-2 py-1 text-sm"
-                value={renameInput}
-                onChange={e => setRenameInput(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') handleRenameGroup();
-                  if (e.key === 'Escape') setRenamingGroup(false);
-                }}
-              />
-              <button
-                onClick={handleRenameGroup}
-                className="text-xs bg-blue-600 text-white rounded px-2 hover:bg-blue-700"
-              >
-                OK
-              </button>
-              <button
-                onClick={() => setRenamingGroup(false)}
-                className="text-xs text-gray-400 hover:text-gray-600 px-1"
-              >
-                ✕
-              </button>
-            </div>
-          </div>
-        )}
         <ul className="space-y-1">
           {researchers.map((s) => (
             <li key={s.id} className="flex items-center justify-between rounded px-1 py-1 text-sm hover:bg-gray-50">
@@ -679,9 +644,10 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
           ))}
         </ul>
       </Dropdown>
+      )}
 
       {/* Lembretes */}
-      <RemindersDropdown refreshKey={remindersRefreshKey} currentUser={currentUser} researchers={researchers} />
+      <RemindersDropdown refreshKey={remindersRefreshKey} currentUser={currentUser} researchers={researchers} institutionId={currentInstitution?.id ?? null} />
 
       {/* Deadlines */}
       <Dropdown label="Deadlines" icon={CALENDAR_ICON} badge={upcomingDeadlines.length} linkTo="/app/deadlines">

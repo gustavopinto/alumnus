@@ -17,9 +17,23 @@ STATUS_COLORS = {
 }
 
 
-def build_graph_payload(db: Session) -> dict:
-    professors    = db.query(Professor).filter(Professor.ativo == True).all()
-    researchers   = db.query(Researcher).filter(Researcher.ativo == True).all()
+def build_graph_payload(db: Session, institution_id: int | None = None) -> dict:
+    professors_q  = db.query(Professor).filter(Professor.ativo == True)
+    researchers_q = db.query(Researcher).filter(Researcher.ativo == True)
+
+    if institution_id is not None:
+        from ..models import ResearchGroup, ProfessorGroup
+        prof_ids = db.query(ProfessorGroup.professor_id).filter(
+            ProfessorGroup.institution_id == institution_id
+        ).subquery()
+        professors_q = professors_q.filter(Professor.id.in_(prof_ids))
+        group_ids = db.query(ResearchGroup.id).filter(
+            ResearchGroup.institution_id == institution_id
+        ).subquery()
+        researchers_q = researchers_q.filter(Researcher.group_id.in_(group_ids))
+
+    professors    = professors_q.all()
+    researchers   = researchers_q.all()
     relationships = db.query(Relationship).all()
 
     layout    = db.query(GraphLayout).filter(GraphLayout.name == "default").first()

@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends
+from typing import Optional
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
@@ -9,8 +11,11 @@ router = APIRouter(prefix="/graph", tags=["graph"])
 
 
 @router.get("/")
-def get_graph(db: Session = Depends(get_db)):
-    return graph_service.build_graph_payload(db)
+def get_graph(
+    institution_id: Optional[int] = Query(None),
+    db: Session = Depends(get_db),
+):
+    return graph_service.build_graph_payload(db, institution_id)
 
 
 @router.put("/layout")

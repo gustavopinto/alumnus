@@ -4,16 +4,18 @@ from ..models import ManualComment, ManualEntry, ManualVote
 from ..schemas import ManualEntryCreate
 
 
-def list_entries_ordered(db: Session) -> list[ManualEntry]:
-    entries = (
+def list_entries_ordered(db: Session, institution_id: int | None = None) -> list[ManualEntry]:
+    q = (
         db.query(ManualEntry)
         .options(
             joinedload(ManualEntry.author),
             joinedload(ManualEntry.votes),
             joinedload(ManualEntry.comments).joinedload(ManualComment.author),
         )
-        .all()
     )
+    if institution_id is not None:
+        q = q.filter(ManualEntry.institution_id == institution_id)
+    entries = q.all()
     return sorted(entries, key=lambda e: (-len(e.votes), e.created_at))
 
 
@@ -27,6 +29,7 @@ def create_entry(db: Session, data: ManualEntryCreate, author_id: int) -> Manual
         answer=data.answer,
         position=data.position or 0,
         author_id=author_id,
+        institution_id=data.institution_id,
     )
     db.add(entry)
     db.commit()

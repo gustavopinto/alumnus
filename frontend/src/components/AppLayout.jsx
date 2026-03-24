@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Outlet, useOutletContext, useNavigate, Link, useLocation } from 'react-router-dom';
 import Sidebar, { SidebarRail } from './Sidebar';
-import { getGraph, getResearchers } from '../api';
+import { getGraph, getResearchers, getInstitutions, getMyEmails } from '../api';
 import { removeToken, getTokenPayload, getMe } from '../auth';
 
 function slugify(nome) {
@@ -178,27 +178,68 @@ export default function AppLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('sidebarOpen') !== 'false');
   const [remindersRefreshKey, setRemindersRefreshKey] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [institutionSubOpen, setInstitutionSubOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [institutionName, setInstitutionName] = useState(null);
+  const [institutions, setInstitutions] = useState([]);
+  const [currentInstitution, setCurrentInstitution] = useState(null);
   const [profileTopbar, setProfileTopbar] = useState(null);
   const settingsRef = useRef(null);
+  const currentInstIdRef = useRef(null);
   const navigate = useNavigate();
 
+  useEffect(() => { currentInstIdRef.current = currentInstitution?.id ?? null; }, [currentInstitution]);
+
   const loadData = useCallback(async () => {
-    const [graphData, researchersData] = await Promise.all([getGraph(), getResearchers()]);
+    const instId = currentInstIdRef.current;
+    const [graphData, researchersData] = await Promise.all([getGraph(instId), getResearchers(instId)]);
     setResearchers(researchersData || []);
     setNodes(
-      (graphData.nodes || []).map((n) => ({
+      (graphData?.nodes || []).map((n) => ({
         ...n,
         data: { ...n.data, name: shortName(n.data.name), researcherId: n.id },
       })),
     );
-    setEdges(graphData.edges || []);
+    setEdges(graphData?.edges || []);
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  // Reload data when institution changes
+  useEffect(() => {
+    if (currentInstitution !== undefined) loadData();
+  }, [currentInstitution]); // eslint-disable-line
+
+  function handleSetCurrentInstitution(inst) {
+    setCurrentInstitution(inst);
+    setInstitutionName(inst.name);
+  }
 
   useEffect(() => {
-    getMe().then((u) => { if (u) setCurrentUser(u); }).catch(() => {});
+    getMe().then((u) => {
+      if (u) {
+        setCurrentUser(u);
+        if (u.role === 'superadmin') {
+          getInstitutions().then(list => {
+            if (Array.isArray(list) && list.length > 0) {
+              setInstitutions(list);
+              setInstitutionName(list[0].name);
+              setCurrentInstitution({ id: list[0].id, name: list[0].name });
+            }
+          }).catch(() => {});
+        } else if (u.role === 'professor') {
+          getMyEmails().then(list => {
+            if (Array.isArray(list) && list.length > 0) {
+              const seen = new Set();
+              const inst = list
+                .map(e => ({ id: e.institution_id, name: e.institution_name }))
+                .filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true; });
+              setInstitutions(inst);
+              setInstitutionName(inst[0].name);
+              setCurrentInstitution(inst[0]);
+            }
+          }).catch(() => {});
+        }
+      }
+    }).catch(() => {});
   }, []);
 
   const refreshSidebarReminders = useCallback(() => {
@@ -257,8 +298,11 @@ export default function AppLayout() {
       refreshSidebarReminders,
       currentUser,
       setProfileTopbar,
+      currentInstitution,
+      setCurrentInstitution: handleSetCurrentInstitution,
+      institutions,
     }),
-    [sidebarOpen, setSidebarOpenPersist, researchers, loadData, nodes, edges, refreshSidebarReminders, currentUser],
+    [sidebarOpen, setSidebarOpenPersist, researchers, loadData, nodes, edges, refreshSidebarReminders, currentUser, currentInstitution, institutions],
   );
 
   const { pathname } = useLocation();
@@ -296,7 +340,7 @@ export default function AppLayout() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <h1 className="text-base font-bold text-blue-700 group-hover:text-blue-800 leading-tight">Alumnus</h1>
-                  <p className="text-xs text-gray-500 leading-tight">Rede de pesquisa</p>
+                  <p className="text-xs text-gray-500 leading-tight">{institutionName || 'Rede de pesquisa'}</p>
                 </div>
               </Link>
               <div className="mt-2 pl-9">
@@ -311,6 +355,7 @@ export default function AppLayout() {
                 isAdmin={['professor','superadmin'].includes(payload?.role)}
                 remindersRefreshKey={remindersRefreshKey}
                 currentUser={currentUser}
+                currentInstitution={currentInstitution}
               />
             </div>
             <div className="shrink-0 py-2.5 px-4 border-t border-gray-200/80 bg-white">
@@ -335,6 +380,7 @@ export default function AppLayout() {
             currentUser={currentUser}
             role={payload?.role}
             isAdmin={['professor','superadmin'].includes(payload?.role)}
+            currentInstitution={currentInstitution}
           />
         )}
       </aside>
@@ -406,6 +452,58 @@ export default function AppLayout() {
                         </svg>
                         Dashboard
                       </button>
+                      {institutions.length > 1 ? (
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setInstitutionSubOpen(o => !o)}
+                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 justify-between"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                              </svg>
+                              {currentInstitution?.name || 'Instituição'}
+                            </div>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </button>
+                          {institutionSubOpen && (
+                            <div className="absolute right-full top-0 w-44 bg-white border rounded-xl shadow-lg z-50 py-1">
+                              {institutions.map(inst => (
+                                <button
+                                  key={inst.id}
+                                  type="button"
+                                  onClick={() => { handleSetCurrentInstitution(inst); setSettingsOpen(false); setInstitutionSubOpen(false); }}
+                                  className={`w-full flex items-center px-4 py-2.5 text-sm ${currentInstitution?.id === inst.id ? 'text-blue-700 bg-blue-50' : 'text-gray-700 hover:bg-gray-50'}`}
+                                >
+                                  {inst.name}
+                                </button>
+                              ))}
+                              <div className="border-t mx-2 my-1" />
+                              <button
+                                type="button"
+                                onClick={() => { setSettingsOpen(false); setInstitutionSubOpen(false); navigate('/app/institutions'); }}
+                                className="w-full flex items-center px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                              >
+                                Gerenciar
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => { setSettingsOpen(false); navigate('/app/institutions'); }}
+                          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                          </svg>
+                          {currentInstitution?.name || 'Instituição'}
+                        </button>
+                      )}
                       <div className="border-t mx-2 my-1" />
                     </>
                   )}

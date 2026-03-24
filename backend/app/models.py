@@ -219,39 +219,43 @@ class GraphLayout(Base):
 class Reminder(Base):
     __tablename__ = "reminders"
 
-    id            = Column(Integer, primary_key=True, index=True)
-    text          = Column(Text, nullable=False)
-    due_date      = Column(Date, nullable=True)
-    done          = Column(Boolean, default=False, nullable=False)
-    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at    = Column(DateTime, default=datetime.utcnow)
+    id             = Column(Integer, primary_key=True, index=True)
+    text           = Column(Text, nullable=False)
+    due_date       = Column(Date, nullable=True)
+    done           = Column(Boolean, default=False, nullable=False)
+    created_by_id  = Column(Integer, ForeignKey("users.id"), nullable=True)
+    institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=True)
+    created_at     = Column(DateTime, default=datetime.utcnow)
 
-    created_by = relationship("User", foreign_keys=[created_by_id])
-
-
-
-class ManualEntry(Base):
-    __tablename__ = "manual_entries"
-
-    id         = Column(Integer, primary_key=True, index=True)
-    question   = Column(Text, nullable=False)
-    answer     = Column(Text, nullable=False)
-    author_id  = Column(Integer, ForeignKey("users.id"), nullable=True)
-    position   = Column(Integer, default=0, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-
-    author   = relationship("User", foreign_keys=[author_id])
-    votes    = relationship("ManualVote", back_populates="entry", cascade="all, delete-orphan")
-    comments = relationship("ManualComment", back_populates="entry", cascade="all, delete-orphan", order_by="ManualComment.created_at")
+    created_by  = relationship("User", foreign_keys=[created_by_id])
+    institution = relationship("Institution", foreign_keys=[institution_id])
 
 
-class ManualVote(Base):
-    __tablename__ = "manual_votes"
 
-    entry_id = Column(Integer, ForeignKey("manual_entries.id", ondelete="CASCADE"), primary_key=True)
+class Tip(Base):
+    __tablename__ = "tips"
+
+    id             = Column(Integer, primary_key=True, index=True)
+    question       = Column(Text, nullable=False)
+    answer         = Column(Text, nullable=False)
+    author_id      = Column(Integer, ForeignKey("users.id"), nullable=True)
+    institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=True)
+    position       = Column(Integer, default=0, nullable=False)
+    created_at     = Column(DateTime, default=datetime.utcnow)
+
+    author      = relationship("User", foreign_keys=[author_id])
+    institution = relationship("Institution", foreign_keys=[institution_id])
+    votes    = relationship("TipVote", back_populates="entry", cascade="all, delete-orphan")
+    comments = relationship("TipComment", back_populates="entry", cascade="all, delete-orphan", order_by="TipComment.created_at")
+
+
+class TipVote(Base):
+    __tablename__ = "tip_votes"
+
+    entry_id = Column(Integer, ForeignKey("tips.id", ondelete="CASCADE"), primary_key=True)
     user_id  = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
 
-    entry = relationship("ManualEntry", back_populates="votes")
+    entry = relationship("Tip", back_populates="votes")
     user  = relationship("User", foreign_keys=[user_id])
 
 
@@ -268,14 +272,14 @@ class DeadlineInterest(Base):
     __table_args__ = (UniqueConstraint("deadline_key", "user_id"),)
 
 
-class ManualComment(Base):
-    __tablename__ = "manual_comments"
+class TipComment(Base):
+    __tablename__ = "tip_comments"
 
     id         = Column(Integer, primary_key=True, index=True)
-    entry_id   = Column(Integer, ForeignKey("manual_entries.id", ondelete="CASCADE"), nullable=False)
+    entry_id   = Column(Integer, ForeignKey("tips.id", ondelete="CASCADE"), nullable=False)
     text       = Column(Text, nullable=False)
     author_id  = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    entry  = relationship("ManualEntry", back_populates="comments")
+    entry  = relationship("Tip", back_populates="comments")
     author = relationship("User", foreign_keys=[author_id])

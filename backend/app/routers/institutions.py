@@ -19,6 +19,22 @@ def list_institutions(
     return institution_service.list_all(db)
 
 
+@router.post("/", response_model=InstitutionOut, status_code=201)
+def create_institution(
+    data: AddInstitutionalEmail,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_superadmin),
+):
+    from ..institutional_email import extract_domain, is_public_email_domain
+    if is_public_email_domain(data.email):
+        raise HTTPException(status_code=422, detail=INSTITUTIONAL_EMAIL_HELP_PT)
+    domain = extract_domain(data.email)
+    inst = institution_service.get_or_create_institution(db, domain)
+    db.commit()
+    db.refresh(inst)
+    return inst
+
+
 # ── Emails institucionais do professor ────────────────────────────────────────
 
 @router.get("/my-emails", response_model=list[ProfessorInstitutionOut])

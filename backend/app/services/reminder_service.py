@@ -44,24 +44,23 @@ def reminder_to_out(
         created_at=r.created_at,
         created_by_id=r.created_by_id,
         created_by_name=created_by_name,
+        institution_id=r.institution_id,
     )
 
 
-def list_ordered(db: Session) -> list[Reminder]:
-    return (
-        db.query(Reminder)
-        .options(joinedload(Reminder.created_by))
-        .order_by(
-            Reminder.done,
-            Reminder.due_date.asc().nullslast(),
-            Reminder.created_at.desc(),
-        )
-        .all()
-    )
+def list_ordered(db: Session, institution_id: int | None = None) -> list[Reminder]:
+    q = db.query(Reminder).options(joinedload(Reminder.created_by))
+    if institution_id is not None:
+        q = q.filter(Reminder.institution_id == institution_id)
+    return q.order_by(
+        Reminder.done,
+        Reminder.due_date.asc().nullslast(),
+        Reminder.created_at.desc(),
+    ).all()
 
 
-def list_reminders_out(db: Session, viewer_id: int | None) -> list[ReminderOut]:
-    reminders = list_ordered(db)
+def list_reminders_out(db: Session, viewer_id: int | None, institution_id: int | None = None) -> list[ReminderOut]:
+    reminders = list_ordered(db, institution_id)
     creator_ids = {r.created_by_id for r in reminders if r.created_by_id is not None}
     creator_name_map: dict[int, str] = {}
     if creator_ids:
@@ -79,6 +78,7 @@ def create(
         text=data.text,
         due_date=data.due_date or None,
         created_by_id=created_by_id,
+        institution_id=data.institution_id,
     )
     db.add(reminder)
     db.commit()
@@ -97,6 +97,7 @@ def create(
                         text=data.text,
                         due_date=data.due_date or None,
                         created_by_id=created_by_id,
+                        institution_id=data.institution_id,
                     ))
                     copies += 1
             if copies:
