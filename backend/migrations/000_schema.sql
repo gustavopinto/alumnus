@@ -1,14 +1,14 @@
 -- Schema único consolidado — representa o estado final do banco.
--- Execute este arquivo em um banco limpo.
+-- Execute este arquivo em um banco limpo ou existente (idempotente).
 
-CREATE TABLE institutions (
+CREATE TABLE IF NOT EXISTS institutions (
     id         SERIAL PRIMARY KEY,
     name       VARCHAR(255) NOT NULL,
     domain     VARCHAR(255) UNIQUE NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE professors (
+CREATE TABLE IF NOT EXISTS professors (
     id         SERIAL PRIMARY KEY,
     nome       VARCHAR(255) NOT NULL,
     ativo      BOOLEAN NOT NULL DEFAULT TRUE,
@@ -16,7 +16,7 @@ CREATE TABLE professors (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE professor_institutions (
+CREATE TABLE IF NOT EXISTS professor_institutions (
     id                  SERIAL PRIMARY KEY,
     professor_id        INTEGER NOT NULL REFERENCES professors(id) ON DELETE CASCADE,
     institution_id      INTEGER NOT NULL REFERENCES institutions(id),
@@ -25,14 +25,14 @@ CREATE TABLE professor_institutions (
     UNIQUE (professor_id, institution_id)
 );
 
-CREATE TABLE research_groups (
+CREATE TABLE IF NOT EXISTS research_groups (
     id             SERIAL PRIMARY KEY,
     name           VARCHAR(255) NOT NULL,
     institution_id INTEGER REFERENCES institutions(id),
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE professor_groups (
+CREATE TABLE IF NOT EXISTS professor_groups (
     professor_id   INTEGER NOT NULL REFERENCES professors(id) ON DELETE CASCADE,
     group_id       INTEGER NOT NULL REFERENCES research_groups(id) ON DELETE CASCADE,
     role_in_group  VARCHAR(20) NOT NULL DEFAULT 'coordinator',
@@ -41,7 +41,7 @@ CREATE TABLE professor_groups (
     PRIMARY KEY (professor_id, group_id)
 );
 
-CREATE TABLE researchers (
+CREATE TABLE IF NOT EXISTS researchers (
     id              SERIAL PRIMARY KEY,
     nome            VARCHAR(255) NOT NULL,
     status          VARCHAR(50)  NOT NULL,
@@ -58,7 +58,7 @@ CREATE TABLE researchers (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE relationships (
+CREATE TABLE IF NOT EXISTS relationships (
     id                   SERIAL PRIMARY KEY,
     source_researcher_id INTEGER NOT NULL REFERENCES researchers(id) ON DELETE CASCADE,
     target_researcher_id INTEGER NOT NULL REFERENCES researchers(id) ON DELETE CASCADE,
@@ -66,7 +66,7 @@ CREATE TABLE relationships (
     created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id                   SERIAL PRIMARY KEY,
     email                VARCHAR(255) UNIQUE NOT NULL,
     nome                 VARCHAR(255) NOT NULL,
@@ -94,7 +94,7 @@ CREATE TABLE users (
     created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE notes (
+CREATE TABLE IF NOT EXISTS notes (
     id             SERIAL PRIMARY KEY,
     user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     institution_id INTEGER REFERENCES institutions(id) ON DELETE SET NULL,
@@ -105,7 +105,7 @@ CREATE TABLE notes (
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE file_uploads (
+CREATE TABLE IF NOT EXISTS file_uploads (
     id            SERIAL PRIMARY KEY,
     data          BYTEA        NOT NULL,
     mime_type     VARCHAR(100) NOT NULL,
@@ -113,14 +113,14 @@ CREATE TABLE file_uploads (
     created_at    TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
-CREATE TABLE graph_layouts (
+CREATE TABLE IF NOT EXISTS graph_layouts (
     id           SERIAL PRIMARY KEY,
     name         VARCHAR(100) DEFAULT 'default',
     layout_jsonb JSONB        DEFAULT '{}',
     updated_at   TIMESTAMPTZ  NOT NULL DEFAULT now()
 );
 
-CREATE TABLE reminders (
+CREATE TABLE IF NOT EXISTS reminders (
     id             SERIAL PRIMARY KEY,
     text           TEXT NOT NULL,
     due_date       DATE,
@@ -130,7 +130,7 @@ CREATE TABLE reminders (
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE tips (
+CREATE TABLE IF NOT EXISTS tips (
     id             SERIAL PRIMARY KEY,
     question       TEXT NOT NULL,
     answer         TEXT NOT NULL,
@@ -140,13 +140,13 @@ CREATE TABLE tips (
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE tip_votes (
+CREATE TABLE IF NOT EXISTS tip_votes (
     entry_id INTEGER NOT NULL REFERENCES tips(id) ON DELETE CASCADE,
     user_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     PRIMARY KEY (entry_id, user_id)
 );
 
-CREATE TABLE tip_comments (
+CREATE TABLE IF NOT EXISTS tip_comments (
     id         SERIAL PRIMARY KEY,
     entry_id   INTEGER NOT NULL REFERENCES tips(id) ON DELETE CASCADE,
     text       TEXT NOT NULL,
@@ -154,7 +154,7 @@ CREATE TABLE tip_comments (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE deadlines (
+CREATE TABLE IF NOT EXISTS deadlines (
     id             SERIAL PRIMARY KEY,
     label          VARCHAR(255) NOT NULL,
     url            TEXT         NOT NULL,
@@ -164,7 +164,7 @@ CREATE TABLE deadlines (
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE TABLE deadline_interests (
+CREATE TABLE IF NOT EXISTS deadline_interests (
     id          SERIAL PRIMARY KEY,
     deadline_id INTEGER NOT NULL REFERENCES deadlines(id) ON DELETE CASCADE,
     user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -172,10 +172,8 @@ CREATE TABLE deadline_interests (
     CONSTRAINT deadline_interests_key UNIQUE (deadline_id, user_id)
 );
 
-CREATE TABLE schema_migrations (
+CREATE TABLE IF NOT EXISTS schema_migrations (
     id      SERIAL PRIMARY KEY,
     name    TEXT UNIQUE NOT NULL,
     applied TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
-INSERT INTO schema_migrations (name) VALUES ('000_schema.sql');

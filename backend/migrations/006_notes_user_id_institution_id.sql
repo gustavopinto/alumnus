@@ -3,4 +3,9 @@
 
 ALTER TABLE notes ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE SET NULL;
 ALTER TABLE notes ADD COLUMN IF NOT EXISTS institution_id INTEGER REFERENCES institutions(id) ON DELETE SET NULL;
-ALTER TABLE notes ALTER COLUMN researcher_id DROP NOT NULL;
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='notes' AND column_name='researcher_id') THEN
+        ALTER TABLE notes ALTER COLUMN researcher_id DROP NOT NULL;
+    END IF;
+END$$;

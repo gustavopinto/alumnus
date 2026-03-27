@@ -15,7 +15,7 @@ class InstitutionOut(BaseModel):
     id: int
     name: str
     domain: str
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -26,7 +26,7 @@ class ProfessorOut(BaseModel):
     id: int
     nome: str
     ativo: bool
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -42,7 +42,7 @@ class ProfessorInstitutionOut(BaseModel):
     institutional_email: str
     institution_name: Optional[str] = None
     institution_domain: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -63,7 +63,7 @@ class ResearchGroupOut(BaseModel):
     name: str
     institution_id: Optional[int] = None
     institution_name: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -123,8 +123,8 @@ class ResearcherOut(BaseModel):
     enrollment_date: Optional[date]
     photo_url: Optional[str] = None
     photo_thumb_url: Optional[str] = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -148,7 +148,7 @@ class RelationshipOut(BaseModel):
     source_researcher_id: int
     target_researcher_id: int
     relation_type: str
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -168,7 +168,7 @@ class NoteOut(BaseModel):
     file_name: Optional[str]
     created_by_id: Optional[int] = None
     created_by_name: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -217,7 +217,7 @@ class UserOut(BaseModel):
     professor_id:  Optional[int] = None
     researcher_id: Optional[int] = None
     last_login:    Optional[datetime]
-    created_at:    datetime
+    created_at:    Optional[datetime] = None
     plan_type:     Optional[str] = None
     plan_status:   Optional[str] = None
     account_activated_at: Optional[datetime] = None
@@ -313,7 +313,7 @@ class ReminderOut(BaseModel):
     text: str
     due_date: Optional[date]
     done: bool
-    created_at: datetime
+    created_at: Optional[datetime] = None
     created_by_id: Optional[int] = None
     created_by_name: Optional[str] = None
     institution_id: Optional[int] = None
@@ -342,7 +342,7 @@ class TipCommentOut(BaseModel):
     text: str
     author_id: Optional[int]
     author_name: Optional[str] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -363,7 +363,7 @@ class TipOut(BaseModel):
     vote_count: int = 0
     user_voted: bool = False
     comments: list[TipCommentOut] = []
-    created_at: datetime
+    created_at: Optional[datetime] = None
     institution_id: Optional[int] = None
 
     model_config = {"from_attributes": True}
@@ -398,7 +398,7 @@ class DeadlineOut(BaseModel):
     date: date
     institution_id: Optional[int] = None
     created_by_id: Optional[int] = None
-    created_at: datetime
+    created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 

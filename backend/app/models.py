@@ -14,7 +14,7 @@ class Institution(Base):
     id         = Column(Integer, primary_key=True, index=True)
     name       = Column(String(255), nullable=False)
     domain     = Column(String(255), unique=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, server_default="now()")
 
     professor_institutions = relationship("ProfessorInstitution", back_populates="institution")
     groups                 = relationship("ResearchGroup", back_populates="institution")
@@ -28,8 +28,8 @@ class Professor(Base):
     id              = Column(Integer, primary_key=True, index=True)
     nome            = Column(String(255), nullable=False)
     ativo           = Column(Boolean, default=True)
-    created_at      = Column(DateTime, default=datetime.utcnow)
-    updated_at      = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at      = Column(DateTime, default=datetime.utcnow, server_default="now()")
+    updated_at      = Column(DateTime, default=datetime.utcnow, server_default="now()", onupdate=datetime.utcnow)
 
     user                   = relationship("User", back_populates="professor", uselist=False)
     professor_institutions = relationship("ProfessorInstitution", back_populates="professor", cascade="all, delete-orphan")
@@ -44,7 +44,7 @@ class ProfessorInstitution(Base):
     professor_id        = Column(Integer, ForeignKey("professors.id", ondelete="CASCADE"), nullable=False)
     institution_id      = Column(Integer, ForeignKey("institutions.id"), nullable=False)
     institutional_email = Column(String(255), unique=True, nullable=False)
-    created_at          = Column(DateTime, default=datetime.utcnow)
+    created_at          = Column(DateTime, default=datetime.utcnow, server_default="now()")
 
     professor   = relationship("Professor", back_populates="professor_institutions")
     institution = relationship("Institution", back_populates="professor_institutions")
@@ -60,7 +60,7 @@ class ResearchGroup(Base):
     id             = Column(Integer, primary_key=True, index=True)
     name           = Column(String(255), nullable=False)
     institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=True)
-    created_at     = Column(DateTime, default=datetime.utcnow)
+    created_at     = Column(DateTime, default=datetime.utcnow, server_default="now()")
 
     institution      = relationship("Institution", back_populates="groups")
     professor_groups = relationship("ProfessorGroup", back_populates="group", cascade="all, delete-orphan")
@@ -74,7 +74,7 @@ class ProfessorGroup(Base):
     group_id       = Column(Integer, ForeignKey("research_groups.id", ondelete="CASCADE"), primary_key=True)
     role_in_group  = Column(String(20), nullable=False, default="coordinator")
     institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=True)
-    created_at     = Column(DateTime, default=datetime.utcnow)
+    created_at     = Column(DateTime, default=datetime.utcnow, server_default="now()")
 
     professor   = relationship("Professor", back_populates="professor_groups")
     group       = relationship("ResearchGroup", back_populates="professor_groups")
@@ -98,8 +98,8 @@ class Researcher(Base):
     matricula        = Column(String(50), nullable=True)
     curso            = Column(String(255), nullable=True)
     enrollment_date  = Column(Date, nullable=True)
-    created_at       = Column(DateTime, default=datetime.utcnow)
-    updated_at       = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at       = Column(DateTime, default=datetime.utcnow, server_default="now()")
+    updated_at       = Column(DateTime, default=datetime.utcnow, server_default="now()", onupdate=datetime.utcnow)
 
     orientador = relationship("Professor", back_populates="researchers")
     group      = relationship("ResearchGroup", back_populates="researchers")
@@ -125,7 +125,7 @@ class Relationship(Base):
     source_researcher_id = Column(Integer, ForeignKey("researchers.id"), nullable=False)
     target_researcher_id = Column(Integer, ForeignKey("researchers.id"), nullable=False)
     relation_type        = Column(String(50), nullable=False)
-    created_at           = Column(DateTime, default=datetime.utcnow)
+    created_at           = Column(DateTime, default=datetime.utcnow, server_default="now()")
 
     source_researcher = relationship("Researcher", foreign_keys=[source_researcher_id])
     target_researcher = relationship("Researcher", foreign_keys=[target_researcher_id])
@@ -141,7 +141,7 @@ class Note(Base):
     file_url       = Column(String(500), nullable=True)
     file_name      = Column(String(255), nullable=True)
     created_by_id  = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at     = Column(DateTime, default=datetime.utcnow)
+    created_at     = Column(DateTime, default=datetime.utcnow, server_default="now()")
 
     created_by = relationship("User", foreign_keys=[created_by_id])
 
@@ -174,7 +174,7 @@ class User(Base):
     whatsapp             = Column(String(20), nullable=True)
     interesses           = Column(Text, nullable=True)
     bio                  = Column(Text, nullable=True)
-    created_at           = Column(DateTime, default=datetime.utcnow)
+    created_at           = Column(DateTime, default=datetime.utcnow, server_default="now()")
 
     professor  = relationship("Professor", back_populates="user", foreign_keys=[professor_id])
     researcher = relationship("Researcher", foreign_keys=[researcher_id])
@@ -187,7 +187,7 @@ class FileUpload(Base):
     data          = Column(LargeBinary, nullable=False)
     mime_type     = Column(String(100), nullable=False)
     original_name = Column(String(255), nullable=False)
-    created_at    = Column(DateTime, default=datetime.utcnow)
+    created_at    = Column(DateTime, default=datetime.utcnow, server_default="now()")
 
 
 class GraphLayout(Base):
@@ -196,7 +196,7 @@ class GraphLayout(Base):
     id           = Column(Integer, primary_key=True, index=True)
     name         = Column(String(100), default="default")
     layout_jsonb = Column(JSON, default=dict)
-    updated_at   = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at   = Column(DateTime, default=datetime.utcnow, server_default="now()", onupdate=datetime.utcnow)
 
 
 class Reminder(Base):
@@ -208,7 +208,7 @@ class Reminder(Base):
     done           = Column(Boolean, default=False, nullable=False)
     created_by_id  = Column(Integer, ForeignKey("users.id"), nullable=True)
     institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=True)
-    created_at     = Column(DateTime, default=datetime.utcnow)
+    created_at     = Column(DateTime, default=datetime.utcnow, server_default="now()")
 
     created_by  = relationship("User", foreign_keys=[created_by_id])
     institution = relationship("Institution", foreign_keys=[institution_id])
@@ -224,7 +224,7 @@ class Tip(Base):
     author_id      = Column(Integer, ForeignKey("users.id"), nullable=True)
     institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=True)
     position       = Column(Integer, default=0, nullable=False)
-    created_at     = Column(DateTime, default=datetime.utcnow)
+    created_at     = Column(DateTime, default=datetime.utcnow, server_default="now()")
 
     author      = relationship("User", foreign_keys=[author_id])
     institution = relationship("Institution", foreign_keys=[institution_id])
@@ -251,7 +251,7 @@ class Deadline(Base):
     date           = Column(Date, nullable=False)
     institution_id = Column(Integer, ForeignKey("institutions.id", ondelete="CASCADE"), nullable=True)
     created_by_id  = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    created_at     = Column(DateTime, default=datetime.utcnow)
+    created_at     = Column(DateTime, default=datetime.utcnow, server_default="now()")
 
     institution = relationship("Institution", foreign_keys=[institution_id])
     created_by  = relationship("User", foreign_keys=[created_by_id])
@@ -264,7 +264,7 @@ class DeadlineInterest(Base):
     id          = Column(Integer, primary_key=True, index=True)
     deadline_id = Column(Integer, ForeignKey("deadlines.id", ondelete="CASCADE"), nullable=False)
     user_id     = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    created_at  = Column(DateTime, default=datetime.utcnow)
+    created_at  = Column(DateTime, default=datetime.utcnow, server_default="now()")
 
     deadline = relationship("Deadline", back_populates="interests")
     user     = relationship("User", foreign_keys=[user_id])
@@ -279,7 +279,7 @@ class TipComment(Base):
     entry_id   = Column(Integer, ForeignKey("tips.id", ondelete="CASCADE"), nullable=False)
     text       = Column(Text, nullable=False)
     author_id  = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow, server_default="now()")
 
     entry  = relationship("Tip", back_populates="comments")
     author = relationship("User", foreign_keys=[author_id])
