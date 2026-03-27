@@ -105,8 +105,6 @@ class Researcher(Base):
     group      = relationship("ResearchGroup", back_populates="researchers")
     user       = relationship("User", primaryjoin="User.researcher_id == Researcher.id", foreign_keys="[User.researcher_id]", uselist=False, viewonly=True)
 
-    notes      = relationship("Note", back_populates="researcher", cascade="all, delete-orphan")
-
     @property
     def photo_url(self) -> str | None:
         return self.user.photo_url if self.user else None
@@ -136,15 +134,15 @@ class Relationship(Base):
 class Note(Base):
     __tablename__ = "notes"
 
-    id            = Column(Integer, primary_key=True, index=True)
-    researcher_id = Column(Integer, ForeignKey("researchers.id"), nullable=False)
-    text          = Column(Text, nullable=False)
-    file_url      = Column(String(500), nullable=True)
-    file_name     = Column(String(255), nullable=True)
-    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    created_at    = Column(DateTime, default=datetime.utcnow)
+    id             = Column(Integer, primary_key=True, index=True)
+    user_id        = Column(Integer, ForeignKey("users.id"), nullable=False)
+    institution_id = Column(Integer, ForeignKey("institutions.id"), nullable=True)
+    text           = Column(Text, nullable=False)
+    file_url       = Column(String(500), nullable=True)
+    file_name      = Column(String(255), nullable=True)
+    created_by_id  = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at     = Column(DateTime, default=datetime.utcnow)
 
-    researcher = relationship("Researcher", back_populates="notes")
     created_by = relationship("User", foreign_keys=[created_by_id])
 
 

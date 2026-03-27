@@ -2,11 +2,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAppLayout } from '../components/AppLayout';
 import { getProfileBySlug, updateResearcher, updateMyProfile, updateUserProfile, uploadPhoto, getNotes, createNote, deleteNote, getDeadlineInterests, getDeadlines } from '../api';
-import { slugify } from '../deadlines';
 import { getTokenPayload } from '../auth';
 import { modKey, isModEnter } from '../platform';
 import Toast from '../components/Toast';
-import { renderWithMentions, invalidMentions } from '../mentionUtils.jsx';
+import { slugify, renderWithMentions, invalidMentions, useMentions, MentionDropdown } from '../mentionUtils.jsx';
 
 const STATUS_LABELS = { graduacao: 'Graduação', mestrado: 'Mestrado', doutorado: 'Doutorado', postdoc: 'Pós-doc', professor: 'Professor' };
 const STATUS_COLORS = { graduacao: '#3B82F6', mestrado: '#F59E0B', doutorado: '#10B981', postdoc: '#06B6D4', professor: '#7C3AED' };
@@ -141,17 +140,18 @@ function buildProfileForm(u) {
   };
 }
 
-function NotesSection({ researcherId, canAdd, isProfessor, currentUserId, researchers = [] }) {
+function NotesSection({ userId, institutionId, canAdd, isProfessor, currentUserId, researchers = [] }) {
   const [notes, setNotes] = useState([]);
   const [text, setText] = useState('');
   const [file, setFile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
-  const [mentionSearch, setMentionSearch] = useState(null);
-  const [mentionIndex, setMentionIndex] = useState(0);
   const [mentionError, setMentionError] = useState('');
   const fileRef = useRef();
   const textareaRef = useRef();
+
+  const { mentionSuggestions, mentionIndex, setMentionIndex, handleTextChange, insertMention, handleMentionKeyDown } =
+    useMentions({ text, setText, inputRef: textareaRef, researchers });
 
   function wrapFormat(prefix, suffix) {
     const el = textareaRef.current;
@@ -168,50 +168,12 @@ function NotesSection({ researcherId, canAdd, isProfessor, currentUserId, resear
     }, 0);
   }
 
-  function handleTextChange(e) {
-    const val = e.target.value;
-    setText(val);
-    const pos = e.target.selectionStart;
-    const before = val.slice(0, pos);
-    const match = before.match(/@([\w-]*)$/);
-    if (match) {
-      setMentionSearch({ start: match.index, query: match[1].toLowerCase() });
-      setMentionIndex(0);
-    } else {
-      setMentionSearch(null);
-    }
-  }
-
-  function insertMention(slug) {
-    const el = textareaRef.current;
-    if (!el || !mentionSearch) return;
-    const pos = el.selectionStart;
-    const before = text.slice(0, mentionSearch.start);
-    const after = text.slice(pos);
-    const newText = before + '@' + slug + ' ' + after;
-    setText(newText);
-    setMentionSearch(null);
-    setMentionIndex(0);
-    requestAnimationFrame(() => {
-      const newPos = before.length + slug.length + 2;
-      el.setSelectionRange(newPos, newPos);
-      el.focus();
-    });
-  }
-
-  const mentionSuggestions = mentionSearch !== null
-    ? researchers.filter(r =>
-        r.nome.toLowerCase().includes(mentionSearch.query) ||
-        slugify(r.nome).includes(mentionSearch.query)
-      ).slice(0, 6)
-    : [];
-
   async function load() {
-    const data = await getNotes(researcherId);
+    const data = await getNotes(userId, institutionId);
     setNotes(Array.isArray(data) ? data : []);
   }
 
-  useEffect(() => { load(); }, [researcherId]);
+  useEffect(() => { load(); }, [userId, institutionId]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -220,7 +182,7 @@ function NotesSection({ researcherId, canAdd, isProfessor, currentUserId, resear
     if (bad.length > 0) { setMentionError(`Menção não encontrada: ${bad.join(', ')}`); return; }
     setMentionError('');
     setSaving(true);
-    await createNote(researcherId, text, file);
+    await createNote(userId, text, file, institutionId);
     setText('');
     setFile(null);
     if (fileRef.current) fileRef.current.value = '';
@@ -271,30 +233,11 @@ function NotesSection({ researcherId, canAdd, isProfessor, currentUserId, resear
             value={text}
             onChange={(e) => { handleTextChange(e); setMentionError(''); }}
             onKeyDown={(e) => {
-              if (isModEnter(e)) { e.preventDefault(); handleSubmit(e); return; }
-              if (!mentionSuggestions.length) return;
-              if (e.key === 'Escape') { e.preventDefault(); setMentionSearch(null); }
-              else if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIndex(i => (i + 1) % mentionSuggestions.length); }
-              else if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIndex(i => (i - 1 + mentionSuggestions.length) % mentionSuggestions.length); }
-              else if (e.key === 'Enter') { e.preventDefault(); insertMention(slugify(mentionSuggestions[mentionIndex].nome)); }
+              if (handleMentionKeyDown(e)) return;
+              if (isModEnter(e)) { e.preventDefault(); handleSubmit(e); }
             }}
           />
-          {mentionSuggestions.length > 0 && (
-            <div className="absolute left-0 right-0 top-full mt-0.5 bg-white border rounded-lg shadow-lg z-50 py-1">
-              {mentionSuggestions.map((r, i) => (
-                <button
-                  key={r.id}
-                  type="button"
-                  onMouseDown={e => { e.preventDefault(); insertMention(slugify(r.nome)); }}
-                  onMouseEnter={() => setMentionIndex(i)}
-                  className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 ${i === mentionIndex ? 'bg-blue-50 text-blue-700' : 'hover:bg-blue-50 hover:text-blue-700'}`}
-                >
-                  <span className="font-medium">{r.nome}</span>
-                  <span className="text-xs text-gray-400">@{slugify(r.nome)}</span>
-                </button>
-              ))}
-            </div>
-          )}
+          <MentionDropdown suggestions={mentionSuggestions} activeIndex={mentionIndex} onSelect={insertMention} onHover={setMentionIndex} />
         </div>
         {mentionError && <p className="text-xs text-red-500">{mentionError}</p>}
         <div className="flex items-center gap-3">
@@ -919,8 +862,16 @@ export default function ResearcherPage() {
             </div>
           </section>
         )}
-        {researcher && (
-          <NotesSection researcherId={researcher.id} canAdd={isProfessor || isOwnProfile} isProfessor={isProfessor} currentUserId={payload?.sub != null ? Number(payload.sub) : null} researchers={researchers} />
+        {researcherUser && (
+          <NotesSection
+            key={`notes-${currentInstitution?.id ?? 'none'}`}
+            userId={researcherUser.id}
+            institutionId={currentInstitution?.id ?? null}
+            canAdd={isProfessor || isOwnProfile}
+            isProfessor={isProfessor}
+            currentUserId={payload?.sub != null ? Number(payload.sub) : null}
+            researchers={researchers}
+          />
         )}
       </main>
     </div>

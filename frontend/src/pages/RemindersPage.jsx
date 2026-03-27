@@ -3,12 +3,7 @@ import { useAppLayout } from '../components/AppLayout';
 import { getReminders, createReminder, deleteReminder } from '../api';
 import Toast from '../components/Toast';
 import { canDeleteReminder, creatorDisplayName } from '../reminderAccess';
-import { invalidMentions, renderWithMentions } from '../mentionUtils.jsx';
-
-function slugify(nome) {
-  return (nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
-}
+import { slugify, invalidMentions, renderWithMentions, useMentions, MentionDropdown } from '../mentionUtils.jsx';
 
 function formatDue(dateStr) {
   if (!dateStr) return null;
@@ -33,9 +28,11 @@ export default function RemindersPage() {
   const [text, setText] = useState('');
   const [dueDate, setDueDate] = useState(todayIso);
   const [saving, setSaving] = useState(false);
-  const [mentionSearch, setMentionSearch] = useState(null); // {start, query} | null
-  const [mentionIndex, setMentionIndex] = useState(0);
+  const [mentionError, setMentionError] = useState('');
+  const [toast, setToast] = useState('');
   const textareaRef = useRef();
+  const { mentionSuggestions, mentionIndex, setMentionIndex, handleTextChange, insertMention, handleMentionKeyDown } =
+    useMentions({ text, setText, inputRef: textareaRef, researchers });
 
   const load = useCallback(async () => {
     const data = await getReminders(currentInstitution?.id);
@@ -68,47 +65,6 @@ export default function RemindersPage() {
       el.focus();
     }, 0);
   }
-
-  function handleTextChange(e) {
-    const val = e.target.value;
-    setText(val);
-    const pos = e.target.selectionStart;
-    const before = val.slice(0, pos);
-    const match = before.match(/@([\w-]*)$/);
-    if (match) {
-      setMentionSearch({ start: match.index, query: match[1].toLowerCase() });
-      setMentionIndex(0);
-    } else {
-      setMentionSearch(null);
-    }
-  }
-
-  function insertMention(slug) {
-    const el = textareaRef.current;
-    if (!el || !mentionSearch) return;
-    const pos = el.selectionStart;
-    const before = text.slice(0, mentionSearch.start);
-    const after = text.slice(pos);
-    const newText = before + '@' + slug + ' ' + after;
-    setText(newText);
-    setMentionSearch(null);
-    setMentionIndex(0);
-    requestAnimationFrame(() => {
-      const newPos = before.length + slug.length + 2;
-      el.setSelectionRange(newPos, newPos);
-      el.focus();
-    });
-  }
-
-  const mentionSuggestions = mentionSearch !== null
-    ? researchers.filter(r =>
-        r.nome.toLowerCase().includes(mentionSearch.query) ||
-        slugify(r.nome).includes(mentionSearch.query)
-      ).slice(0, 6)
-    : [];
-
-  const [mentionError, setMentionError] = useState('');
-  const [toast, setToast] = useState('');
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -166,30 +122,11 @@ export default function RemindersPage() {
                 value={text}
                 onChange={e => { handleTextChange(e); setMentionError(''); }}
                 onKeyDown={e => {
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleSubmit(e); return; }
-                  if (!mentionSuggestions.length) return;
-                  if (e.key === 'Escape') { e.preventDefault(); setMentionSearch(null); }
-                  else if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIndex(i => (i + 1) % mentionSuggestions.length); }
-                  else if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIndex(i => (i - 1 + mentionSuggestions.length) % mentionSuggestions.length); }
-                  else if (e.key === 'Enter') { e.preventDefault(); insertMention(slugify(mentionSuggestions[mentionIndex].nome)); }
+                  if (handleMentionKeyDown(e)) return;
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleSubmit(e); }
                 }}
               />
-              {mentionSuggestions.length > 0 && (
-                <div className="absolute left-0 right-0 top-full mt-0.5 bg-white border rounded-lg shadow-lg z-50 py-1">
-                  {mentionSuggestions.map((r, i) => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onMouseDown={e => { e.preventDefault(); insertMention(slugify(r.nome)); }}
-                      onMouseEnter={() => setMentionIndex(i)}
-                      className={`w-full text-left px-3 py-1.5 text-sm flex items-center gap-2 ${i === mentionIndex ? 'bg-blue-50 text-blue-700' : 'hover:bg-blue-50 hover:text-blue-700'}`}
-                    >
-                      <span className="font-medium">{r.nome}</span>
-                      <span className="text-xs text-gray-400">@{slugify(r.nome)}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+              <MentionDropdown suggestions={mentionSuggestions} activeIndex={mentionIndex} onSelect={insertMention} onHover={setMentionIndex} />
             </div>
             {mentionError && <p className="text-xs text-red-500">{mentionError}</p>}
             <div className="flex items-center gap-3">

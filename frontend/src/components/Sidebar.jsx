@@ -3,14 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import ResearcherForm from './ResearcherForm';
 import { deleteResearcher, getProfessors, getGroups, updateGroup, getReminders, createReminder, updateReminder, deleteReminder, getDeadlines, deleteDeadline, getTips } from '../api';
 import { canDeleteReminder, creatorDisplayName, isReminderFromSomeoneElse } from '../reminderAccess';
-import { invalidMentions, renderWithMentions } from '../mentionUtils.jsx';
+import { slugify, invalidMentions, renderWithMentions, useMentions, MentionDropdown } from '../mentionUtils.jsx';
 import { isModEnter } from '../platform';
 import { daysUntil } from '../deadlines';
-
-function slugify(nome) {
-  return (nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
-}
 
 function today() {
   return new Date().toISOString().split('T')[0];
@@ -24,12 +19,13 @@ function RemindersDropdown({ rail = false, refreshKey = 0, onRefresh = null, cur
   const [date, setDate] = useState(today());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [mentionSearch, setMentionSearch] = useState(null); // {start, query} | null
-  const [mentionIndex, setMentionIndex] = useState(0);
   const ref = useRef();
   const dateRef = useRef();
   const inputRef = useRef();
   const navigate = useNavigate();
+
+  const { mentionSuggestions, mentionIndex, setMentionIndex, handleTextChange, insertMention, handleMentionKeyDown } =
+    useMentions({ text, setText, inputRef, researchers, maxLength: 50 });
 
   const load = useCallback(async () => {
     const data = await getReminders(institutionId);
@@ -44,44 +40,6 @@ function RemindersDropdown({ rail = false, refreshKey = 0, onRefresh = null, cur
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
-
-  function handleTextChange(e) {
-    const val = e.target.value;
-    setText(val);
-    const pos = e.target.selectionStart;
-    const before = val.slice(0, pos);
-    const match = before.match(/@([\w-]*)$/);
-    if (match) {
-      setMentionSearch({ start: match.index, query: match[1].toLowerCase() });
-      setMentionIndex(0);
-    } else {
-      setMentionSearch(null);
-    }
-  }
-
-  function insertMention(slug) {
-    const input = inputRef.current;
-    if (!input || !mentionSearch) return;
-    const pos = input.selectionStart;
-    const before = text.slice(0, mentionSearch.start);
-    const after = text.slice(pos);
-    const newText = (before + '@' + slug + ' ' + after).slice(0, 50);
-    setText(newText);
-    setMentionSearch(null);
-    setMentionIndex(0);
-    requestAnimationFrame(() => {
-      const newPos = before.length + slug.length + 2;
-      input.setSelectionRange(newPos, newPos);
-      input.focus();
-    });
-  }
-
-  const mentionSuggestions = mentionSearch !== null
-    ? researchers.filter(r =>
-        r.nome.toLowerCase().includes(mentionSearch.query) ||
-        slugify(r.nome).includes(mentionSearch.query)
-      ).slice(0, 6)
-    : [];
 
   async function handleAdd(e) {
     e.preventDefault();
@@ -199,33 +157,11 @@ function RemindersDropdown({ rail = false, refreshKey = 0, onRefresh = null, cur
                   maxLength={50}
                   onChange={handleTextChange}
                   onKeyDown={e => {
-                    if (mentionSuggestions.length) {
-                      if (e.key === 'Escape') { e.preventDefault(); setMentionSearch(null); }
-                      else if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIndex(i => (i + 1) % mentionSuggestions.length); }
-                      else if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIndex(i => (i - 1 + mentionSuggestions.length) % mentionSuggestions.length); }
-                      else if (e.key === 'Enter') { e.preventDefault(); insertMention(slugify(mentionSuggestions[mentionIndex].nome)); }
-                    } else if (isModEnter(e)) {
-                      e.preventDefault();
-                      handleAdd(e);
-                    }
+                    if (handleMentionKeyDown(e)) return;
+                    if (isModEnter(e)) { e.preventDefault(); handleAdd(e); }
                   }}
                 />
-                {mentionSuggestions.length > 0 && (
-                  <div className="absolute left-0 right-0 top-full mt-0.5 bg-white border rounded-lg shadow-lg z-[70] py-1">
-                    {mentionSuggestions.map((r, i) => (
-                      <button
-                        key={r.id}
-                        type="button"
-                        onMouseDown={e => { e.preventDefault(); insertMention(slugify(r.nome)); }}
-                        onMouseEnter={() => setMentionIndex(i)}
-                        className={`w-full text-left px-3 py-1.5 text-sm truncate ${i === mentionIndex ? 'bg-blue-50 text-blue-700' : 'hover:bg-blue-50 hover:text-blue-700'}`}
-                      >
-                        {r.nome}
-                        <span className="ml-1.5 text-xs text-gray-400">@{slugify(r.nome)}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
+                <MentionDropdown suggestions={mentionSuggestions} activeIndex={mentionIndex} onSelect={insertMention} onHover={setMentionIndex} zIndex="z-[70]" />
               </div>
               <div className="flex items-center gap-2">
                 <label className="flex-1 flex items-center gap-1.5 border rounded px-2 py-1.5 text-sm text-gray-600 cursor-pointer hover:border-blue-400 hover:text-blue-600 transition-colors bg-white">

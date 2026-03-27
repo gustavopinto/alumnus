@@ -95,13 +95,14 @@ CREATE TABLE users (
 );
 
 CREATE TABLE notes (
-    id            SERIAL PRIMARY KEY,
-    researcher_id INTEGER NOT NULL REFERENCES researchers(id) ON DELETE CASCADE,
-    text          TEXT NOT NULL,
-    file_url      VARCHAR(500),
-    file_name     VARCHAR(255),
-    created_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    id             SERIAL PRIMARY KEY,
+    user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    institution_id INTEGER REFERENCES institutions(id) ON DELETE SET NULL,
+    text           TEXT NOT NULL,
+    file_url       VARCHAR(500),
+    file_name      VARCHAR(255),
+    created_by_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE file_uploads (
@@ -159,6 +160,7 @@ CREATE TABLE deadlines (
     url            TEXT         NOT NULL,
     date           DATE         NOT NULL,
     institution_id INTEGER REFERENCES institutions(id) ON DELETE CASCADE,
+    created_by_id  INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

@@ -54,15 +54,17 @@ export const getGraph = (institutionId) =>
 export const updateLayout = (positions) => request('/graph/layout', { method: 'PUT', body: JSON.stringify({ positions }) });
 
 // Notes
-export const getNotes = (researcherId) => request(`/researchers/${researcherId}/notes`);
+export const getNotes = (userId, institutionId) =>
+  request(`/users/${userId}/notes${institutionId ? `?institution_id=${institutionId}` : ''}`);
 export const deleteNote = (noteId) => request(`/notes/${noteId}`, { method: 'DELETE' });
 
-export async function createNote(researcherId, text, file) {
+export async function createNote(userId, text, file, institutionId) {
   const form = new FormData();
   form.append('text', text);
   if (file) form.append('file', file);
+  if (institutionId != null) form.append('institution_id', institutionId);
   const token = getToken();
-  const res = await fetch(`/api/researchers/${researcherId}/notes`, {
+  const res = await fetch(`/api/users/${userId}/notes`, {
     method: 'POST',
     body: form,
     headers: token ? { Authorization: `Bearer ${token}` } : {},

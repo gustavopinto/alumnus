@@ -161,7 +161,8 @@ class NoteCreate(BaseModel):
 
 class NoteOut(BaseModel):
     id: int
-    researcher_id: int
+    user_id: int
+    institution_id: Optional[int] = None
     text: str
     file_url: Optional[str]
     file_name: Optional[str]
