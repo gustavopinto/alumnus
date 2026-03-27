@@ -1,6 +1,7 @@
 import logging
 
-from sqlalchemy import and_, or_, select
+from fastapi import HTTPException
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from ..models import Professor, ProfessorGroup, ProfessorInstitution, ResearchGroup, Researcher, User
@@ -48,6 +49,13 @@ def list_all(db: Session, ativo: bool | None, institution_id: int | None = None)
 
 
 def create(db: Session, data: ResearcherCreate) -> Researcher:
+    if data.email and data.email.strip():
+        existing = db.query(Researcher).filter(
+            func.lower(Researcher.email) == data.email.strip().lower(),
+            Researcher.ativo == True,
+        ).first()
+        if existing:
+            raise HTTPException(status_code=409, detail="Email já cadastrado para outro pesquisador ativo")
     payload = data.model_dump()
     institution_id = payload.pop("institution_id", None)
     # Auto-resolve group_id from orientador if not explicitly provided

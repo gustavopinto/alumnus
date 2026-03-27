@@ -155,12 +155,8 @@ def _stats_global(db: Session, hide_superadmin_count: bool, current: User = None
             total_tips = db.query(func.count(Tip.id)).filter(
                 Tip.institution_id.in_(institution_ids)
             ).scalar()
-            total_notes = db.query(func.count(Note.id)).join(
-                Researcher, Researcher.id == Note.researcher_id
-            ).join(
-                ResearchGroup, ResearchGroup.id == Researcher.group_id
-            ).filter(
-                ResearchGroup.institution_id.in_(institution_ids)
+            total_notes = db.query(func.count(Note.id)).filter(
+                Note.institution_id.in_(institution_ids)
             ).scalar()
 
     return {
@@ -238,6 +234,8 @@ def list_users(db: Session = Depends(get_db), current: User = Depends(require_da
         joinedload(User.professor).joinedload(Professor.professor_institutions).joinedload(ProfessorInstitution.institution),
     ]
     institution_ids = _accessible_institution_ids(db, current)
+    professor = professor_service.get_by_user(db, current) if not _is_superadmin(current) else None
+    prof_id = professor.id if professor else None
 
     if _is_superadmin(current):
         users = (
@@ -246,11 +244,8 @@ def list_users(db: Session = Depends(get_db), current: User = Depends(require_da
             .all()
         )
     else:
-        if not institution_ids:
-            users = []
-        else:
-            # Professor/admin:
-            # - apenas usuários das instituições vinculadas ao professor atual
+        if institution_ids:
+            # Professor: apenas usuários das instituições vinculadas
             # - exclui superadmin "puro" (sem researcher)
             users = (
                 db.query(User)
@@ -274,6 +269,20 @@ def list_users(db: Session = Depends(get_db), current: User = Depends(require_da
                 .distinct()
                 .all()
             )
+        else:
+            users = []
+
+        # Garante que o próprio professor logado sempre aparece na lista
+        seen_ids = {u.id for u in users}
+        if current.id not in seen_ids:
+            self_user = (
+                db.query(User)
+                .options(*eager_opts)
+                .filter(User.id == current.id)
+                .first()
+            )
+            if self_user:
+                users = [self_user] + list(users)
 
     pending_query = (
         db.query(Researcher)
@@ -284,13 +293,23 @@ def list_users(db: Session = Depends(get_db), current: User = Depends(require_da
         )
     )
     if institution_ids is not None:
-        if not institution_ids:
-            pending = []
+        # Para professores: inclui alunos do grupo/instituição E alunos
+        # orientados diretamente pelo professor (mesmo sem grupo definido)
+        pending_conditions = []
+        if institution_ids:
+            pending_conditions.append(
+                and_(
+                    Researcher.group_id.isnot(None),
+                    Researcher.group.has(ResearchGroup.institution_id.in_(institution_ids)),
+                )
+            )
+        if prof_id:
+            pending_conditions.append(Researcher.orientador_id == prof_id)
+
+        if pending_conditions:
+            pending = pending_query.filter(or_(*pending_conditions)).all()
         else:
-            pending = pending_query.filter(
-                Researcher.group_id.isnot(None),
-                Researcher.group.has(ResearchGroup.institution_id.in_(institution_ids)),
-            ).all()
+            pending = []
     else:
         pending = pending_query.all()
 
