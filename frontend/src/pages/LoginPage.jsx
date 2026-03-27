@@ -61,7 +61,7 @@ export default function LoginPage() {
         return;
       }
 
-      if (payload.role === 'student') {
+      if (payload.role === 'researcher') {
         if (!payload.researcher_id) {
           navigate('/app/manual', { replace: true });
         } else {

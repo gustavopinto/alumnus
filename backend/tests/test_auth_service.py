@@ -2,10 +2,9 @@
 Unit tests for app/services/auth_service.py
 
 Covers:
-- _norm_email
+- _norm_email (via user_email_exists)
 - user_email_exists
-- get_active_researcher_for_email
-- create_student_from_researcher
+- activate_account
 - authenticate
 - record_login
 """
@@ -17,7 +16,7 @@ from passlib.context import CryptContext
 
 from app.services import auth_service
 from app.schemas import RegisterRequest
-from app.models import User, Researcher
+from app.models import User
 
 from .conftest import make_researcher, make_user
 
@@ -50,78 +49,40 @@ class TestUserEmailExists:
 
 
 # ---------------------------------------------------------------------------
-# get_active_researcher_for_email
+# activate_account
 # ---------------------------------------------------------------------------
 
-class TestGetActiveResearcherForEmail:
-    def test_returns_none_when_no_researcher(self, db):
-        result = auth_service.get_active_researcher_for_email(db, "ghost@univ.edu.br")
-        assert result is None
-
-    def test_returns_active_researcher_by_email(self, db):
-        r = make_researcher(db, email="active@univ.edu.br", ativo=True)
-        result = auth_service.get_active_researcher_for_email(db, "active@univ.edu.br")
-        assert result is not None
-        assert result.id == r.id
-
-    def test_returns_none_for_inactive_researcher(self, db):
-        make_researcher(db, email="inactive@univ.edu.br", ativo=False)
-        result = auth_service.get_active_researcher_for_email(db, "inactive@univ.edu.br")
-        assert result is None
-
-    def test_case_insensitive_email_lookup(self, db):
-        r = make_researcher(db, email="cased@univ.edu.br", ativo=True)
-        result = auth_service.get_active_researcher_for_email(db, "CASED@UNIV.EDU.BR")
-        assert result is not None
-        assert result.id == r.id
-
-    def test_strips_whitespace(self, db):
-        r = make_researcher(db, email="ws@univ.edu.br", ativo=True)
-        result = auth_service.get_active_researcher_for_email(db, "  ws@univ.edu.br  ")
-        assert result is not None
-        assert result.id == r.id
-
-
-# ---------------------------------------------------------------------------
-# create_student_from_researcher
-# ---------------------------------------------------------------------------
-
-class TestCreateStudentFromResearcher:
-    def test_creates_user_with_correct_fields(self, db):
-        researcher = make_researcher(db, nome="Joao Neto", email="joao@univ.edu.br")
-        req = RegisterRequest(email="joao@univ.edu.br", password="password123")
-        user = auth_service.create_student_from_researcher(db, req, researcher, pwd_ctx)
+class TestActivateAccount:
+    def test_activates_pending_account(self, db):
+        make_researcher(db, email="pending@univ.edu.br", password=None)
+        req = RegisterRequest(email="pending@univ.edu.br", password="newpassword1")
+        user = auth_service.activate_account(db, req, pwd_ctx)
 
         assert user.id is not None
-        assert user.email == "joao@univ.edu.br"
-        assert user.nome == "Joao Neto"
-        assert user.role == "student"
-        assert user.researcher_id == researcher.id
+        assert user.email == "pending@univ.edu.br"
+        assert user.password_hash is not None
+        assert pwd_ctx.verify("newpassword1", user.password_hash)
 
-    def test_password_is_hashed(self, db):
-        researcher = make_researcher(db, email="hash@univ.edu.br")
-        req = RegisterRequest(email="hash@univ.edu.br", password="plaintext9")
-        user = auth_service.create_student_from_researcher(db, req, researcher, pwd_ctx)
+    def test_returns_404_for_unknown_email(self, db):
+        from fastapi import HTTPException
+        req = RegisterRequest(email="ghost@univ.edu.br", password="password1")
+        with pytest.raises(HTTPException) as exc:
+            auth_service.activate_account(db, req, pwd_ctx)
+        assert exc.value.status_code == 404
 
-        assert user.password_hash != "plaintext9"
-        assert pwd_ctx.verify("plaintext9", user.password_hash)
+    def test_returns_409_for_already_active_account(self, db):
+        from fastapi import HTTPException
+        make_user(db, email="active@univ.edu.br", password="existing123")
+        req = RegisterRequest(email="active@univ.edu.br", password="newpassword1")
+        with pytest.raises(HTTPException) as exc:
+            auth_service.activate_account(db, req, pwd_ctx)
+        assert exc.value.status_code == 409
 
-    def test_marks_researcher_as_registered(self, db):
-        researcher = make_researcher(db, email="mark@univ.edu.br", registered=False)
-        req = RegisterRequest(email="mark@univ.edu.br", password="password99")
-        auth_service.create_student_from_researcher(db, req, researcher, pwd_ctx)
-
-        db.refresh(researcher)
-        assert researcher.registered is True
-
-    def test_user_is_persisted_to_db(self, db):
-        researcher = make_researcher(db, email="persist@univ.edu.br")
-        req = RegisterRequest(email="persist@univ.edu.br", password="persisted1")
-        user = auth_service.create_student_from_researcher(db, req, researcher, pwd_ctx)
-
-        fetched = db.query(User).filter(User.id == user.id).first()
-        assert fetched is not None
-        assert fetched.email == "persist@univ.edu.br"
+    def test_role_preserved_after_activation(self, db):
+        make_researcher(db, email="role@univ.edu.br", password=None)
+        req = RegisterRequest(email="role@univ.edu.br", password="password11")
+        user = auth_service.activate_account(db, req, pwd_ctx)
+        assert user.role == "researcher"
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +114,12 @@ class TestAuthenticate:
         make_user(db, email="strip@univ.edu.br", password="passpass1")
         user = auth_service.authenticate(db, "  strip@univ.edu.br  ", "passpass1", pwd_ctx)
         assert user is not None
+
+    def test_returns_none_for_pending_account(self, db):
+        """Conta pendente (password_hash=None) não pode autenticar."""
+        make_researcher(db, email="pending@univ.edu.br", password=None)
+        result = auth_service.authenticate(db, "pending@univ.edu.br", "anypassword", pwd_ctx)
+        assert result is None
 
 
 # ---------------------------------------------------------------------------

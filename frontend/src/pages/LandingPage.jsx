@@ -41,7 +41,7 @@ function LoginForm() {
       saveToken(data.access_token);
       let payload;
       try { payload = JSON.parse(atob(data.access_token.split('.')[1])); } catch { setError('Sessão inválida.'); return; }
-      if (payload.role === 'student') {
+      if (payload.role === 'researcher') {
         if (!payload.researcher_id) { navigate('/app/manual', { replace: true }); }
         else {
           const r = await fetch(`/api/researchers/${payload.researcher_id}`, { headers: { Authorization: `Bearer ${data.access_token}` } });

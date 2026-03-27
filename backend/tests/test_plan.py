@@ -104,8 +104,8 @@ class TestIsPlanUser:
         u = _make_plain_user(role="superadmin")
         assert is_plan_user(u) is True
 
-    def test_student_is_not_plan_user(self):
-        u = _make_plain_user(role="student")
+    def test_researcher_is_not_plan_user(self):
+        u = _make_plain_user(role="researcher")
         assert is_plan_user(u) is False
 
     def test_admin_is_not_plan_user(self):
@@ -167,8 +167,8 @@ class TestEnsureProfessorPlanDefaults:
         assert result is False
         assert u.plan_type == PLAN_MONTHLY
 
-    def test_returns_false_for_student(self):
-        u = _make_plain_user(role="student")
+    def test_returns_false_for_researcher(self):
+        u = _make_plain_user(role="researcher")
         result = ensure_professor_plan_defaults(u)
 
         assert result is False
@@ -222,8 +222,8 @@ class TestRefreshUserPlanStatus:
         db.refresh(user)
         assert user.plan_status == STATUS_ACTIVE
 
-    def test_no_op_for_student(self, db):
-        user = make_user(db, role="student")
+    def test_no_op_for_researcher(self, db):
+        user = make_user(db, role="researcher")
         # Should not raise or change anything
         refresh_user_plan_status(db, user)
         assert user.plan_status is None
@@ -260,8 +260,8 @@ class TestRefreshUserPlanStatus:
 # ---------------------------------------------------------------------------
 
 class TestComputeTrialDaysRemaining:
-    def test_returns_none_for_student(self):
-        u = _make_plain_user(role="student")
+    def test_returns_none_for_researcher(self):
+        u = _make_plain_user(role="researcher")
         assert compute_trial_days_remaining(u) is None
 
     def test_returns_none_for_non_trial_plan(self):
@@ -293,8 +293,8 @@ class TestComputeTrialDaysRemaining:
 # ---------------------------------------------------------------------------
 
 class TestUserToOut:
-    def test_student_gets_no_plan_fields(self):
-        u = _make_plain_user(role="student")
+    def test_researcher_gets_no_plan_fields(self):
+        u = _make_plain_user(role="researcher")
         out = user_to_out(u)
 
         assert out.plan_type is None
@@ -325,11 +325,11 @@ class TestUserToOut:
         assert out.plan_type is None
 
     def test_basic_fields_always_present(self):
-        u = _make_plain_user(role="student")
+        u = _make_plain_user(role="researcher")
         u.email = "user@test.com"
         u.nome = "Full Name"
         out = user_to_out(u)
 
         assert out.email == "user@test.com"
         assert out.nome == "Full Name"
-        assert out.role == "student"
+        assert out.role == "researcher"

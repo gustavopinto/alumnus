@@ -3,7 +3,9 @@ import logging
 from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
-from ..models import GraphLayout, Professor, ProfessorInstitution, Relationship, Researcher
+from sqlalchemy.orm import joinedload
+
+from ..models import GraphLayout, Professor, ProfessorInstitution, Relationship, Researcher, User
 from ..schemas import LayoutUpdate
 from ..slug import slugify
 
@@ -19,8 +21,13 @@ STATUS_COLORS = {
 
 
 def build_graph_payload(db: Session, institution_id: int | None = None) -> dict:
-    professors_q  = db.query(Professor).filter(Professor.ativo == True)
-    researchers_q = db.query(Researcher).filter(Researcher.ativo == True)
+    professors_q  = db.query(Professor).options(joinedload(Professor.user)).filter(Professor.ativo == True)
+    researchers_q = (
+        db.query(Researcher)
+        .outerjoin(User, User.researcher_id == Researcher.id)
+        .options(joinedload(Researcher.user))
+        .filter(Researcher.ativo == True)
+    )
 
     if institution_id is not None:
         from ..models import ResearchGroup

@@ -9,7 +9,7 @@ import pytest
 from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, StaticPool
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
@@ -28,6 +28,7 @@ def engine():
     eng = create_engine(
         SQLITE_URL,
         connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
     )
     Base.metadata.create_all(bind=eng)
     yield eng
@@ -64,18 +65,27 @@ def client(db):
 # Helper factories
 # ---------------------------------------------------------------------------
 
-def make_researcher(db, nome="Ana Silva", email="ana@univ.edu.br", ativo=True, registered=False):
-    r = Researcher(
-        nome=nome,
+def make_researcher(db, nome="Ana Silva", email="ana@univ.edu.br", ativo=True, password=None):
+    """Cria um Researcher + User vinculado (password=None → conta pendente)."""
+    researcher = Researcher(
         status="mestrado",
-        email=email,
         ativo=ativo,
-        registered=registered,
     )
-    db.add(r)
+    db.add(researcher)
+    db.flush()
+
+    user = User(
+        email=email,
+        nome=nome,
+        password_hash=pwd_ctx.hash(password) if password else None,
+        role="researcher",
+        is_admin=False,
+        researcher_id=researcher.id,
+    )
+    db.add(user)
     db.commit()
-    db.refresh(r)
-    return r
+    db.refresh(researcher)
+    return researcher
 
 
 def make_user(
@@ -95,7 +105,7 @@ def make_user(
         nome=nome,
         password_hash=pwd_ctx.hash(password),
         role=role,
-        is_admin=role in ("admin", "superadmin"),
+        is_admin=role == "superadmin",
         researcher_id=researcher_id,
         plan_type=plan_type,
         plan_status=plan_status,

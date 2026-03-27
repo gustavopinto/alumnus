@@ -2,7 +2,7 @@ import logging
 
 from fastapi import HTTPException
 from sqlalchemy import and_, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, contains_eager, joinedload
 
 from ..models import Professor, ProfessorGroup, ProfessorInstitution, ResearchGroup, Researcher, User
 from ..schemas import ResearcherCreate, ResearcherUpdate
@@ -25,8 +25,15 @@ def _resolve_group_id(db: Session, orientador_id: int | None, institution_id: in
     return pg.group_id if pg else None
 
 
+def _with_user(q):
+    """Aplica eager load do User vinculado via User.researcher_id."""
+    return q.outerjoin(User, User.researcher_id == Researcher.id).options(
+        contains_eager(Researcher.user)
+    )
+
+
 def list_all(db: Session, ativo: bool | None, institution_id: int | None = None) -> list[Researcher]:
-    q = db.query(Researcher)
+    q = _with_user(db.query(Researcher))
     if ativo is not None:
         q = q.filter(Researcher.ativo == ativo)
     if institution_id is not None:
@@ -36,51 +43,74 @@ def list_all(db: Session, ativo: bool | None, institution_id: int | None = None)
         prof_ids = select(ProfessorInstitution.professor_id).where(
             ProfessorInstitution.institution_id == institution_id
         )
-        # Include by group membership OR by orientador being in the institution
         q = q.filter(
             or_(
                 Researcher.group_id.in_(group_ids),
                 and_(Researcher.group_id.is_(None), Researcher.orientador_id.in_(prof_ids)),
             )
         )
-    results = q.order_by(Researcher.nome).all()
-    # Superadmin users are invisible to all profiles
-    return [r for r in results if not (r.user and r.user.role == 'superadmin')]
+    results = q.order_by(User.nome).all()
+    # Superadmin users são invisíveis em perfis de pesquisadores
+    return [r for r in results if not (r.user and r.user.role == "superadmin")]
 
 
 def create(db: Session, data: ResearcherCreate) -> Researcher:
-    if data.email and data.email.strip():
-        existing = db.query(Researcher).filter(
-            func.lower(Researcher.email) == data.email.strip().lower(),
-            Researcher.ativo == True,
-        ).first()
-        if existing:
-            raise HTTPException(status_code=409, detail="Email já cadastrado para outro pesquisador ativo")
-    payload = data.model_dump()
-    institution_id = payload.pop("institution_id", None)
-    # Auto-resolve group_id from orientador if not explicitly provided
-    if payload.get("group_id") is None:
-        if payload.get("orientador_id") is not None:
-            payload["group_id"] = _resolve_group_id(db, payload["orientador_id"], institution_id)
+    # Verifica duplicidade de email na tabela users
+    if db.query(User).filter(func.lower(User.email) == data.email).first():
+        raise HTTPException(status_code=409, detail="Email já cadastrado")
+
+    # Resolve group_id
+    institution_id = data.institution_id
+    group_id = data.group_id
+    if group_id is None:
+        if data.orientador_id is not None:
+            group_id = _resolve_group_id(db, data.orientador_id, institution_id)
         elif institution_id is not None:
             group = db.query(ResearchGroup).filter(ResearchGroup.institution_id == institution_id).first()
-            payload["group_id"] = group.id if group else None
-    researcher = Researcher(**payload)
+            group_id = group.id if group else None
+
+    # Cria Researcher sem nome/email (ficam no User)
+    researcher = Researcher(
+        status=data.status,
+        group_id=group_id,
+        orientador_id=data.orientador_id,
+        observacoes=data.observacoes,
+    )
     db.add(researcher)
+    db.flush()  # gera researcher.id antes de criar o User
+
+    # Cria User vinculado (sem senha — conta pendente)
+    user = User(
+        email=data.email,
+        nome=data.nome,
+        password_hash=None,
+        role="researcher",
+        is_admin=False,
+        researcher_id=researcher.id,
+    )
+    db.add(user)
     db.commit()
-    db.refresh(researcher)
-    logger.info("Researcher created: %s (id=%s)", researcher.nome, researcher.id)
-    return researcher
+
+    logger.info("Researcher+User created: %s (researcher_id=%s)", data.email, researcher.id)
+    return get_by_id(db, researcher.id)
 
 
 def get_by_id(db: Session, researcher_id: int) -> Researcher | None:
-    return db.query(Researcher).get(researcher_id)
+    return (
+        _with_user(db.query(Researcher))
+        .filter(Researcher.id == researcher_id)
+        .first()
+    )
 
 
 def find_by_slug(db: Session, slug: str) -> Researcher | None:
-    researchers = db.query(Researcher).filter(Researcher.ativo == True).all()
+    researchers = (
+        _with_user(db.query(Researcher))
+        .filter(Researcher.ativo == True)
+        .all()
+    )
     for r in researchers:
-        if slugify(r.nome) == slug:
+        if r.user and slugify(r.user.nome) == slug:
             return r
     return None
 
@@ -92,16 +122,15 @@ def get_linked_user(db: Session, researcher_id: int) -> User | None:
 def update(db: Session, researcher: Researcher, data: ResearcherUpdate) -> Researcher:
     payload = data.model_dump(exclude_unset=True)
 
-    # When orientador changes, auto-update group_id (unless explicitly provided)
+    # Quando orientador muda, atualiza group_id automaticamente
     if "orientador_id" in payload and "group_id" not in payload:
         payload["group_id"] = _resolve_group_id(db, payload["orientador_id"])
 
     for key, value in payload.items():
         setattr(researcher, key, value)
     db.commit()
-    db.refresh(researcher)
     logger.info("Researcher updated: id=%s", researcher.id)
-    return researcher
+    return get_by_id(db, researcher.id)
 
 
 def deactivate(db: Session, researcher: Researcher) -> None:

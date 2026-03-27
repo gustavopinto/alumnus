@@ -5,7 +5,7 @@ import { getTokenPayload } from '../auth';
 import { useAppLayout } from '../components/AppLayout';
 import Toast from '../components/Toast';
 
-const ROLE_LABELS = { superadmin: 'Superadmin', professor: 'Professor', student: 'Aluno' };
+const ROLE_LABELS = { superadmin: 'Superadmin', professor: 'Professor', researcher: 'Aluno' };
 const STATUS_LABELS = { graduacao: 'Graduação', mestrado: 'Mestrado', doutorado: 'Doutorado', postdoc: 'Pós-doc', professor: 'Professor' };
 const STATUS_COLORS = {
   professor: 'bg-purple-100 text-purple-700 border-purple-200',
@@ -18,7 +18,7 @@ const ROLE_COLORS = {
   superadmin: 'bg-red-100 text-red-700 border-red-200',
   admin:      'bg-purple-100 text-purple-700 border-purple-200',
   professor:  'bg-blue-100 text-blue-700 border-blue-200',
-  student:    'bg-green-100 text-green-700 border-green-200',
+  researcher: 'bg-green-100 text-green-700 border-green-200',
   pending:    'bg-gray-100 text-gray-500 border-gray-200',
 };
 
@@ -72,7 +72,7 @@ export default function AdminPage() {
     });
   }
 
-  const ROLE_ORDER = { superadmin: 0, professor: 1, student: 2 };
+  const ROLE_ORDER = { superadmin: 0, professor: 1, researcher: 2 };
 
   async function load() {
     const [s, u] = await Promise.all([getAdminStats(), getAdminUsers()]);
@@ -197,7 +197,7 @@ export default function AdminPage() {
             )}
             <StatCard label="Professores"  value={stats?.users_by_role?.professor  ?? 0} color="text-blue-600" />
             <div className="bg-white rounded-xl border shadow-sm p-5 flex flex-col gap-1">
-              <span className="text-3xl font-bold text-green-600">{stats?.users_by_role?.student ?? 0}</span>
+              <span className="text-3xl font-bold text-green-600">{stats?.users_by_role?.researcher ?? 0}</span>
               <span className="text-sm text-gray-500">Alunos</span>
               {(stats?.total_pending ?? 0) > 0 && (
                 <span className="text-xs text-yellow-600 mt-0.5">{stats.total_pending} sem acesso validado</span>
@@ -381,7 +381,7 @@ export default function AdminPage() {
                           >
                             <option value="superadmin">Superadmin</option>
                             <option value="professor">Professor</option>
-                            <option value="student">Aluno</option>
+                            <option value="researcher">Aluno</option>
                           </select>
                           <button
                             onClick={() => handleRoleChange(u.id)}
@@ -399,13 +399,13 @@ export default function AdminPage() {
                         </div>
                       ) : (
                         <div className="flex items-center gap-1 flex-wrap">
-                          {u.role !== 'student' ? (
+                          {u.role !== 'researcher' ? (
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${ROLE_COLORS[u.role] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
                               {ROLE_LABELS[u.role] || u.role}
                             </span>
                           ) : (
                             <>
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${ROLE_COLORS.student}`}>
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${ROLE_COLORS.researcher}`}>
                                 Aluno
                               </span>
                               {u.researcher_status && (

@@ -105,7 +105,7 @@ def seed_users(cur):
     users = [
         (ADMIN_EMAIL,      "Admin",          "superadmin", True,  None,         None),
         (PROFESSOR_EMAIL,  PROFESSOR_NOME,   "professor",  False, professor_id, None),
-        (RESEARCHER_EMAIL, RESEARCHER_NOME,  "student",    False, None,         researcher_id),
+        (RESEARCHER_EMAIL, RESEARCHER_NOME,  "researcher", False, None,         researcher_id),
     ]
     for email, nome, role, is_admin, prof_id, res_id in users:
         cur.execute(

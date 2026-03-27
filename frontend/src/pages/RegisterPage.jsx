@@ -75,11 +75,11 @@ export default function RegisterPage() {
           </div>
           <h1 className="text-2xl font-bold text-blue-700">Alumnus</h1>
         </div>
-        <p className="text-sm text-gray-500 mb-1">Criar conta</p>
-        <p className="text-xs text-gray-600 mb-3 leading-relaxed">{REGISTER_PROFESSOR_ONLY_HINT_PT}</p>
+        <p className="text-sm text-gray-500 mb-1">{inviteEmail ? 'Ativar conta' : 'Criar conta'}</p>
+        {!inviteEmail && <p className="text-xs text-gray-600 mb-3 leading-relaxed">{REGISTER_PROFESSOR_ONLY_HINT_PT}</p>}
         {inviteEmail && (
           <p className="text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 mb-4">
-            Você foi convidado para ativar sua conta. Defina uma senha para continuar.
+            Você foi convidado para o Alumnus. Defina uma senha para ativar sua conta.
           </p>
         )}
 
@@ -95,7 +95,7 @@ export default function RegisterPage() {
             onKeyDown={e => isModEnter(e) && handleSubmit(e)} />
           <button type="submit" disabled={loading}
             className="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-            {loading ? 'Cadastrando...' : <><span>Criar conta</span> <span className="opacity-50 text-xs">{modKey}+Enter</span></>}
+            {loading ? 'Aguarde...' : <><span>{inviteEmail ? 'Ativar conta' : 'Criar conta'}</span> <span className="opacity-50 text-xs">{modKey}+Enter</span></>}
           </button>
         </form>
 

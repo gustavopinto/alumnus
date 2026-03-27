@@ -21,7 +21,7 @@ class TestSlugify:
         assert slugify("Conceição") == "conceicao"
 
     def test_multiple_spaces_become_single_hyphen(self):
-        assert slugify("Ana   Silva") == "ana---silva"
+        assert slugify("Ana   Silva") == "ana-silva"
 
     def test_leading_trailing_whitespace_stripped(self):
         assert slugify("  nome  ") == "nome"

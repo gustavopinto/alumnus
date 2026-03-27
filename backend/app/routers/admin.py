@@ -11,12 +11,12 @@ from ..plan import clear_plan, ensure_professor_plan_defaults
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
-VALID_ROLES = ("professor", "student", "superadmin")
+VALID_ROLES = ("professor", "researcher", "superadmin")
 
 _ADMIN_USER_LIST_ROLE_ORDER = {
     "superadmin": 0,
     "professor":  1,
-    "student":    2,
+    "researcher": 2,
 }
 
 
@@ -86,7 +86,7 @@ def _stats_global(db: Session, hide_superadmin_count: bool, current: User = None
             users_by_role = {
                 "superadmin": 0,
                 "professor":  by_role.get("professor", 0),
-                "student":    by_role.get("student", 0),
+                "researcher": by_role.get("researcher", 0),
             }
         else:
             role_counts = db.query(User.role, func.count(User.id)).group_by(User.role).all()
@@ -94,18 +94,21 @@ def _stats_global(db: Session, hide_superadmin_count: bool, current: User = None
             users_by_role = {
                 "superadmin": by_role.get("superadmin", 0),
                 "professor":  by_role.get("professor", 0),
-                "student":    by_role.get("student", 0),
+                "researcher": by_role.get("researcher", 0),
             }
-        researchers, pending = db.query(
-            func.count(Researcher.id).filter(Researcher.ativo.is_(True)),
-            func.count(Researcher.id).filter(Researcher.ativo.is_(True), Researcher.registered.is_(False)),
-        ).one()
+        researchers = db.query(func.count(Researcher.id)).filter(Researcher.ativo.is_(True)).scalar() or 0
+        pending = (
+            db.query(func.count(Researcher.id))
+            .join(User, User.researcher_id == Researcher.id)
+            .filter(Researcher.ativo.is_(True), User.password_hash.is_(None))
+            .scalar() or 0
+        )
         total_reminders = db.query(func.count(Reminder.id)).scalar()
         total_tips = db.query(func.count(Tip.id)).scalar()
         total_notes = db.query(func.count(Note.id)).scalar()
     else:
         if not institution_ids:
-            users_by_role = {"superadmin": 0, "professor": 0, "student": 0}
+            users_by_role = {"superadmin": 0, "professor": 0, "researcher": 0}
             researchers = 0
             pending = 0
             total_reminders = 0
@@ -130,25 +133,30 @@ def _stats_global(db: Session, hide_superadmin_count: bool, current: User = None
                 .distinct()
                 .all()
             )
-            users_by_role = {"superadmin": 0, "professor": 0, "student": 0}
+            users_by_role = {"superadmin": 0, "professor": 0, "researcher": 0}
             for _, role in visible_users:
                 if role == "superadmin":
                     continue
                 users_by_role[role] = users_by_role.get(role, 0) + 1
 
-            researchers, pending = db.query(
-                func.count(Researcher.id).filter(
+            researchers = (
+                db.query(func.count(Researcher.id))
+                .filter(
                     Researcher.ativo.is_(True),
                     Researcher.group_id.isnot(None),
                     Researcher.group.has(ResearchGroup.institution_id.in_(institution_ids)),
-                ),
-                func.count(Researcher.id).filter(
+                ).scalar() or 0
+            )
+            pending = (
+                db.query(func.count(Researcher.id))
+                .join(User, User.researcher_id == Researcher.id)
+                .filter(
                     Researcher.ativo.is_(True),
-                    Researcher.registered.is_(False),
+                    User.password_hash.is_(None),
                     Researcher.group_id.isnot(None),
                     Researcher.group.has(ResearchGroup.institution_id.in_(institution_ids)),
-                ),
-            ).one()
+                ).scalar() or 0
+            )
             total_reminders = db.query(func.count(Reminder.id)).filter(
                 Reminder.institution_id.in_(institution_ids)
             ).scalar()
@@ -189,11 +197,6 @@ def list_users(db: Session = Depends(get_db), current: User = Depends(require_da
             return [u.researcher.group.institution.name]
         return []
 
-    def _institutions_for_pending(r: Researcher) -> list:
-        if r.group and r.group.institution:
-            return [r.group.institution.name]
-        return []
-
     def _serialize_user(u: User) -> dict:
         return {
             "id": u.id,
@@ -202,31 +205,14 @@ def list_users(db: Session = Depends(get_db), current: User = Depends(require_da
             "role": u.role,
             "is_admin": u.is_admin,
             "researcher_id": u.researcher_id,
-            "researcher_nome": u.researcher.nome if u.researcher else None,
+            "researcher_nome": u.nome if u.researcher else None,
             "researcher_status": u.researcher.status if u.researcher else None,
             "whatsapp": u.whatsapp,
             "photo_url": u.photo_thumb_url or u.photo_url,
             "last_login": u.last_login,
             "created_at": u.created_at,
-            "pending": False,
+            "pending": u.password_hash is None,
             "institutions": _institutions_for_user(u),
-        }
-
-    def _serialize_pending(r: Researcher) -> dict:
-        return {
-            "id": None,
-            "email": r.email or "—",
-            "nome": r.nome,
-            "role": "student",
-            "researcher_id": r.id,
-            "researcher_nome": r.nome,
-            "researcher_status": r.status,
-            "last_login": None,
-            "created_at": None,
-            "whatsapp": None,
-            "photo_url": None,
-            "pending": True,
-            "institutions": _institutions_for_pending(r),
         }
 
     eager_opts = [
@@ -284,43 +270,14 @@ def list_users(db: Session = Depends(get_db), current: User = Depends(require_da
             if self_user:
                 users = [self_user] + list(users)
 
-    pending_query = (
-        db.query(Researcher)
-        .options(joinedload(Researcher.group).joinedload(ResearchGroup.institution))
-        .filter(
-            Researcher.ativo.is_(True),
-            Researcher.registered.is_(False),
-        )
-    )
-    if institution_ids is not None:
-        # Para professores: inclui alunos do grupo/instituição E alunos
-        # orientados diretamente pelo professor (mesmo sem grupo definido)
-        pending_conditions = []
-        if institution_ids:
-            pending_conditions.append(
-                and_(
-                    Researcher.group_id.isnot(None),
-                    Researcher.group.has(ResearchGroup.institution_id.in_(institution_ids)),
-                )
-            )
-        if prof_id:
-            pending_conditions.append(Researcher.orientador_id == prof_id)
-
-        if pending_conditions:
-            pending = pending_query.filter(or_(*pending_conditions)).all()
-        else:
-            pending = []
-    else:
-        pending = pending_query.all()
-
     def _user_sort_key(u: User) -> tuple:
+        # Pendentes (sem senha) vão para o final
+        pending = u.password_hash is None
         role_rank = _ADMIN_USER_LIST_ROLE_ORDER.get(u.role, 99)
-        return (role_rank, (u.nome or "").strip().lower())
+        return (pending, role_rank, (u.nome or "").strip().lower())
 
     users_sorted = sorted(users, key=_user_sort_key)
-    pending_sorted = sorted(pending, key=lambda r: (r.nome or "").strip().lower())
-
-    return [_serialize_user(u) for u in users_sorted] + [_serialize_pending(r) for r in pending_sorted]
+    return [_serialize_user(u) for u in users_sorted]
 
 
 # ── Role update (superadmin only) ─────────────────────────────────────────────
@@ -344,7 +301,19 @@ def update_user(
     user.role = data.role
     user.is_admin = data.role == "superadmin"
 
-    if data.role == "student":
+    # Gerencia FKs atomicamente ao mudar de role (mantém consistência com chk_users_no_dual_fk)
+    if data.role == "researcher":
+        # researcher não deve ter professor_id
+        user.professor_id = None
+    elif data.role == "professor":
+        # professor não deve ter researcher_id
+        user.researcher_id = None
+    elif data.role == "superadmin":
+        # superadmin é um papel puro — sem perfil vinculado
+        user.professor_id = None
+        user.researcher_id = None
+
+    if data.role == "researcher":
         clear_plan(user)
     elif data.role in ("professor", "superadmin") and old_role not in ("professor", "superadmin"):
         ensure_professor_plan_defaults(user)
@@ -372,7 +341,6 @@ def delete_user(
         researcher = db.query(Researcher).filter(Researcher.id == user.researcher_id).first()
         if researcher:
             researcher.ativo = False
-            researcher.registered = False
     # Nullify FK references to avoid integrity errors
     db.query(Note).filter(Note.created_by_id == user_id).update({"created_by_id": None})
     db.query(Reminder).filter(Reminder.created_by_id == user_id).update({"created_by_id": None})
@@ -399,20 +367,24 @@ def bulk_delete(
                 researcher = db.query(Researcher).filter(Researcher.id == user.researcher_id).first()
                 if researcher:
                     researcher.ativo = False
-                    researcher.registered = False
             db.query(Note).filter(Note.created_by_id == uid).update({"created_by_id": None})
             db.query(Reminder).filter(Reminder.created_by_id == uid).update({"created_by_id": None})
             db.query(Tip).filter(Tip.author_id == uid).update({"author_id": None})
             db.query(TipComment).filter(TipComment.author_id == uid).update({"author_id": None})
             db.delete(user)
     for rid in data.researcher_ids:
-        researcher = db.query(Researcher).filter(Researcher.id == rid).first()
-        if researcher and not researcher.registered:
-            db.delete(researcher)
+        # researcher_ids: compatibilidade — encontra via user vinculado
+        user = db.query(User).filter(User.researcher_id == rid).first()
+        if user and user.password_hash is None:
+            researcher = db.query(Researcher).filter(Researcher.id == rid).first()
+            db.query(Note).filter(Note.created_by_id == user.id).update({"created_by_id": None})
+            db.delete(user)
+            if researcher:
+                db.delete(researcher)
     db.commit()
 
 
-# ── Delete pending researcher (superadmin only) ────────────────────────────────
+# ── Delete pending researcher ──────────────────────────────────────────────────
 
 @router.delete("/researchers/{researcher_id}", status_code=204)
 def delete_pending_researcher(
@@ -423,7 +395,12 @@ def delete_pending_researcher(
     researcher = db.query(Researcher).filter(Researcher.id == researcher_id).first()
     if not researcher:
         raise HTTPException(status_code=404, detail="Pesquisador não encontrado")
-    if researcher.registered:
-        raise HTTPException(status_code=400, detail="Pesquisador já possui conta — remova o usuário")
-    db.delete(researcher)
+    user = db.query(User).filter(User.researcher_id == researcher_id).first()
+    if user and user.password_hash is not None:
+        raise HTTPException(status_code=400, detail="Pesquisador já possui conta ativa — remova o usuário")
+    if user:
+        db.query(Note).filter(Note.created_by_id == user.id).update({"created_by_id": None})
+        db.delete(user)
+    if researcher:
+        db.delete(researcher)
     db.commit()

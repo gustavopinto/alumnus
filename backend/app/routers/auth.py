@@ -13,7 +13,6 @@ from ..schemas import RegisterRequest, LoginRequest, TokenOut, UserOut
 from ..plan import ensure_professor_plan_defaults, refresh_user_plan_status, user_to_out
 from ..deps import get_current_user, SECRET_KEY, ALGORITHM
 from ..services import auth_service
-from ..institutional_email import INSTITUTIONAL_EMAIL_HELP_PT, is_public_email_domain
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -37,19 +36,8 @@ def make_token(user: User) -> str:
 
 @router.post("/register", response_model=UserOut, status_code=201)
 def register(data: RegisterRequest, db: Session = Depends(get_db)):
-    if auth_service.user_email_exists(db, data.email):
-        raise HTTPException(status_code=409, detail="Email já cadastrado")
-
-    researcher = auth_service.get_active_researcher_for_email(db, data.email)
-    if not researcher:
-        if is_public_email_domain(data.email):
-            raise HTTPException(status_code=400, detail=INSTITUTIONAL_EMAIL_HELP_PT)
-        raise HTTPException(
-            status_code=404,
-            detail="Email não encontrado. Entre em contato com seu orientador.",
-        )
-
-    user = auth_service.create_student_from_researcher(db, data, researcher, pwd_ctx)
+    """Ativa conta de um usuário convidado: define a senha pela primeira vez."""
+    user = auth_service.activate_account(db, data, pwd_ctx)
     return user_to_out(user)
 
 

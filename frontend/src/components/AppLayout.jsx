@@ -310,7 +310,7 @@ export default function AppLayout() {
             }
           }).catch(() => { setCurrentInstitution(null); });
         } else {
-          // student: sem filtro de instituição
+          // researcher: sem filtro de instituição
           setCurrentInstitution(null);
         }
       }

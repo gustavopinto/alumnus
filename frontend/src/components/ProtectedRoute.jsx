@@ -45,7 +45,7 @@ export default function ProtectedRoute({ children, professorOnly = false, adminO
 
         if (payload.is_admin || isPrivileged(payload.role)) { setState('ok'); return; }
 
-        // student
+        // researcher
         if (professorOnly) { setState('forbidden'); return; }
 
         const me = await getMe();

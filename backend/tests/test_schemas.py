@@ -2,7 +2,7 @@
 Unit tests for app/schemas.py validators.
 
 Covers field_validators on:
-- ResearcherUpdate (instagram_url, twitter_url)
+- UserProfileUpdate (instagram_url, twitter_url)
 - RegisterRequest (email normalization, password length)
 """
 
@@ -10,121 +10,121 @@ import pytest
 from datetime import date
 from pydantic import ValidationError
 
-from app.schemas import ResearcherUpdate, RegisterRequest, ReminderCreate, ReminderUpdate
+from app.schemas import UserProfileUpdate, RegisterRequest, ReminderCreate, ReminderUpdate
 
 
 # ---------------------------------------------------------------------------
-# ResearcherUpdate.validate_instagram_handle
+# UserProfileUpdate.validate_instagram_handle
 # ---------------------------------------------------------------------------
 
 class TestInstagramHandleValidator:
     def test_valid_handle_without_at(self):
-        obj = ResearcherUpdate(instagram_url="joao.silva")
+        obj = UserProfileUpdate(instagram_url="joao.silva")
         assert obj.instagram_url == "joao.silva"
 
     def test_valid_handle_with_at_prefix_is_stripped(self):
-        obj = ResearcherUpdate(instagram_url="@joao.silva")
+        obj = UserProfileUpdate(instagram_url="@joao.silva")
         assert obj.instagram_url == "joao.silva"
 
     def test_none_is_accepted(self):
-        obj = ResearcherUpdate(instagram_url=None)
+        obj = UserProfileUpdate(instagram_url=None)
         assert obj.instagram_url is None
 
     def test_empty_string_becomes_none(self):
-        obj = ResearcherUpdate(instagram_url="")
+        obj = UserProfileUpdate(instagram_url="")
         assert obj.instagram_url is None
 
     def test_whitespace_only_becomes_none(self):
-        obj = ResearcherUpdate(instagram_url="   ")
+        obj = UserProfileUpdate(instagram_url="   ")
         assert obj.instagram_url is None
 
     def test_handle_with_dots_and_underscores(self):
-        obj = ResearcherUpdate(instagram_url="my.handle_123")
+        obj = UserProfileUpdate(instagram_url="my.handle_123")
         assert obj.instagram_url == "my.handle_123"
 
     def test_handle_31_chars_raises(self):
         long_handle = "a" * 31  # exceeds 30 char limit
         with pytest.raises(ValidationError) as exc_info:
-            ResearcherUpdate(instagram_url=long_handle)
+            UserProfileUpdate(instagram_url=long_handle)
         assert "Instagram" in str(exc_info.value)
 
     def test_handle_with_invalid_char_raises(self):
         with pytest.raises(ValidationError) as exc_info:
-            ResearcherUpdate(instagram_url="invalid handle!")
+            UserProfileUpdate(instagram_url="invalid handle!")
         assert "Instagram" in str(exc_info.value)
 
     def test_handle_with_hyphen_raises(self):
         with pytest.raises(ValidationError):
-            ResearcherUpdate(instagram_url="invalid-handle")
+            UserProfileUpdate(instagram_url="invalid-handle")
 
     def test_handle_exactly_30_chars_accepted(self):
         handle = "a" * 30
-        obj = ResearcherUpdate(instagram_url=handle)
+        obj = UserProfileUpdate(instagram_url=handle)
         assert obj.instagram_url == handle
 
     def test_handle_exactly_1_char_accepted(self):
-        obj = ResearcherUpdate(instagram_url="a")
+        obj = UserProfileUpdate(instagram_url="a")
         assert obj.instagram_url == "a"
 
     def test_at_prefix_stripped_then_validated(self):
         # "@" + 30 valid chars = total string 31 chars, but after stripping @ it is 30 — valid
         handle = "@" + "a" * 30
-        obj = ResearcherUpdate(instagram_url=handle)
+        obj = UserProfileUpdate(instagram_url=handle)
         assert obj.instagram_url == "a" * 30
 
 
 # ---------------------------------------------------------------------------
-# ResearcherUpdate.validate_twitter_handle
+# UserProfileUpdate.validate_twitter_handle
 # ---------------------------------------------------------------------------
 
 class TestTwitterHandleValidator:
     def test_valid_handle_without_at(self):
-        obj = ResearcherUpdate(twitter_url="joao_silva")
+        obj = UserProfileUpdate(twitter_url="joao_silva")
         assert obj.twitter_url == "joao_silva"
 
     def test_valid_handle_with_at_prefix_is_stripped(self):
-        obj = ResearcherUpdate(twitter_url="@joao_silva")
+        obj = UserProfileUpdate(twitter_url="@joao_silva")
         assert obj.twitter_url == "joao_silva"
 
     def test_none_is_accepted(self):
-        obj = ResearcherUpdate(twitter_url=None)
+        obj = UserProfileUpdate(twitter_url=None)
         assert obj.twitter_url is None
 
     def test_empty_string_becomes_none(self):
-        obj = ResearcherUpdate(twitter_url="")
+        obj = UserProfileUpdate(twitter_url="")
         assert obj.twitter_url is None
 
     def test_whitespace_only_becomes_none(self):
-        obj = ResearcherUpdate(twitter_url="   ")
+        obj = UserProfileUpdate(twitter_url="   ")
         assert obj.twitter_url is None
 
     def test_handle_16_chars_raises(self):
         long_handle = "a" * 16  # exceeds 15 char limit
         with pytest.raises(ValidationError) as exc_info:
-            ResearcherUpdate(twitter_url=long_handle)
+            UserProfileUpdate(twitter_url=long_handle)
         assert "Twitter" in str(exc_info.value)
 
     def test_handle_exactly_15_chars_accepted(self):
         handle = "a" * 15
-        obj = ResearcherUpdate(twitter_url=handle)
+        obj = UserProfileUpdate(twitter_url=handle)
         assert obj.twitter_url == handle
 
     def test_handle_with_dot_raises(self):
         # dots are not allowed in Twitter handles
         with pytest.raises(ValidationError):
-            ResearcherUpdate(twitter_url="user.name")
+            UserProfileUpdate(twitter_url="user.name")
 
     def test_handle_with_hyphen_raises(self):
         with pytest.raises(ValidationError):
-            ResearcherUpdate(twitter_url="user-name")
+            UserProfileUpdate(twitter_url="user-name")
 
     def test_alphanumeric_and_underscore_accepted(self):
-        obj = ResearcherUpdate(twitter_url="User_123")
+        obj = UserProfileUpdate(twitter_url="User_123")
         assert obj.twitter_url == "User_123"
 
     def test_at_prefix_stripped_then_validated(self):
         handle = "@" + "a" * 15
-        obj = ResearcherUpdate(twitter_url=handle)
+        obj = UserProfileUpdate(twitter_url=handle)
         assert obj.twitter_url == "a" * 15
 
 
@@ -156,7 +156,7 @@ class TestRegisterRequestValidators:
     def test_password_7_chars_raises(self):
         with pytest.raises(ValidationError) as exc_info:
             RegisterRequest(email="a@b.com", password="1234567")
-        assert "8 characters" in str(exc_info.value)
+        assert "8 caracter" in str(exc_info.value)
 
     def test_password_empty_raises(self):
         with pytest.raises(ValidationError):

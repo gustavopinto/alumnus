@@ -87,14 +87,11 @@ class Researcher(Base):
     __tablename__ = "researchers"
 
     id               = Column(Integer, primary_key=True, index=True)
-    nome             = Column(String(255), nullable=False)
     status           = Column(String(50), nullable=False)  # graduacao, mestrado, doutorado, postdoc
-    email            = Column(String(255), nullable=True)
     group_id         = Column(Integer, ForeignKey("research_groups.id"), nullable=True)
     orientador_id    = Column(Integer, ForeignKey("professors.id"), nullable=True)
     observacoes      = Column(Text, nullable=True)
     ativo            = Column(Boolean, default=True)
-    registered       = Column(Boolean, default=False)
     matricula        = Column(String(50), nullable=True)
     curso            = Column(String(255), nullable=True)
     enrollment_date  = Column(Date, nullable=True)
@@ -104,6 +101,20 @@ class Researcher(Base):
     orientador = relationship("Professor", back_populates="researchers")
     group      = relationship("ResearchGroup", back_populates="researchers")
     user       = relationship("User", primaryjoin="User.researcher_id == Researcher.id", foreign_keys="[User.researcher_id]", uselist=False, viewonly=True)
+
+    # Propriedades delegadas ao User vinculado
+    @property
+    def nome(self) -> str:
+        return self.user.nome if self.user else ""
+
+    @property
+    def email(self) -> str | None:
+        return self.user.email if self.user else None
+
+    @property
+    def registered(self) -> bool:
+        """True quando o usuário já definiu sua senha (conta ativa)."""
+        return bool(self.user and self.user.password_hash)
 
     @property
     def photo_url(self) -> str | None:
@@ -153,8 +164,8 @@ class User(Base):
     id                   = Column(Integer, primary_key=True, index=True)
     email                = Column(String(255), unique=True, nullable=False, index=True)
     nome                 = Column(String(255), nullable=False)
-    password_hash        = Column(String(255), nullable=False)
-    role                 = Column(String(20), nullable=False)  # superadmin | professor | student
+    password_hash        = Column(String(255), nullable=True)
+    role                 = Column(String(20), nullable=False)  # superadmin | professor | researcher
     is_admin             = Column(Boolean, nullable=False, default=False)  # computed from role
     professor_id         = Column(Integer, ForeignKey("professors.id"), nullable=True)
     researcher_id        = Column(Integer, ForeignKey("researchers.id"), nullable=True)

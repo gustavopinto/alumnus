@@ -86,18 +86,33 @@ class JoinGroupRequest(BaseModel):
 
 class ResearcherCreate(BaseModel):
     nome: str
+    email: str  # obrigatório: cria User vinculado
     status: str
-    email: Optional[str] = None
     orientador_id: Optional[int] = None  # FK → professors.id
     group_id: Optional[int] = None
     observacoes: Optional[str] = None
     institution_id: Optional[int] = None
 
+    @field_validator("email")
+    @classmethod
+    def email_normalize(cls, v: str) -> str:
+        v = (v or "").strip().lower()
+        if not v:
+            raise ValueError("Email é obrigatório")
+        return v
+
+    @field_validator("nome")
+    @classmethod
+    def nome_strip(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("Nome é obrigatório")
+        return v
+
 
 class ResearcherUpdate(BaseModel):
-    nome: Optional[str] = None
+    # nome e email são gerenciados via User — use PATCH /users/me ou admin
     status: Optional[str] = None
-    email: Optional[str] = None
     orientador_id: Optional[int] = None  # FK → professors.id
     group_id: Optional[int] = None
     observacoes: Optional[str] = None

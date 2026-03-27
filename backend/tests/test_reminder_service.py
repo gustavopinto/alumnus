@@ -2,7 +2,6 @@
 Unit tests for app/services/reminder_service.py
 
 Covers:
-- _extract_mention_slugs
 - reminder_to_out
 - list_ordered / list_reminders_out
 - create (with and without mentions)
@@ -23,39 +22,6 @@ from app.schemas import ReminderCreate, ReminderUpdate
 from app.models import Reminder, User, Researcher
 
 from .conftest import make_researcher, make_user, make_reminder
-
-
-# ---------------------------------------------------------------------------
-# _extract_mention_slugs
-# ---------------------------------------------------------------------------
-
-class TestExtractMentionSlugs:
-    def test_no_mentions_returns_empty_set(self):
-        assert reminder_service._extract_mention_slugs("nenhuma menção aqui") == set()
-
-    def test_single_mention(self):
-        slugs = reminder_service._extract_mention_slugs("oi @joao-silva tudo bem?")
-        assert slugs == {"joao-silva"}
-
-    def test_multiple_mentions(self):
-        slugs = reminder_service._extract_mention_slugs("@ana e @carlos fiz isso")
-        assert slugs == {"ana", "carlos"}
-
-    def test_duplicate_mentions_deduplicated(self):
-        slugs = reminder_service._extract_mention_slugs("@ana @ana @ana")
-        assert slugs == {"ana"}
-
-    def test_mention_at_start_of_text(self):
-        slugs = reminder_service._extract_mention_slugs("@first em pé")
-        assert "first" in slugs
-
-    def test_hyphenated_slug(self):
-        slugs = reminder_service._extract_mention_slugs("@joao-da-silva conferir prazo")
-        assert "joao-da-silva" in slugs
-
-    def test_underscore_in_slug(self):
-        slugs = reminder_service._extract_mention_slugs("@user_name aqui")
-        assert "user_name" in slugs
 
 
 # ---------------------------------------------------------------------------
@@ -203,33 +169,22 @@ class TestCreate:
         total = db.query(Reminder).count()
         assert total == 1
 
-    def test_creates_mention_copy_for_different_user(self, db):
-        researcher = make_researcher(db, nome="Ana Silva", email="ana@univ.edu.br")
-        mentioned_user = make_user(
-            db, email="ana@univ.edu.br", nome="Ana Silva",
-            researcher_id=researcher.id, role="student"
-        )
+    def test_creates_single_reminder_with_mention_text(self, db):
         creator = make_user(db, email="creator@univ.edu.br", nome="Creator", role="professor")
 
         data = ReminderCreate(text="@ana-silva revise o prazo")
         reminder_service.create(db, data, created_by_id=creator.id)
 
         total = db.query(Reminder).count()
-        # original + 1 copy for mentioned user
-        assert total == 2
+        assert total == 1
 
-    def test_no_copy_when_creator_mentions_self(self, db):
-        researcher = make_researcher(db, nome="Ana Silva", email="self@univ.edu.br")
-        creator = make_user(
-            db, email="self@univ.edu.br", nome="Ana Silva",
-            researcher_id=researcher.id, role="student"
-        )
+    def test_creates_reminder_with_institution_id(self, db):
+        creator = make_user(db, email="inst@univ.edu.br", nome="Prof", role="professor")
 
-        data = ReminderCreate(text="@ana-silva lembro a mim mesmo")
-        reminder_service.create(db, data, created_by_id=creator.id)
+        data = ReminderCreate(text="Lembrete institucional", institution_id=None)
+        reminder = reminder_service.create(db, data, created_by_id=creator.id)
 
-        total = db.query(Reminder).count()
-        assert total == 1  # no copy for self
+        assert reminder.created_by_id == creator.id
 
 
 # ---------------------------------------------------------------------------
@@ -286,40 +241,40 @@ class TestUpdate:
 class TestCanUserDeleteReminder:
     def test_professor_can_delete_any_reminder(self, db):
         professor = make_user(db, email="prof@univ.edu.br", role="professor")
-        other = make_user(db, email="other@univ.edu.br", role="student")
+        other = make_user(db, email="other@univ.edu.br", role="researcher")
         reminder = make_reminder(db, created_by_id=other.id)
 
         assert reminder_service.can_user_delete_reminder(professor, reminder) is True
 
     def test_admin_can_delete_any_reminder(self, db):
         admin = make_user(db, email="admin@univ.edu.br", role="admin")
-        other = make_user(db, email="s@univ.edu.br", role="student")
+        other = make_user(db, email="s@univ.edu.br", role="researcher")
         reminder = make_reminder(db, created_by_id=other.id)
 
         assert reminder_service.can_user_delete_reminder(admin, reminder) is True
 
     def test_superadmin_can_delete_any_reminder(self, db):
         superadmin = make_user(db, email="sa@univ.edu.br", role="superadmin")
-        other = make_user(db, email="s2@univ.edu.br", role="student")
+        other = make_user(db, email="s2@univ.edu.br", role="researcher")
         reminder = make_reminder(db, created_by_id=other.id)
 
         assert reminder_service.can_user_delete_reminder(superadmin, reminder) is True
 
     def test_student_can_delete_own_reminder(self, db):
-        student = make_user(db, email="st@univ.edu.br", role="student")
+        student = make_user(db, email="st@univ.edu.br", role="researcher")
         reminder = make_reminder(db, created_by_id=student.id)
 
         assert reminder_service.can_user_delete_reminder(student, reminder) is True
 
     def test_student_cannot_delete_others_reminder(self, db):
-        student = make_user(db, email="st2@univ.edu.br", role="student")
-        other = make_user(db, email="other2@univ.edu.br", role="student")
+        student = make_user(db, email="st2@univ.edu.br", role="researcher")
+        other = make_user(db, email="other2@univ.edu.br", role="researcher")
         reminder = make_reminder(db, created_by_id=other.id)
 
         assert reminder_service.can_user_delete_reminder(student, reminder) is False
 
     def test_student_cannot_delete_reminder_with_no_creator(self, db):
-        student = make_user(db, email="st3@univ.edu.br", role="student")
+        student = make_user(db, email="st3@univ.edu.br", role="researcher")
         reminder = make_reminder(db, created_by_id=None)
 
         assert reminder_service.can_user_delete_reminder(student, reminder) is False

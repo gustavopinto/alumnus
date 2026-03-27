@@ -1,11 +1,12 @@
 import logging
 from datetime import datetime
 
+from fastapi import HTTPException
 from passlib.context import CryptContext
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from ..models import Researcher, User
+from ..models import User
 from ..schemas import RegisterRequest
 
 logger = logging.getLogger(__name__)
@@ -22,33 +23,37 @@ def user_email_exists(db: Session, email: str) -> bool:
     )
 
 
-def get_active_researcher_for_email(db: Session, email: str) -> Researcher | None:
-    e = _norm_email(email)
-    return (
-        db.query(Researcher)
-        .filter(func.lower(Researcher.email) == e, Researcher.ativo == True)
-        .first()
-    )
-
-
-def create_student_from_researcher(
+def activate_account(
     db: Session,
     data: RegisterRequest,
-    researcher: Researcher,
     pwd_ctx: CryptContext,
 ) -> User:
-    user = User(
-        email=data.email,
-        nome=researcher.nome,
-        password_hash=pwd_ctx.hash(data.password),
-        role="student",
-        researcher_id=researcher.id,
-    )
-    db.add(user)
-    researcher.registered = True
+    """Define a senha de um User pendente (convidado mas sem senha)."""
+    from ..models import Researcher
+    e = _norm_email(data.email)
+    user = db.query(User).filter(func.lower(User.email) == e).first()
+    if not user:
+        raise HTTPException(
+            status_code=404,
+            detail="Email não encontrado. Entre em contato com seu orientador.",
+        )
+    # Bloqueia ativação se o pesquisador vinculado foi inativado
+    if user.researcher_id:
+        researcher = db.query(Researcher).filter(Researcher.id == user.researcher_id).first()
+        if researcher and not researcher.ativo:
+            raise HTTPException(
+                status_code=404,
+                detail="Email não encontrado. Entre em contato com seu orientador.",
+            )
+    if user.password_hash is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="Esta conta já está ativa. Use o login.",
+        )
+    user.password_hash = pwd_ctx.hash(data.password)
     db.commit()
     db.refresh(user)
-    logger.info("User registered: %s (student)", user.email)
+    logger.info("Account activated: %s", user.email)
     return user
 
 
@@ -57,7 +62,9 @@ def authenticate(
 ) -> User | None:
     e = _norm_email(email)
     user = db.query(User).filter(func.lower(User.email) == e).first()
-    if not user or not pwd_ctx.verify(password, user.password_hash):
+    if not user or user.password_hash is None:
+        return None
+    if not pwd_ctx.verify(password, user.password_hash):
         return None
     return user
 

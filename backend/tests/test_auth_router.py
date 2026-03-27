@@ -30,7 +30,7 @@ from .conftest import make_researcher, make_user, pwd_ctx
 
 class TestMakeToken:
     def test_token_contains_user_id(self, db):
-        user = make_user(db, email="tok@univ.edu.br", role="student")
+        user = make_user(db, email="tok@univ.edu.br", role="researcher")
         token = make_token(user)
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         assert payload["sub"] == str(user.id)
@@ -41,20 +41,20 @@ class TestMakeToken:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         assert payload["role"] == "professor"
 
-    def test_token_is_admin_true_for_admin_role(self, db):
-        user = make_user(db, email="adm_tok@univ.edu.br", role="admin")
+    def test_token_is_admin_true_for_superadmin_role(self, db):
+        user = make_user(db, email="adm_tok@univ.edu.br", role="superadmin")
         token = make_token(user)
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         assert payload["is_admin"] is True
 
     def test_token_is_admin_false_for_student(self, db):
-        user = make_user(db, email="stu_tok@univ.edu.br", role="student")
+        user = make_user(db, email="stu_tok@univ.edu.br", role="researcher")
         token = make_token(user)
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         assert payload["is_admin"] is False
 
     def test_token_has_exp_field(self, db):
-        user = make_user(db, email="exp_tok@univ.edu.br", role="student")
+        user = make_user(db, email="exp_tok@univ.edu.br", role="researcher")
         token = make_token(user)
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         assert "exp" in payload
@@ -84,43 +84,44 @@ class TestRegister:
         client, db = http_client
         make_researcher(db, nome="Novo Aluno", email="novo@univ.edu.br", ativo=True)
 
-        resp = client.post("/auth/register", json={
+        resp = client.post("/api/auth/register", json={
             "email": "novo@univ.edu.br",
             "password": "strongpass1",
         })
         assert resp.status_code == 201
         data = resp.json()
         assert data["email"] == "novo@univ.edu.br"
-        assert data["role"] == "student"
+        assert data["role"] == "researcher"
 
     def test_duplicate_email_returns_409(self, http_client):
         client, db = http_client
         make_researcher(db, nome="Dup Aluno", email="dup@univ.edu.br", ativo=True)
         # First registration
-        client.post("/auth/register", json={"email": "dup@univ.edu.br", "password": "strongpass1"})
+        client.post("/api/auth/register", json={"email": "dup@univ.edu.br", "password": "strongpass1"})
         # Second registration with same email
-        resp = client.post("/auth/register", json={"email": "dup@univ.edu.br", "password": "anotherpass"})
+        resp = client.post("/api/auth/register", json={"email": "dup@univ.edu.br", "password": "anotherpass"})
         assert resp.status_code == 409
 
     def test_email_not_in_researcher_returns_404(self, http_client):
         client, db = http_client
-        resp = client.post("/auth/register", json={
+        resp = client.post("/api/auth/register", json={
             "email": "ghost@univ.edu.br",
             "password": "strongpass1",
         })
         assert resp.status_code == 404
 
-    def test_public_email_without_researcher_returns_400(self, http_client):
+    def test_unknown_email_returns_404(self, http_client):
         client, db = http_client
-        resp = client.post("/auth/register", json={
+        # No new self-registration; accounts must be pre-created by admin
+        resp = client.post("/api/auth/register", json={
             "email": "nobody@gmail.com",
             "password": "strongpass1",
         })
-        assert resp.status_code == 400
+        assert resp.status_code == 404
 
     def test_password_too_short_returns_422(self, http_client):
         client, db = http_client
-        resp = client.post("/auth/register", json={
+        resp = client.post("/api/auth/register", json={
             "email": "short@univ.edu.br",
             "password": "1234567",
         })
@@ -130,7 +131,7 @@ class TestRegister:
         client, db = http_client
         make_researcher(db, nome="Inativo", email="inativo@univ.edu.br", ativo=False)
 
-        resp = client.post("/auth/register", json={
+        resp = client.post("/api/auth/register", json={
             "email": "inativo@univ.edu.br",
             "password": "strongpass1",
         })
@@ -140,7 +141,7 @@ class TestRegister:
         client, db = http_client
         make_researcher(db, nome="Case Aluno", email="case@univ.edu.br", ativo=True)
 
-        resp = client.post("/auth/register", json={
+        resp = client.post("/api/auth/register", json={
             "email": "CASE@UNIV.EDU.BR",
             "password": "strongpass1",
         })
@@ -150,7 +151,7 @@ class TestRegister:
         client, db = http_client
         researcher = make_researcher(db, nome="Mark R", email="markr@univ.edu.br", ativo=True)
 
-        client.post("/auth/register", json={"email": "markr@univ.edu.br", "password": "strongpass1"})
+        client.post("/api/auth/register", json={"email": "markr@univ.edu.br", "password": "strongpass1"})
         db.refresh(researcher)
         assert researcher.registered is True
 
@@ -164,7 +165,7 @@ class TestLogin:
         client, db = http_client
         make_user(db, email="login@univ.edu.br", password="correctpass")
 
-        resp = client.post("/auth/login", json={
+        resp = client.post("/api/auth/login", json={
             "email": "login@univ.edu.br",
             "password": "correctpass",
         })
@@ -177,7 +178,7 @@ class TestLogin:
         client, db = http_client
         make_user(db, email="wrongpw@univ.edu.br", password="correctpass")
 
-        resp = client.post("/auth/login", json={
+        resp = client.post("/api/auth/login", json={
             "email": "wrongpw@univ.edu.br",
             "password": "wrongpassword",
         })
@@ -185,7 +186,7 @@ class TestLogin:
 
     def test_nonexistent_user_returns_401(self, http_client):
         client, db = http_client
-        resp = client.post("/auth/login", json={
+        resp = client.post("/api/auth/login", json={
             "email": "nobody@univ.edu.br",
             "password": "any",
         })
@@ -196,7 +197,7 @@ class TestLogin:
         user = make_user(db, email="lastlogin@univ.edu.br", password="testpass9")
         assert user.last_login is None
 
-        client.post("/auth/login", json={"email": "lastlogin@univ.edu.br", "password": "testpass9"})
+        client.post("/api/auth/login", json={"email": "lastlogin@univ.edu.br", "password": "testpass9"})
         db.refresh(user)
         assert user.last_login is not None
 
@@ -204,7 +205,7 @@ class TestLogin:
         client, db = http_client
         make_user(db, email="decode@univ.edu.br", password="decodepass")
 
-        resp = client.post("/auth/login", json={"email": "decode@univ.edu.br", "password": "decodepass"})
+        resp = client.post("/api/auth/login", json={"email": "decode@univ.edu.br", "password": "decodepass"})
         token = resp.json()["access_token"]
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         assert payload["email"] == "decode@univ.edu.br"
@@ -213,7 +214,7 @@ class TestLogin:
         client, db = http_client
         make_user(db, email="ci_login@univ.edu.br", password="cipassword")
 
-        resp = client.post("/auth/login", json={
+        resp = client.post("/api/auth/login", json={
             "email": "CI_LOGIN@UNIV.EDU.BR",
             "password": "cipassword",
         })
@@ -241,7 +242,7 @@ class TestMe:
         app.dependency_overrides[get_current_user] = override_get_current_user
 
         with TestClient(app) as c:
-            resp = c.get("/auth/me")
+            resp = c.get("/api/auth/me")
 
         app.dependency_overrides.clear()
 
@@ -252,5 +253,5 @@ class TestMe:
 
     def test_me_without_auth_returns_403_or_401(self, http_client):
         client, db = http_client
-        resp = client.get("/auth/me")
+        resp = client.get("/api/auth/me")
         assert resp.status_code in (401, 403)
