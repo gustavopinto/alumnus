@@ -769,7 +769,7 @@ export default function ResearcherPage() {
     }
   }
 
-  useEffect(() => { load(); }, [slug]);
+  useEffect(() => { if (currentInstitution === undefined) return; load(); }, [slug, currentInstitution]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setProfileTopbar(null);

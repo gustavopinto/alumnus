@@ -64,7 +64,7 @@ export default function DeadlinesPage() {
     setInterests(iv || []);
   }, []);
 
-  useEffect(() => { load(currentInstitution?.id); }, [load, currentInstitution, deadlinesRefreshKey]);
+  useEffect(() => { if (currentInstitution === undefined) return; load(currentInstitution?.id); }, [load, currentInstitution, deadlinesRefreshKey]);
 
   async function handleToggle(deadlineId) {
     if (loading) return;

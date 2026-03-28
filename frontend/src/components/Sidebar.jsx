@@ -32,7 +32,7 @@ function RemindersDropdown({ rail = false, refreshKey = 0, onRefresh = null, cur
     setReminders(data || []);
   }, [institutionId]);
 
-  useEffect(() => { load(); }, [refreshKey, load]);
+  useEffect(() => { if (institutionId === undefined) return; load(); }, [refreshKey, load, institutionId]);
 
 
   useEffect(() => {
@@ -379,7 +379,10 @@ const INSTITUTION_ICON = (
 /** Barra estreita com ícones quando o menu principal está recolhido */
 export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshKey = 0, currentUser = null, role = null, isAdmin = false, currentInstitution = null }) {
   const [railDeadlines, setRailDeadlines] = useState([]);
-  useEffect(() => { getDeadlines(currentInstitution?.id).then(d => setRailDeadlines(d || [])).catch(() => {}); }, [currentInstitution]);
+  useEffect(() => {
+    if (currentInstitution === undefined) return;
+    getDeadlines(currentInstitution?.id).then(d => setRailDeadlines(d || [])).catch(() => {});
+  }, [currentInstitution]);
   const upcomingDeadlines = railDeadlines.filter(d => daysUntil(d.date) >= 0);
 
   return (
@@ -409,7 +412,7 @@ export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshK
           )}
         </Link>
 
-        <RemindersDropdown rail refreshKey={remindersRefreshKey} currentUser={currentUser} institutionId={currentInstitution?.id ?? null} />
+        <RemindersDropdown rail refreshKey={remindersRefreshKey} currentUser={currentUser} institutionId={currentInstitution === undefined ? undefined : (currentInstitution?.id ?? null)} />
 
         <Link
           to="/app/deadlines"
@@ -458,10 +461,17 @@ export default function Sidebar({ researchers, onRefresh, onRefreshReminders = n
   const [renamingGroup, setRenamingGroup] = useState(false);
   const [renameInput, setRenameInput] = useState('');
   const [sidebarDeadlines, setSidebarDeadlines] = useState([]);
-  useEffect(() => { getDeadlines(currentInstitution?.id).then(d => setSidebarDeadlines(d || [])).catch(() => {}); }, [currentInstitution, deadlinesRefreshKey]);
-  const [sidebarTipCount, setSidebarTipCount] = useState(0);
-  useEffect(() => { getTips(currentInstitution?.id).then(d => setSidebarTipCount(Array.isArray(d) ? d.length : 0)).catch(() => {}); }, [currentInstitution, tipsRefreshKey]);
   useEffect(() => {
+    if (currentInstitution === undefined) return;
+    getDeadlines(currentInstitution?.id).then(d => setSidebarDeadlines(d || [])).catch(() => {});
+  }, [currentInstitution, deadlinesRefreshKey]);
+  const [sidebarTipCount, setSidebarTipCount] = useState(0);
+  useEffect(() => {
+    if (currentInstitution === undefined) return;
+    getTips(currentInstitution?.id).then(d => setSidebarTipCount(Array.isArray(d) ? d.length : 0)).catch(() => {});
+  }, [currentInstitution, tipsRefreshKey]);
+  useEffect(() => {
+    if (currentInstitution === undefined) return;
     if (isAdmin) {
       getProfessors().then(data => setProfessors(data || [])).catch(() => {});
     }
@@ -567,7 +577,7 @@ export default function Sidebar({ researchers, onRefresh, onRefreshReminders = n
       )}
 
       {/* Lembretes */}
-      <RemindersDropdown refreshKey={remindersRefreshKey} onRefresh={onRefreshReminders} currentUser={currentUser} researchers={researchers} institutionId={currentInstitution?.id ?? null} />
+      <RemindersDropdown refreshKey={remindersRefreshKey} onRefresh={onRefreshReminders} currentUser={currentUser} researchers={researchers} institutionId={currentInstitution === undefined ? undefined : (currentInstitution?.id ?? null)} />
 
       {/* Deadlines */}
       <Dropdown label="Próximos deadlines" icon={CALENDAR_ICON} badge={upcomingDeadlines.length} linkTo="/app/deadlines" disabled={sidebarDeadlines.length <= 1}>

@@ -269,7 +269,7 @@ export default function ManualPage() {
     setEntries(data || []);
   }
 
-  useEffect(() => { load(currentInstitution?.id); }, [currentInstitution]);
+  useEffect(() => { if (currentInstitution === undefined) return; load(currentInstitution?.id); }, [currentInstitution]);
 
   async function handleSubmit(e) {
     e.preventDefault();

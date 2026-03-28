@@ -39,7 +39,7 @@ export default function RemindersPage() {
     setReminders(data || []);
   }, [currentInstitution]);
 
-  useEffect(() => { load(); }, [load, remindersRefreshKey]);
+  useEffect(() => { if (currentInstitution === undefined) return; load(); }, [load, remindersRefreshKey, currentInstitution]);
 
 
   useEffect(() => {
