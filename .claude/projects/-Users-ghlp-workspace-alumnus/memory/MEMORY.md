@@ -1,1 +1,0 @@
-- [user_profile.md](user_profile.md) — Gustavo Pinto, professor, advises 7 students across PhD/MS/undergrad
