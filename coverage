@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BACKEND_DIR="$SCRIPT_DIR/backend"
+VENV_PYTHON="$BACKEND_DIR/.venv/bin/python"
+
+cd "$BACKEND_DIR"
+
+"$VENV_PYTHON" -m pytest tests/ \
+  --cov=app \
+  --cov-report=term-missing \
+  --cov-report=html:coverage_html \
+  "$@"
+
+echo ""
+echo "Relatório HTML gerado em: $BACKEND_DIR/coverage_html/index.html"

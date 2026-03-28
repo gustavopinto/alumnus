@@ -66,6 +66,6 @@ def is_public_email_domain(email: str) -> bool:
 
 INSTITUTIONAL_EMAIL_HELP_PT = (
     "Use um e-mail institucional da sua universidade "
-    "(ex.: @universidade.edu.br, @usp.br). "
+    "(ex.: @ufpa.br). "
     "E-mails públicos (Gmail, Hotmail, Outlook, UOL etc.) não são aceitos para cadastro."
 )

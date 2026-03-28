@@ -11,3 +11,6 @@ uploads/*
 !uploads/.gitkeep
 .venv/
 .claude/
+backend/coverage_html/
+backend/.coverage
+.coverage
