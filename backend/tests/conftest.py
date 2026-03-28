@@ -67,10 +67,7 @@ def client(db):
 
 def make_researcher(db, nome="Ana Silva", email="ana@univ.edu.br", ativo=True, password=None):
     """Cria um Researcher + User vinculado (password=None → conta pendente)."""
-    researcher = Researcher(
-        status="mestrado",
-        ativo=ativo,
-    )
+    researcher = Researcher(status="mestrado")
     db.add(researcher)
     db.flush()
 
@@ -79,7 +76,7 @@ def make_researcher(db, nome="Ana Silva", email="ana@univ.edu.br", ativo=True, p
         nome=nome,
         password_hash=pwd_ctx.hash(password) if password else None,
         role="researcher",
-        is_admin=False,
+        ativo=ativo,
         researcher_id=researcher.id,
     )
     db.add(user)
@@ -105,7 +102,6 @@ def make_user(
         nome=nome,
         password_hash=pwd_ctx.hash(password),
         role=role,
-        is_admin=role == "superadmin",
         researcher_id=researcher_id,
         plan_type=plan_type,
         plan_status=plan_status,

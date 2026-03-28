@@ -29,7 +29,6 @@ def activate_account(
     pwd_ctx: CryptContext,
 ) -> User:
     """Define a senha de um User pendente (convidado mas sem senha)."""
-    from ..models import Researcher
     e = _norm_email(data.email)
     user = db.query(User).filter(func.lower(User.email) == e).first()
     if not user:
@@ -37,14 +36,12 @@ def activate_account(
             status_code=404,
             detail="Email não encontrado. Entre em contato com seu orientador.",
         )
-    # Bloqueia ativação se o pesquisador vinculado foi inativado
-    if user.researcher_id:
-        researcher = db.query(Researcher).filter(Researcher.id == user.researcher_id).first()
-        if researcher and not researcher.ativo:
-            raise HTTPException(
-                status_code=404,
-                detail="Email não encontrado. Entre em contato com seu orientador.",
-            )
+    # Bloqueia ativação se o usuário foi inativado
+    if not user.ativo:
+        raise HTTPException(
+            status_code=404,
+            detail="Email não encontrado. Entre em contato com seu orientador.",
+        )
     if user.password_hash is not None:
         raise HTTPException(
             status_code=409,

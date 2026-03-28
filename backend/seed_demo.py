@@ -110,12 +110,12 @@ def run():
         db.flush()
 
         # ── Users ──────────────────────────────────────────────────────────
-        def ensure_user(email, nome, role, professor_id=None, researcher_id=None, is_admin=False, pw='alumnus123'):
+        def ensure_user(email, nome, role, professor_id=None, researcher_id=None, pw='alumnus123'):
             if not db.query(User).filter_by(email=email).first():
                 now = datetime.utcnow()
                 db.add(User(
                     email=email, nome=nome, password_hash=h(pw),
-                    role=role, is_admin=is_admin,
+                    role=role,
                     professor_id=professor_id,
                     researcher_id=researcher_id,
                     last_login=now - timedelta(days=1),
@@ -141,7 +141,7 @@ def run():
             if r and not db.query(User).filter_by(email=email).first():
                 db.add(User(
                     email=email, nome=nome, password_hash=h('alumnus123'),
-                    role='researcher', is_admin=False,
+                    role='researcher',
                     researcher_id=r.id,
                     last_login=datetime.utcnow() - timedelta(days=3),
                     created_at=datetime.utcnow(),

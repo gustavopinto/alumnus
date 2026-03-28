@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..deps import require_professor, require_superadmin, get_current_user
-from ..models import ProfessorGroup, ResearchGroup, User
+from ..models import ProfessorGroup, ResearchGroup, Researcher, User
 from ..schemas import JoinGroupRequest, ResearchGroupCreate, ResearchGroupOut, ResearchGroupUpdate
 from ..services import group_service, professor_service
 
@@ -138,15 +138,17 @@ def list_group_members(
     db: Session = Depends(get_db),
     current: User = Depends(require_professor),
 ):
-    from ..models import Researcher
     group = group_service.get_group_by_id(db, group_id)
     if not group:
         raise HTTPException(status_code=404, detail="Grupo não encontrado")
 
-    researchers = db.query(Researcher).filter(
-        Researcher.group_id == group_id,
-        Researcher.ativo == True,
-    ).order_by(Researcher.nome).all()
+    researchers = (
+        db.query(Researcher)
+        .outerjoin(User, User.researcher_id == Researcher.id)
+        .filter(Researcher.group_id == group_id, User.ativo == True)
+        .order_by(User.nome)
+        .all()
+    )
 
     return [
         {

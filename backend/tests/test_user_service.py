@@ -14,7 +14,6 @@ def make_user(db, email="u@test.br"):
         nome="Test User",
         password_hash=pwd_ctx.hash("pass"),
         role="researcher",
-        is_admin=False,
     )
     db.add(u)
     db.commit()

@@ -46,7 +46,6 @@ def _make_plain_user(**kwargs):
     u.email = kwargs.get("email", "x@x.com")
     u.nome = kwargs.get("nome", "Test User")
     u.role = kwargs.get("role", "professor")
-    u.is_admin = u.role in ("admin", "superadmin")
     u.researcher_id = kwargs.get("researcher_id", None)
     u.last_login = kwargs.get("last_login", None)
     u.created_at = kwargs.get("created_at", datetime.utcnow())

@@ -35,7 +35,7 @@ def _with_user(q):
 def list_all(db: Session, ativo: bool | None, institution_id: int | None = None) -> list[Researcher]:
     q = _with_user(db.query(Researcher))
     if ativo is not None:
-        q = q.filter(Researcher.ativo == ativo)
+        q = q.filter(User.ativo == ativo)
     if institution_id is not None:
         group_ids = select(ResearchGroup.id).where(
             ResearchGroup.institution_id == institution_id
@@ -85,7 +85,6 @@ def create(db: Session, data: ResearcherCreate) -> Researcher:
         nome=data.nome,
         password_hash=None,
         role="researcher",
-        is_admin=False,
         researcher_id=researcher.id,
     )
     db.add(user)
@@ -106,7 +105,7 @@ def get_by_id(db: Session, researcher_id: int) -> Researcher | None:
 def find_by_slug(db: Session, slug: str) -> Researcher | None:
     researchers = (
         _with_user(db.query(Researcher))
-        .filter(Researcher.ativo == True)
+        .filter(User.ativo == True)
         .all()
     )
     for r in researchers:

@@ -168,7 +168,7 @@ class TestListUsers:
     def test_professor_sees_only_users_from_linked_institutions(self, professor_client):
         client, acting_user, db = professor_client
 
-        prof = Professor(nome="Prof Dashboard")
+        prof = Professor()
         db.add(prof)
         db.flush()
         acting_user.professor_id = prof.id
@@ -215,7 +215,7 @@ class TestListUsers:
     def test_professor_with_multiple_institutions_sees_both(self, professor_client):
         client, acting_user, db = professor_client
 
-        prof = Professor(nome="Prof Multi")
+        prof = Professor()
         db.add(prof)
         db.flush()
         acting_user.professor_id = prof.id
@@ -336,7 +336,7 @@ class TestUpdateUser:
         resp = client.put(f"/api/admin/users/{researcher.id}", json={"role": "superadmin"})
         assert resp.status_code == 200
         db.refresh(researcher)
-        assert researcher.is_admin is True
+        assert researcher.role == "superadmin"
 
 
 # ---------------------------------------------------------------------------

@@ -13,7 +13,7 @@ def make_professor_with_group(db, nome="Prof Test", domain="test.br"):
     inst = Institution(name=nome.upper()[:10], domain=domain)
     db.add(inst)
     db.flush()
-    prof = Professor(nome=nome, ativo=True)
+    prof = Professor()
     db.add(prof)
     db.flush()
     group = ResearchGroup(name=f"Grupo {nome}", institution_id=inst.id)
@@ -31,7 +31,6 @@ def make_professor_with_group(db, nome="Prof Test", domain="test.br"):
         nome=nome,
         password_hash=pwd_ctx.hash("pass"),
         role="professor",
-        is_admin=False,
         professor_id=prof.id,
     )
     db.add(user)

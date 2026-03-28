@@ -19,7 +19,7 @@ def make_institution(db, name="UNICAMP", domain="unicamp.br"):
 def make_professor(db, nome="Prof Teste", email=None):
     if email is None:
         email = f"prof_{nome.lower().replace(' ', '_')}@inst.br"
-    prof = Professor(nome=nome, ativo=True)
+    prof = Professor()
     db.add(prof)
     db.flush()
     user = User(
@@ -27,7 +27,6 @@ def make_professor(db, nome="Prof Teste", email=None):
         nome=nome,
         password_hash=pwd_ctx.hash("testpass"),
         role="professor",
-        is_admin=False,
         professor_id=prof.id,
     )
     db.add(user)

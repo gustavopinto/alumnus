@@ -2,6 +2,8 @@ import logging
 
 from sqlalchemy.orm import Session
 
+from sqlalchemy.orm import joinedload
+
 from ..models import Professor, User
 
 logger = logging.getLogger(__name__)
@@ -18,7 +20,14 @@ def get_by_user(db: Session, user: User) -> Professor | None:
 
 
 def list_active(db: Session) -> list[Professor]:
-    return db.query(Professor).filter(Professor.ativo == True).order_by(Professor.nome).all()
+    return (
+        db.query(Professor)
+        .join(User, User.professor_id == Professor.id)
+        .options(joinedload(Professor.user))
+        .filter(User.ativo == True)
+        .order_by(User.nome)
+        .all()
+    )
 
 
 def update(db: Session, professor: Professor, data: dict) -> Professor:

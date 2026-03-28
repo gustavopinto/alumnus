@@ -21,12 +21,17 @@ STATUS_COLORS = {
 
 
 def build_graph_payload(db: Session, institution_id: int | None = None) -> dict:
-    professors_q  = db.query(Professor).options(joinedload(Professor.user)).filter(Professor.ativo == True)
+    professors_q  = (
+        db.query(Professor)
+        .join(User, User.professor_id == Professor.id)
+        .options(joinedload(Professor.user))
+        .filter(User.ativo == True)
+    )
     researchers_q = (
         db.query(Researcher)
         .outerjoin(User, User.researcher_id == Researcher.id)
         .options(joinedload(Researcher.user))
-        .filter(Researcher.ativo == True)
+        .filter(User.ativo == True)
     )
 
     if institution_id is not None:

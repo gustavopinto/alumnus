@@ -96,11 +96,16 @@ def _stats_global(db: Session, hide_superadmin_count: bool, current: User = None
                 "professor":  by_role.get("professor", 0),
                 "researcher": by_role.get("researcher", 0),
             }
-        researchers = db.query(func.count(Researcher.id)).filter(Researcher.ativo.is_(True)).scalar() or 0
+        researchers = (
+            db.query(func.count(Researcher.id))
+            .join(User, User.researcher_id == Researcher.id)
+            .filter(User.ativo.is_(True))
+            .scalar() or 0
+        )
         pending = (
             db.query(func.count(Researcher.id))
             .join(User, User.researcher_id == Researcher.id)
-            .filter(Researcher.ativo.is_(True), User.password_hash.is_(None))
+            .filter(User.ativo.is_(True), User.password_hash.is_(None))
             .scalar() or 0
         )
         total_reminders = db.query(func.count(Reminder.id)).scalar()
@@ -141,8 +146,9 @@ def _stats_global(db: Session, hide_superadmin_count: bool, current: User = None
 
             researchers = (
                 db.query(func.count(Researcher.id))
+                .join(User, User.researcher_id == Researcher.id)
                 .filter(
-                    Researcher.ativo.is_(True),
+                    User.ativo.is_(True),
                     Researcher.group_id.isnot(None),
                     Researcher.group.has(ResearchGroup.institution_id.in_(institution_ids)),
                 ).scalar() or 0
@@ -151,7 +157,7 @@ def _stats_global(db: Session, hide_superadmin_count: bool, current: User = None
                 db.query(func.count(Researcher.id))
                 .join(User, User.researcher_id == Researcher.id)
                 .filter(
-                    Researcher.ativo.is_(True),
+                    User.ativo.is_(True),
                     User.password_hash.is_(None),
                     Researcher.group_id.isnot(None),
                     Researcher.group.has(ResearchGroup.institution_id.in_(institution_ids)),
@@ -203,7 +209,7 @@ def list_users(db: Session = Depends(get_db), current: User = Depends(require_da
             "email": u.email,
             "nome": u.nome,
             "role": u.role,
-            "is_admin": u.is_admin,
+            "is_admin": u.role == "superadmin",
             "researcher_id": u.researcher_id,
             "researcher_nome": u.nome if u.researcher else None,
             "researcher_status": u.researcher.status if u.researcher else None,
@@ -299,7 +305,6 @@ def update_user(
 
     old_role = user.role
     user.role = data.role
-    user.is_admin = data.role == "superadmin"
 
     # Gerencia FKs atomicamente ao mudar de role (mantém consistência com chk_users_no_dual_fk)
     if data.role == "researcher":
@@ -319,7 +324,7 @@ def update_user(
         ensure_professor_plan_defaults(user)
 
     db.commit()
-    return {"id": user.id, "role": user.role, "is_admin": user.is_admin}
+    return {"id": user.id, "role": user.role, "is_admin": user.role == "superadmin"}
 
 
 # ── Delete user (superadmin only) ─────────────────────────────────────────────
@@ -337,10 +342,6 @@ def delete_user(
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
     if user.role == "superadmin" and current.role != "superadmin":
         raise HTTPException(status_code=403, detail="Apenas superadmin pode remover outro superadmin")
-    if user.researcher_id:
-        researcher = db.query(Researcher).filter(Researcher.id == user.researcher_id).first()
-        if researcher:
-            researcher.ativo = False
     # Nullify FK references to avoid integrity errors
     db.query(Note).filter(Note.created_by_id == user_id).update({"created_by_id": None})
     db.query(Reminder).filter(Reminder.created_by_id == user_id).update({"created_by_id": None})
@@ -363,10 +364,6 @@ def bulk_delete(
             continue
         user = db.query(User).filter(User.id == uid).first()
         if user and not (user.role == "superadmin" and current.role != "superadmin"):
-            if user.researcher_id:
-                researcher = db.query(Researcher).filter(Researcher.id == user.researcher_id).first()
-                if researcher:
-                    researcher.ativo = False
             db.query(Note).filter(Note.created_by_id == uid).update({"created_by_id": None})
             db.query(Reminder).filter(Reminder.created_by_id == uid).update({"created_by_id": None})
             db.query(Tip).filter(Tip.author_id == uid).update({"author_id": None})

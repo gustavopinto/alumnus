@@ -10,7 +10,7 @@ pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def make_professor(db, nome="Prof Graph", email="prof@graph.br"):
-    prof = Professor(nome=nome, ativo=True)
+    prof = Professor()
     db.add(prof)
     db.flush()
     user = User(
@@ -18,7 +18,6 @@ def make_professor(db, nome="Prof Graph", email="prof@graph.br"):
         nome=nome,
         password_hash=pwd_ctx.hash("pass"),
         role="professor",
-        is_admin=False,
         professor_id=prof.id,
     )
     db.add(user)

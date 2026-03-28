@@ -25,16 +25,33 @@ class Institution(Base):
 class Professor(Base):
     __tablename__ = "professors"
 
-    id              = Column(Integer, primary_key=True, index=True)
-    nome            = Column(String(255), nullable=False)
-    ativo           = Column(Boolean, default=True)
-    created_at      = Column(DateTime, default=datetime.utcnow, server_default="now()")
-    updated_at      = Column(DateTime, default=datetime.utcnow, server_default="now()", onupdate=datetime.utcnow)
+    id         = Column(Integer, primary_key=True, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, server_default="now()")
+    updated_at = Column(DateTime, default=datetime.utcnow, server_default="now()", onupdate=datetime.utcnow)
 
     user                   = relationship("User", back_populates="professor", uselist=False)
     professor_institutions = relationship("ProfessorInstitution", back_populates="professor", cascade="all, delete-orphan")
     professor_groups       = relationship("ProfessorGroup", back_populates="professor", cascade="all, delete-orphan")
     researchers            = relationship("Researcher", back_populates="orientador")
+
+    # Propriedades delegadas ao User vinculado
+    @property
+    def nome(self) -> str:
+        return self.user.nome if self.user else ""
+
+    @nome.setter
+    def nome(self, value: str) -> None:
+        if self.user:
+            self.user.nome = value
+
+    @property
+    def ativo(self) -> bool:
+        return self.user.ativo if self.user else False  # sem user = inativo
+
+    @ativo.setter
+    def ativo(self, value: bool) -> None:
+        if self.user:
+            self.user.ativo = value
 
 
 class ProfessorInstitution(Base):
@@ -91,7 +108,6 @@ class Researcher(Base):
     group_id         = Column(Integer, ForeignKey("research_groups.id"), nullable=True)
     orientador_id    = Column(Integer, ForeignKey("professors.id"), nullable=True)
     observacoes      = Column(Text, nullable=True)
-    ativo            = Column(Boolean, default=True)
     matricula        = Column(String(50), nullable=True)
     curso            = Column(String(255), nullable=True)
     enrollment_date  = Column(Date, nullable=True)
@@ -103,6 +119,15 @@ class Researcher(Base):
     user       = relationship("User", primaryjoin="User.researcher_id == Researcher.id", foreign_keys="[User.researcher_id]", uselist=False, viewonly=True)
 
     # Propriedades delegadas ao User vinculado
+    @property
+    def ativo(self) -> bool:
+        return self.user.ativo if self.user else False  # sem user = inativo
+
+    @ativo.setter
+    def ativo(self, value: bool) -> None:
+        if self.user:
+            self.user.ativo = value
+
     @property
     def nome(self) -> str:
         return self.user.nome if self.user else ""
@@ -166,7 +191,7 @@ class User(Base):
     nome                 = Column(String(255), nullable=False)
     password_hash        = Column(String(255), nullable=True)
     role                 = Column(String(20), nullable=False)  # superadmin | professor | researcher
-    is_admin             = Column(Boolean, nullable=False, default=False)  # computed from role
+    ativo                = Column(Boolean, nullable=False, default=True)
     professor_id         = Column(Integer, ForeignKey("professors.id"), nullable=True)
     researcher_id        = Column(Integer, ForeignKey("researchers.id"), nullable=True)
     last_login           = Column(DateTime, nullable=True)
@@ -189,6 +214,10 @@ class User(Base):
 
     professor  = relationship("Professor", back_populates="user", foreign_keys=[professor_id])
     researcher = relationship("Researcher", foreign_keys=[researcher_id])
+
+    @property
+    def is_admin(self) -> bool:
+        return self.role == "superadmin"
 
 
 class FileUpload(Base):

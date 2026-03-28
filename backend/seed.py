@@ -103,20 +103,20 @@ def seed_users(cur):
 
     # Users
     users = [
-        (ADMIN_EMAIL,      "Admin",          "superadmin", True,  None,         None),
-        (PROFESSOR_EMAIL,  PROFESSOR_NOME,   "professor",  False, professor_id, None),
-        (RESEARCHER_EMAIL, RESEARCHER_NOME,  "researcher", False, None,         researcher_id),
+        (ADMIN_EMAIL,      "Admin",          "superadmin", None,         None),
+        (PROFESSOR_EMAIL,  PROFESSOR_NOME,   "professor",  professor_id, None),
+        (RESEARCHER_EMAIL, RESEARCHER_NOME,  "researcher", None,         researcher_id),
     ]
-    for email, nome, role, is_admin, prof_id, res_id in users:
+    for email, nome, role, prof_id, res_id in users:
         cur.execute(
-            """INSERT INTO users (email, nome, password_hash, role, is_admin, professor_id, researcher_id)
-               VALUES (%s,%s,%s,%s,%s,%s,%s)
+            """INSERT INTO users (email, nome, password_hash, role, professor_id, researcher_id)
+               VALUES (%s,%s,%s,%s,%s,%s)
                ON CONFLICT (email) DO UPDATE
                  SET nome=EXCLUDED.nome, password_hash=EXCLUDED.password_hash,
-                     role=EXCLUDED.role, is_admin=EXCLUDED.is_admin,
+                     role=EXCLUDED.role,
                      professor_id=EXCLUDED.professor_id, researcher_id=EXCLUDED.researcher_id
                RETURNING id""",
-            (email, nome, h, role, is_admin, prof_id, res_id),
+            (email, nome, h, role, prof_id, res_id),
         )
         user_id = cur.fetchone()[0]
         print(f"  {role:12s}  {email}  id={user_id}")
