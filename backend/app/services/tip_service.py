@@ -1,7 +1,11 @@
+import logging
+
 from sqlalchemy.orm import Session, joinedload
 
 from ..models import TipComment, Tip, TipVote
 from ..schemas import TipCreate
+
+logger = logging.getLogger(__name__)
 
 
 def list_tips(db: Session, institution_id: int | None = None) -> list[Tip]:
@@ -34,10 +38,12 @@ def create_tip(db: Session, data: TipCreate, author_id: int) -> Tip:
     db.add(entry)
     db.commit()
     db.refresh(entry)
+    logger.info("Tip criado: id=%s author_id=%s institution_id=%s", entry.id, author_id, data.institution_id)
     return entry
 
 
 def delete_tip(db: Session, entry: Tip) -> None:
+    logger.info("Tip removido: id=%s author_id=%s", entry.id, entry.author_id)
     db.delete(entry)
     db.commit()
 

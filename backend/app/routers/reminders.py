@@ -42,6 +42,7 @@ def create_reminder(
         current_user.id if current_user else None,
     )
     if not out:
+        logger.error("Reminder criado (id=%s) mas não foi possível carregá-lo", reminder.id)
         raise HTTPException(status_code=500, detail="Failed to load reminder")
     return out
 
@@ -77,6 +78,7 @@ def delete_reminder(
     if not reminder:
         raise HTTPException(status_code=404, detail="Reminder not found")
     if not reminder_service.can_user_delete_reminder(current_user, reminder):
+        logger.warning("Deleção de lembrete negada: user_id=%s reminder_id=%s", current_user.id, reminder_id)
         raise HTTPException(
             status_code=403,
             detail="Você só pode remover lembretes que você criou.",

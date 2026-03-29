@@ -1,28 +1,56 @@
+import json
 import logging
+import os
 import time
+import traceback
 from contextvars import ContextVar
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
 from .database import engine, Base
 from .routers import researchers, relationships, graph, upload, notes, auth, files, reminders, tips, deadlines, admin, groups, institutions, professors, users, profiles
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
-logger = logging.getLogger(__name__)
+# ── Logging estruturado (JSON em prod, texto legível em dev) ───────────────────
 
-db_logger = logging.getLogger("db.queries")
-db_logger.setLevel(logging.INFO)
-if not db_logger.handlers:
-    _h = logging.StreamHandler()
-    _h.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
-    db_logger.addHandler(_h)
-db_logger.propagate = False
+_ENV = os.getenv("APP_ENV", "development")
+
+class _JsonFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        return json.dumps({
+            "severity": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "time": self.formatTime(record, "%Y-%m-%dT%H:%M:%S"),
+        })
+
+def _setup_logging() -> None:
+    fmt = _JsonFormatter() if _ENV == "production" else logging.Formatter(
+        "%(asctime)s %(name)s %(levelname)s %(message)s"
+    )
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    if not root.handlers:
+        h = logging.StreamHandler()
+        h.setFormatter(fmt)
+        root.addHandler(h)
+    else:
+        for h in root.handlers:
+            h.setFormatter(fmt)
+
+    # Uvicorn já configura seus próprios loggers — só ajusta o formatter
+    for name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
+        uv = logging.getLogger(name)
+        for h in uv.handlers:
+            h.setFormatter(fmt)
+
+_setup_logging()
+logger = logging.getLogger(__name__)
 
 # ── Query counter por request ──────────────────────────────────────────────────
 _query_counter: ContextVar[list] = ContextVar("query_counter", default=None)
@@ -36,14 +64,28 @@ def _count_query(conn, cursor, statement, parameters, context, executemany):
 app = FastAPI(title="Alumnus API", version="0.1.0")
 
 @app.middleware("http")
-async def log_db_queries(request: Request, call_next):
+async def request_logger(request: Request, call_next):
     counter: list = []
     _query_counter.set(counter)
     t0 = time.perf_counter()
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        ms = (time.perf_counter() - t0) * 1000
+        logger.error(
+            "Unhandled exception: %s %s (%.0f ms)\n%s",
+            request.method, request.url.path, ms,
+            traceback.format_exc(),
+        )
+        return JSONResponse(status_code=500, content={"detail": "Internal server error"})
     ms = (time.perf_counter() - t0) * 1000
     n = len(counter)
-    db_logger.info("%-6s %-50s → %2d queries  (%.0f ms)", request.method, request.url.path, n, ms)
+    level = logging.WARNING if response.status_code >= 400 else logging.INFO
+    logger.log(
+        level,
+        "%-6s %-50s → %3d  %2d queries  (%.0f ms)",
+        request.method, request.url.path, response.status_code, n, ms,
+    )
     return response
 
 app.add_middleware(

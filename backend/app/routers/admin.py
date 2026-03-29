@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import and_, func, or_
@@ -8,6 +10,7 @@ from ..deps import require_dashboard, require_superadmin, require_professor
 from ..models import User, Researcher, Reminder, Tip, TipComment, Note, ResearchGroup, ProfessorGroup, Professor, ProfessorInstitution
 from ..plan import clear_plan, ensure_professor_plan_defaults
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 VALID_ROLES = ("professor", "researcher", "superadmin")
@@ -323,6 +326,7 @@ def update_user(
         ensure_professor_plan_defaults(user)
 
     db.commit()
+    logger.warning("Role alterado: user_id=%s %s → %s por admin_id=%s", user.id, old_role, user.role, current.id)
     return {"id": user.id, "role": user.role, "is_admin": user.role == "superadmin"}
 
 
@@ -342,6 +346,7 @@ def delete_user(
     if user.role == "superadmin" and current.role != "superadmin":
         raise HTTPException(status_code=403, detail="Apenas superadmin pode remover outro superadmin")
     # Nullify FK references to avoid integrity errors
+    logger.warning("Usuário removido: user_id=%s email=%s role=%s por admin_id=%s", user.id, user.email, user.role, current.id)
     db.query(Note).filter(Note.created_by_id == user_id).update({"created_by_id": None})
     db.query(Reminder).filter(Reminder.created_by_id == user_id).update({"created_by_id": None})
     db.query(Tip).filter(Tip.author_id == user_id).update({"author_id": None})
@@ -358,25 +363,34 @@ def bulk_delete(
     db: Session = Depends(get_db),
     current: User = Depends(require_dashboard),
 ):
+    deleted_ids = []
     for uid in data.user_ids:
         if uid == current.id:
             continue
         user = db.query(User).filter(User.id == uid).first()
         if user and not (user.role == "superadmin" and current.role != "superadmin"):
+            deleted_ids.append(uid)
             db.query(Note).filter(Note.created_by_id == uid).update({"created_by_id": None})
             db.query(Reminder).filter(Reminder.created_by_id == uid).update({"created_by_id": None})
             db.query(Tip).filter(Tip.author_id == uid).update({"author_id": None})
             db.query(TipComment).filter(TipComment.author_id == uid).update({"author_id": None})
             db.delete(user)
+    pending_deleted = []
     for rid in data.researcher_ids:
         # researcher_ids: compatibilidade — encontra via user vinculado
         user = db.query(User).filter(User.researcher_id == rid).first()
         if user and user.password_hash is None:
+            pending_deleted.append(rid)
             researcher = db.query(Researcher).filter(Researcher.id == rid).first()
             db.query(Note).filter(Note.created_by_id == user.id).update({"created_by_id": None})
             db.delete(user)
             if researcher:
                 db.delete(researcher)
+    if deleted_ids or pending_deleted:
+        logger.warning(
+            "Bulk delete por admin_id=%s: %d usuários removidos (ids=%s), %d pesquisadores pendentes (ids=%s)",
+            current.id, len(deleted_ids), deleted_ids, len(pending_deleted), pending_deleted,
+        )
     db.commit()
 
 

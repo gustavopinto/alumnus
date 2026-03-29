@@ -1,3 +1,4 @@
+import logging
 import os
 import json
 from typing import Optional
@@ -15,6 +16,7 @@ from ..schemas import DeadlineCreate, DeadlineOut, DeadlineInterestOut
 from ..deps import get_current_user, require_professor, require_dashboard
 from ..slug import slugify
 
+logger = logging.getLogger(__name__)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_MAX_TOKENS = int(os.getenv("OPENAI_MAX_TOKENS", "4096"))
@@ -184,12 +186,14 @@ def extract_deadline_from_url(
     except HTTPException:
         raise
     except Exception:
+        logger.warning("HEAD request falhou para url=%s", body.url)
         raise HTTPException(status_code=422, detail="Não foi possível alcançar a URL.")
 
     try:
         resp = httpx.get(body.url, timeout=15, follow_redirects=True, headers=headers)
         resp.raise_for_status()
     except Exception:
+        logger.warning("GET request falhou para url=%s", body.url)
         raise HTTPException(status_code=422, detail="Erro ao baixar o conteúdo da página.")
 
     soup = BeautifulSoup(resp.text, "html.parser")
@@ -224,8 +228,10 @@ def extract_deadline_from_url(
         if not isinstance(deadlines, list):
             deadlines = [deadlines]
     except json.JSONDecodeError:
+        logger.error("OpenAI retornou JSON inválido para url=%s: %r", body.url, raw)
         raise HTTPException(status_code=502, detail="OpenAI retornou resposta inesperada.")
     except Exception as e:
+        logger.error("Erro ao chamar OpenAI para url=%s: %s", body.url, e)
         raise HTTPException(status_code=502, detail=f"Erro ao chamar OpenAI: {e}")
 
     return [ExtractedDeadline(**d) for d in deadlines]

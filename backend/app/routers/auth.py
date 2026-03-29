@@ -51,6 +51,7 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     refresh_user_plan_status(db, user)
     if ensure_professor_plan_defaults(user):
         db.commit()
+    logger.info("Login bem-sucedido: user_id=%s email=%s role=%s", user.id, user.email, user.role)
     return TokenOut(access_token=make_token(user))
 
 
