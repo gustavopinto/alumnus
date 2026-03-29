@@ -30,6 +30,8 @@ from app.models import (
     ResearchGroup,
 )
 
+from app.models import ProfessorGroup
+
 from .conftest import make_user, make_researcher, make_reminder
 
 
@@ -457,3 +459,170 @@ class TestDeletePendingResearcher:
 
         resp = client.delete(f"/api/admin/researchers/{r.id}")
         assert resp.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# _accessible_institution_ids — cobertura dos caminhos de otimização
+# ---------------------------------------------------------------------------
+
+class TestAccessibleInstitutionIds:
+    """Garante que _accessible_institution_ids usa UNION e não lazy-load."""
+
+    def _make_prof_with_institution(self, db, email, domain):
+        """Cria professor + user + instituição vinculada via ProfessorInstitution."""
+        prof = Professor()
+        db.add(prof)
+        db.flush()
+        inst = Institution(name=domain.upper(), domain=domain)
+        db.add(inst)
+        db.flush()
+        db.add(ProfessorInstitution(
+            professor_id=prof.id,
+            institution_id=inst.id,
+            institutional_email=email,
+        ))
+        user = make_user(db, email=email, role="professor")
+        user.professor_id = prof.id
+        db.commit()
+        db.refresh(user)
+        return user, prof, inst
+
+    def test_professor_without_professor_id_sees_no_users(self, db):
+        """User com professor_id=None → institution_ids=set() → lista vazia."""
+        acting = make_user(db, email="noprof@univ.edu.br", role="professor")
+        # professor_id permanece None
+
+        from app.routers.admin import _accessible_institution_ids
+        result = _accessible_institution_ids(db, acting)
+        assert result == set()
+
+    def test_professor_linked_via_professor_institutions(self, db):
+        """Instituição vinculada por ProfessorInstitution aparece no resultado."""
+        acting, prof, inst = self._make_prof_with_institution(db, "pi@pi.edu.br", "pi.edu.br")
+
+        from app.routers.admin import _accessible_institution_ids
+        result = _accessible_institution_ids(db, acting)
+        assert inst.id in result
+
+    def test_professor_linked_only_via_professor_groups(self, db):
+        """Instituição vinculada APENAS por ProfessorGroup (sem ProfessorInstitution)
+        ainda aparece — valida o UNION."""
+        prof = Professor()
+        db.add(prof)
+        db.flush()
+        inst = Institution(name="GroupOnly", domain="grponly.edu.br")
+        db.add(inst)
+        db.flush()
+        group = ResearchGroup(name="G", institution_id=inst.id)
+        db.add(group)
+        db.flush()
+        db.add(ProfessorGroup(
+            professor_id=prof.id,
+            group_id=group.id,
+            role_in_group="coordinator",
+            institution_id=inst.id,
+        ))
+        acting = make_user(db, email="grponly@grponly.edu.br", role="professor")
+        acting.professor_id = prof.id
+        db.commit()
+        db.refresh(acting)
+
+        from app.routers.admin import _accessible_institution_ids
+        result = _accessible_institution_ids(db, acting)
+        assert inst.id in result
+
+    def test_superadmin_returns_none(self, db):
+        sa = make_user(db, email="sa2@univ.edu.br", role="superadmin")
+        from app.routers.admin import _accessible_institution_ids
+        assert _accessible_institution_ids(db, sa) is None
+
+
+class TestCountGroups:
+    """_count_groups usa current.professor_id diretamente (sem buscar professor)."""
+
+    def test_superadmin_counts_all_groups(self, db):
+        from app.routers.admin import _count_groups
+        sa = make_user(db, email="sag@univ.edu.br", role="superadmin")
+        inst = Institution(name="G Inst", domain="ginst.edu.br")
+        db.add(inst)
+        db.flush()
+        db.add(ResearchGroup(name="G1", institution_id=inst.id))
+        db.add(ResearchGroup(name="G2", institution_id=inst.id))
+        db.commit()
+        assert _count_groups(db, sa) == 2
+
+    def test_professor_counts_own_groups(self, db):
+        from app.routers.admin import _count_groups
+        prof = Professor()
+        db.add(prof)
+        db.flush()
+        inst = Institution(name="CG Inst", domain="cginst.edu.br")
+        db.add(inst)
+        db.flush()
+        g1 = ResearchGroup(name="CG1", institution_id=inst.id)
+        g2 = ResearchGroup(name="CG2", institution_id=inst.id)
+        g3 = ResearchGroup(name="CG3", institution_id=inst.id)
+        db.add_all([g1, g2, g3])
+        db.flush()
+        db.add(ProfessorGroup(professor_id=prof.id, group_id=g1.id, role_in_group="coordinator"))
+        db.add(ProfessorGroup(professor_id=prof.id, group_id=g2.id, role_in_group="member"))
+        # g3 não pertence ao professor
+        acting = make_user(db, email="cg@cginst.edu.br", role="professor")
+        acting.professor_id = prof.id
+        db.commit()
+        db.refresh(acting)
+
+        assert _count_groups(db, acting) == 2
+
+    def test_professor_without_professor_id_returns_zero(self, db):
+        from app.routers.admin import _count_groups
+        acting = make_user(db, email="noprofcg@univ.edu.br", role="professor")
+        assert _count_groups(db, acting) == 0
+
+
+class TestListUsersViaGroupInstitution:
+    """Professor vinculado por professor_groups vê usuários da mesma instituição."""
+
+    def test_users_visible_when_linked_via_professor_group(self, db):
+        prof = Professor()
+        db.add(prof)
+        db.flush()
+        inst = Institution(name="GLink", domain="glink.edu.br")
+        db.add(inst)
+        db.flush()
+        group = ResearchGroup(name="GL", institution_id=inst.id)
+        db.add(group)
+        db.flush()
+
+        # Professor vinculado APENAS via ProfessorGroup (sem ProfessorInstitution)
+        db.add(ProfessorGroup(
+            professor_id=prof.id,
+            group_id=group.id,
+            role_in_group="coordinator",
+            institution_id=inst.id,
+        ))
+
+        acting = make_user(db, email="glprof@glink.edu.br", role="professor")
+        acting.professor_id = prof.id
+        db.flush()
+
+        # Researcher no mesmo grupo
+        res = Researcher(status="mestrado", group_id=group.id)
+        db.add(res)
+        db.flush()
+        make_user(db, email="glres@glink.edu.br", nome="GL Res", role="researcher", researcher_id=res.id)
+        db.commit()
+        db.refresh(acting)
+
+        app.dependency_overrides.update({
+            get_db: lambda: (yield db),
+            require_dashboard: lambda: acting,
+            require_superadmin: lambda: acting,
+        })
+        with TestClient(app, raise_server_exceptions=True) as c:
+            resp = c.get("/api/admin/users")
+        app.dependency_overrides.clear()
+
+        assert resp.status_code == 200
+        emails = [u["email"] for u in resp.json()]
+        assert "glres@glink.edu.br" in emails

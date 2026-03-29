@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session, joinedload
 from ..database import get_db
 from ..deps import require_dashboard, require_superadmin, require_professor
 from ..models import User, Researcher, Reminder, Tip, TipComment, Note, ResearchGroup, ProfessorGroup, Professor, ProfessorInstitution
-from ..services import professor_service
 from ..plan import clear_plan, ensure_professor_plan_defaults
 
 router = APIRouter(prefix="/admin", tags=["admin"])
@@ -37,37 +36,39 @@ def _count_groups(db: Session, current: User | None) -> int:
     """Superadmin vê todos os grupos; professor vê apenas seus grupos."""
     if current is None or _is_superadmin(current):
         return db.query(func.count(ResearchGroup.id)).scalar()
-    professor = professor_service.get_by_user(db, current)
-    if not professor:
+    if not current.professor_id:
         return 0
     return db.query(func.count(ProfessorGroup.group_id)).filter(
-        ProfessorGroup.professor_id == professor.id
+        ProfessorGroup.professor_id == current.professor_id
     ).scalar()
 
 
 def _accessible_institution_ids(db: Session, current: User | None) -> set[int] | None:
     """
     Superadmin: sem restrição (None).
-    Professor: instituições às quais está vinculado.
+    Professor: instituições às quais está vinculado — obtidas em 1 query UNION.
     """
     if current is None or _is_superadmin(current):
         return None
-    professor = professor_service.get_by_user(db, current)
-    if not professor:
+    if not current.professor_id:
         return set()
 
-    institution_ids = {
-        int(pi.institution_id)
-        for pi in (professor.professor_institutions or [])
-        if pi.institution_id is not None
-    }
-    # Fallback para bases antigas onde vínculo está só em professor_groups.
-    institution_ids.update(
-        int(pg.institution_id)
-        for pg in (professor.professor_groups or [])
-        if pg.institution_id is not None
+    from_pi = (
+        db.query(ProfessorInstitution.institution_id)
+        .filter(
+            ProfessorInstitution.professor_id == current.professor_id,
+            ProfessorInstitution.institution_id.isnot(None),
+        )
     )
-    return institution_ids
+    from_pg = (
+        db.query(ProfessorGroup.institution_id)
+        .filter(
+            ProfessorGroup.professor_id == current.professor_id,
+            ProfessorGroup.institution_id.isnot(None),
+        )
+    )
+    rows = from_pi.union(from_pg).all()
+    return {int(r[0]) for r in rows}
 
 
 def _stats_global(db: Session, hide_superadmin_count: bool, current: User = None) -> dict:
@@ -226,8 +227,6 @@ def list_users(db: Session = Depends(get_db), current: User = Depends(require_da
         joinedload(User.professor).joinedload(Professor.professor_institutions).joinedload(ProfessorInstitution.institution),
     ]
     institution_ids = _accessible_institution_ids(db, current)
-    professor = professor_service.get_by_user(db, current) if not _is_superadmin(current) else None
-    prof_id = professor.id if professor else None
 
     if _is_superadmin(current):
         users = (
