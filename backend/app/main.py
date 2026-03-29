@@ -1,10 +1,14 @@
 import logging
+import time
+from contextvars import ContextVar
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 
 from .database import engine, Base
 from .routers import researchers, relationships, graph, upload, notes, auth, files, reminders, tips, deadlines, admin, groups, institutions, professors, users, profiles
@@ -12,7 +16,35 @@ from .routers import researchers, relationships, graph, upload, notes, auth, fil
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
+db_logger = logging.getLogger("db.queries")
+db_logger.setLevel(logging.INFO)
+if not db_logger.handlers:
+    _h = logging.StreamHandler()
+    _h.setFormatter(logging.Formatter("%(asctime)s %(name)s %(levelname)s %(message)s"))
+    db_logger.addHandler(_h)
+db_logger.propagate = False
+
+# ── Query counter por request ──────────────────────────────────────────────────
+_query_counter: ContextVar[list] = ContextVar("query_counter", default=None)
+
+@event.listens_for(Engine, "before_cursor_execute")
+def _count_query(conn, cursor, statement, parameters, context, executemany):
+    counter = _query_counter.get()
+    if counter is not None:
+        counter.append(1)
+
 app = FastAPI(title="Alumnus API", version="0.1.0")
+
+@app.middleware("http")
+async def log_db_queries(request: Request, call_next):
+    counter: list = []
+    _query_counter.set(counter)
+    t0 = time.perf_counter()
+    response = await call_next(request)
+    ms = (time.perf_counter() - t0) * 1000
+    n = len(counter)
+    db_logger.info("%-6s %-50s → %2d queries  (%.0f ms)", request.method, request.url.path, n, ms)
+    return response
 
 app.add_middleware(
     CORSMiddleware,

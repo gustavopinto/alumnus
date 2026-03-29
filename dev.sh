@@ -8,9 +8,25 @@ stop() {
   docker compose -f "$ROOT/docker-compose.yml" down
 }
 
+run_migrations() {
+  echo "Aguardando PostgreSQL..."
+  until docker compose -f "$ROOT/docker-compose.yml" exec -T db \
+    pg_isready -U alumnus -q 2>/dev/null; do
+    sleep 1
+  done
+  echo "Aplicando migrations..."
+  docker compose -f "$ROOT/docker-compose.yml" exec -T backend \
+    python3 /app/migrate.py
+}
+
 if [ "${1}" = "stop" ]; then
   stop
   echo "App parada."
+  exit 0
+fi
+
+if [ "${1}" = "migrate" ]; then
+  run_migrations
   exit 0
 fi
 
@@ -21,17 +37,7 @@ docker compose -f "$ROOT/docker-compose.yml" down 2>/dev/null || true
 echo "Buildando e subindo containers..."
 docker compose -f "$ROOT/docker-compose.yml" up --build -d
 
-# Aguarda o banco ficar saudável
-echo "Aguardando PostgreSQL..."
-until docker compose -f "$ROOT/docker-compose.yml" exec -T db \
-  pg_isready -U alumnus -q 2>/dev/null; do
-  sleep 1
-done
-
-# Migrations (DATABASE_URL já está definida no container via docker-compose)
-echo "Aplicando migrations..."
-docker compose -f "$ROOT/docker-compose.yml" exec -T backend \
-  python3 /app/migrate.py
+run_migrations
 
 echo ""
 echo "App rodando:"

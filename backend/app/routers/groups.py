@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
 from ..deps import require_professor, require_superadmin, get_current_user
@@ -27,7 +27,12 @@ def list_my_groups(
 ):
     """Lista os grupos do professor logado. Superadmin lista todos. Aluno retorna seu próprio grupo."""
     if current.role == "superadmin":
-        groups = db.query(ResearchGroup).order_by(ResearchGroup.name).all()
+        groups = (
+            db.query(ResearchGroup)
+            .options(joinedload(ResearchGroup.institution))
+            .order_by(ResearchGroup.name)
+            .all()
+        )
     elif current.role == "professor":
         professor = professor_service.get_by_user(db, current)
         if not professor:
@@ -36,7 +41,12 @@ def list_my_groups(
     else:
         # Student: retorna apenas o grupo ao qual pertence
         if current.researcher and current.researcher.group_id:
-            group = group_service.get_group_by_id(db, current.researcher.group_id)
+            group = (
+                db.query(ResearchGroup)
+                .options(joinedload(ResearchGroup.institution))
+                .filter(ResearchGroup.id == current.researcher.group_id)
+                .first()
+            )
             groups = [group] if group else []
         else:
             groups = []

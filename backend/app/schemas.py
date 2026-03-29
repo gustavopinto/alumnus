@@ -254,8 +254,8 @@ class UserOut(BaseModel):
 
 
 class UserProfileUpdate(BaseModel):
-    photo_url:       Optional[str] = None
-    photo_thumb_url: Optional[str] = None
+    photo_file_id:       Optional[int] = None
+    photo_thumb_file_id: Optional[int] = None
     lattes_url:      Optional[str] = None
     scholar_url:     Optional[str] = None
     linkedin_url:    Optional[str] = None

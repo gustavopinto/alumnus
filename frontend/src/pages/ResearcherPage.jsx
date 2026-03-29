@@ -317,8 +317,8 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, isOwnProfile, 
   const [passwordError, setPasswordError] = useState('');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [photoPreview, setPhotoPreview] = useState(user?.photo_url || null);
-  const [pendingPhotoUrl, setPendingPhotoUrl] = useState(null);
-  const [pendingPhotoThumbUrl, setPendingPhotoThumbUrl] = useState(null);
+  const [pendingPhotoFileId, setPendingPhotoFileId] = useState(null);
+  const [pendingPhotoThumbFileId, setPendingPhotoThumbFileId] = useState(null);
   const [saveError, setSaveError] = useState('');
   const photoRef = useRef();
 
@@ -349,9 +349,9 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, isOwnProfile, 
     if (!file) return;
     setUploadingPhoto(true);
     const res = await uploadPhoto(file);
-    setPendingPhotoUrl(res.url);
-    setPendingPhotoThumbUrl(res.thumb_url || null);
-    setPhotoPreview(res.url);
+    setPendingPhotoFileId(res.file_id);
+    setPendingPhotoThumbFileId(res.thumb_file_id || null);
+    setPhotoPreview(res.file_id ? `/api/files/${res.file_id}` : null);
     setUploadingPhoto(false);
   }
 
@@ -389,8 +389,8 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, isOwnProfile, 
           whatsapp: form.whatsapp || null,
           interesses: form.interesses || null,
           bio: form.bio || null,
-          ...(pendingPhotoUrl
-            ? { photo_url: pendingPhotoUrl, photo_thumb_url: pendingPhotoThumbUrl || null }
+          ...(pendingPhotoFileId
+            ? { photo_file_id: pendingPhotoFileId, photo_thumb_file_id: pendingPhotoThumbFileId || null }
             : {}),
           ...(newPassword ? { password: newPassword } : {}),
         };
@@ -403,8 +403,8 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, isOwnProfile, 
         }
       }
       setEditing(false);
-      setPendingPhotoUrl(null);
-      setPendingPhotoThumbUrl(null);
+      setPendingPhotoFileId(null);
+      setPendingPhotoThumbFileId(null);
       setNewPassword('');
       setConfirmPassword('');
       setToast('Perfil salvo com sucesso');
@@ -421,8 +421,8 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, isOwnProfile, 
   function handleCancel() {
     setEditing(false);
     setPhotoPreview(user?.photo_url || null);
-    setPendingPhotoUrl(null);
-    setPendingPhotoThumbUrl(null);
+    setPendingPhotoFileId(null);
+    setPendingPhotoThumbFileId(null);
     setInstagramError('');
     setTwitterError('');
     setSaveError('');
@@ -813,7 +813,7 @@ export default function ResearcherPage() {
     if (!file || !researcherUser) return;
     setUploadingPhoto(true);
     const res = await uploadPhoto(file);
-    await updateUserProfile(researcherUser.id, { photo_url: res.url, photo_thumb_url: res.thumb_url || null });
+    await updateUserProfile(researcherUser.id, { photo_file_id: res.file_id, photo_thumb_file_id: res.thumb_file_id || null });
     setUploadingPhoto(false);
     load();
   }

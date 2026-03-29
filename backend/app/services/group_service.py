@@ -1,6 +1,6 @@
 import logging
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from ..models import Professor, ProfessorGroup, ProfessorInstitution, ResearchGroup
 
@@ -8,10 +8,13 @@ logger = logging.getLogger(__name__)
 
 
 def list_professor_groups(db: Session, professor: Professor) -> list[ResearchGroup]:
-    ids = [pg.group_id for pg in professor.professor_groups]
-    if not ids:
-        return []
-    return db.query(ResearchGroup).filter(ResearchGroup.id.in_(ids)).all()
+    return (
+        db.query(ResearchGroup)
+        .join(ProfessorGroup, ProfessorGroup.group_id == ResearchGroup.id)
+        .options(joinedload(ResearchGroup.institution))
+        .filter(ProfessorGroup.professor_id == professor.id)
+        .all()
+    )
 
 
 def get_coordinator_group(db: Session, professor: Professor) -> ResearchGroup | None:

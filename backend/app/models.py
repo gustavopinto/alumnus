@@ -199,8 +199,8 @@ class User(Base):
     plan_status          = Column(String(20), nullable=True)
     account_activated_at = Column(DateTime, nullable=True)
     plan_period_ends_at  = Column(DateTime, nullable=True)
-    photo_url            = Column(String(500), nullable=True)
-    photo_thumb_url      = Column(String(500), nullable=True)
+    photo_file_id        = Column(Integer, ForeignKey("file_uploads.id"), nullable=True)
+    photo_thumb_file_id  = Column(Integer, ForeignKey("file_uploads.id"), nullable=True)
     lattes_url           = Column(String(500), nullable=True)
     scholar_url          = Column(String(500), nullable=True)
     linkedin_url         = Column(String(500), nullable=True)
@@ -218,6 +218,14 @@ class User(Base):
     @property
     def is_admin(self) -> bool:
         return self.role == "superadmin"
+
+    @property
+    def photo_url(self) -> str | None:
+        return f"/api/files/{self.photo_file_id}" if self.photo_file_id else None
+
+    @property
+    def photo_thumb_url(self) -> str | None:
+        return f"/api/files/{self.photo_thumb_file_id}" if self.photo_thumb_file_id else None
 
 
 class FileUpload(Base):

@@ -24,7 +24,7 @@ PORTRAIT_JPEG_QUALITY = 82
 THUMB_JPEG_QUALITY = 78
 
 
-def _store_bytes(db: Session, content: bytes, mime_type: str, original_name: str) -> tuple[str, int]:
+def _store_bytes(db: Session, content: bytes, mime_type: str, original_name: str) -> int:
     record = FileUpload(
         data=content,
         mime_type=mime_type,
@@ -33,7 +33,7 @@ def _store_bytes(db: Session, content: bytes, mime_type: str, original_name: str
     db.add(record)
     db.commit()
     db.refresh(record)
-    return f"/api/files/{record.id}", record.id
+    return record.id
 
 
 def build_portrait_and_thumb_jpeg(content: bytes) -> tuple[bytes, bytes]:
@@ -121,6 +121,7 @@ async def save_upload(file: UploadFile, db: Session) -> tuple[str, str]:
     else:
         mime_type = "application/pdf"
 
-    url, fid = _store_bytes(db, content, mime_type, file.filename or "file")
+    fid = _store_bytes(db, content, mime_type, file.filename or "file")
+    url = f"/api/files/{fid}"
     logger.info("Stored file id=%s (%d bytes)", fid, len(content))
     return url, file.filename or "file"

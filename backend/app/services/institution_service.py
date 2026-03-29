@@ -1,6 +1,6 @@
 import logging
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from ..institutional_email import extract_domain, is_public_email_domain
 from ..models import Institution, Professor, ProfessorInstitution, ProfessorGroup, ResearchGroup
@@ -31,6 +31,7 @@ def get_by_id(db: Session, institution_id: int) -> Institution | None:
 def list_professor_emails(db: Session, professor: Professor) -> list[ProfessorInstitution]:
     return (
         db.query(ProfessorInstitution)
+        .options(joinedload(ProfessorInstitution.institution))
         .filter(ProfessorInstitution.professor_id == professor.id)
         .order_by(ProfessorInstitution.created_at)
         .all()

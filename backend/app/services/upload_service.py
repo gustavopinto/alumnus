@@ -23,9 +23,9 @@ async def save_upload(file: UploadFile, db: Session) -> tuple[str, str]:
     return url, name
 
 
-async def save_researcher_photo(file: UploadFile, db: Session) -> tuple[str, str]:
+async def save_researcher_photo(file: UploadFile, db: Session) -> tuple[int, int]:
     """
-    Imagem de perfil: gera retrato 3:4 + miniatura; retorna (url_principal, url_miniatura).
+    Imagem de perfil: gera retrato 3:4 + miniatura; retorna (file_id_principal, file_id_miniatura).
     """
     content = await file.read()
     if len(content) > MAX_BYTES:
@@ -39,7 +39,7 @@ async def save_researcher_photo(file: UploadFile, db: Session) -> tuple[str, str
         )
 
     main_b, thumb_b = await asyncio.to_thread(build_portrait_and_thumb_jpeg, content)
-    url_main, mid = _store_bytes(db, main_b, "image/jpeg", file.filename or "photo.jpg")
-    url_thumb, tid = _store_bytes(db, thumb_b, "image/jpeg", "thumb.jpg")
-    logger.info("Researcher photo stored main id=%s thumb id=%s", mid, tid)
-    return url_main, url_thumb
+    file_id = _store_bytes(db, main_b, "image/jpeg", file.filename or "photo.jpg")
+    thumb_file_id = _store_bytes(db, thumb_b, "image/jpeg", "thumb.jpg")
+    logger.info("Researcher photo stored main id=%s thumb id=%s", file_id, thumb_file_id)
+    return file_id, thumb_file_id
