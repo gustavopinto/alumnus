@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { modKey, isModEnter } from '../platform';
 
@@ -6,12 +6,14 @@ function slugify(nome) {
   return (nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
 }
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getTips, createTip, deleteTip,
   toggleTipVote, addTipComment, deleteTipComment,
 } from '../api';
 import { getTokenPayload, isDashboardRole } from '../auth';
 import { useAppLayout } from '../components/AppLayout';
+import { keys } from '../queryKeys';
 import Toast from '../components/Toast';
 
 function renderFormatted(text) {
@@ -254,42 +256,42 @@ function EntryCard({ entry, authUserId, canModerate, onVote, onDelete, onComment
 }
 
 export default function ManualPage() {
-  const { currentInstitution, refreshSidebarTips } = useAppLayout();
-  const [entries, setEntries] = useState([]);
+  const { currentInstitution } = useAppLayout();
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
-  const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
   const payload = getTokenPayload();
   const canModerateManual = isDashboardRole(payload?.role);
   const authUserId = payload?.sub != null ? Number(payload.sub) : null;
 
-  async function load(instId) {
-    const data = await getTips(instId);
-    setEntries(data || []);
-  }
+  const queryClient = useQueryClient();
+  const instId = currentInstitution !== undefined ? (currentInstitution?.id ?? null) : undefined;
+  const { data: entries = [] } = useQuery({
+    queryKey: keys.tips(instId),
+    queryFn: () => getTips(instId),
+    enabled: instId !== undefined,
+  });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: keys.tips(instId) });
 
-  useEffect(() => { if (currentInstitution === undefined) return; load(currentInstitution?.id); }, [currentInstitution]);
+  const createMutation = useMutation({
+    mutationFn: () => createTip({ question: question.trim(), answer: answer.trim() }, instId),
+    onSuccess: () => { setQuestion(''); setAnswer(''); setToast('Entrada adicionada com sucesso'); invalidate(); },
+  });
 
-  async function handleSubmit(e) {
+  const deleteMutation = useMutation({
+    mutationFn: (id) => deleteTip(id),
+    onSuccess: () => { setToast('Entrada removida'); invalidate(); },
+  });
+
+  function handleSubmit(e) {
     e.preventDefault();
     if (!question.trim() || !answer.trim()) return;
-    setSaving(true);
-    await createTip({ question: question.trim(), answer: answer.trim() }, currentInstitution?.id);
-    setQuestion('');
-    setAnswer('');
-    setSaving(false);
-    setToast('Entrada adicionada com sucesso');
-    load(currentInstitution?.id);
-    refreshSidebarTips?.();
+    createMutation.mutate();
   }
 
   async function handleDelete(id) {
     if (!confirm('Remover esta entrada?')) return;
-    await deleteTip(id);
-    setToast('Entrada removida');
-    load(currentInstitution?.id);
-    refreshSidebarTips?.();
+    deleteMutation.mutate(id);
   }
 
   return (
@@ -336,10 +338,10 @@ export default function ManualPage() {
               <div className="flex items-center gap-3">
                 <button
                   type="submit"
-                  disabled={saving || !question.trim() || !answer.trim()}
+                  disabled={createMutation.isPending || !question.trim() || !answer.trim()}
                   className="ml-auto bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {saving ? 'Salvando...' : <>Adicionar <span className="opacity-50 text-xs">{modKey}+Enter</span></>}
+                  {createMutation.isPending ? 'Salvando...' : <>Adicionar <span className="opacity-50 text-xs">{modKey}+Enter</span></>}
                 </button>
               </div>
             </form>
@@ -357,10 +359,10 @@ export default function ManualPage() {
               entry={entry}
               authUserId={authUserId}
               canModerate={canModerateManual}
-              onVote={load}
+              onVote={invalidate}
               onDelete={handleDelete}
-              onCommentAdded={load}
-              onCommentDeleted={load}
+              onCommentAdded={invalidate}
+              onCommentDeleted={invalidate}
             />
           ))}
         </section>

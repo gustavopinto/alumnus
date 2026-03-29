@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppLayout } from '../components/AppLayout';
 import { getReminders, createReminder, deleteReminder } from '../api';
+import { keys } from '../queryKeys';
 import Toast from '../components/Toast';
 import { canDeleteReminder, creatorDisplayName } from '../reminderAccess';
 import { slugify, invalidMentions, renderWithMentions, useMentions, MentionDropdown } from '../mentionUtils.jsx';
@@ -22,24 +24,34 @@ function todayIso() {
 }
 
 export default function RemindersPage() {
-  const { refreshSidebarReminders, remindersRefreshKey = 0, currentUser, researchers = [], currentInstitution } = useAppLayout();
+  const { currentUser, researchers = [], currentInstitution } = useAppLayout();
   const creatorOpts = { viewerName: currentUser?.nome };
-  const [reminders, setReminders] = useState([]);
+  const instId = currentInstitution !== undefined ? (currentInstitution?.id ?? null) : undefined;
+  const queryClient = useQueryClient();
+
+  const { data: reminders = [] } = useQuery({
+    queryKey: keys.reminders(instId),
+    queryFn: () => getReminders(instId),
+    enabled: instId !== undefined,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: ({ text, dueDate }) => createReminder({ text, due_date: dueDate || null }, instId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.reminders(instId) }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => deleteReminder(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: keys.reminders(instId) }),
+  });
+
   const [text, setText] = useState('');
   const [dueDate, setDueDate] = useState(todayIso);
-  const [saving, setSaving] = useState(false);
   const [mentionError, setMentionError] = useState('');
   const [toast, setToast] = useState('');
   const textareaRef = useRef();
   const { mentionSuggestions, mentionIndex, setMentionIndex, handleTextChange, insertMention, handleMentionKeyDown } =
     useMentions({ text, setText, inputRef: textareaRef, researchers });
-
-  const load = useCallback(async () => {
-    const data = await getReminders(currentInstitution?.id);
-    setReminders(data || []);
-  }, [currentInstitution]);
-
-  useEffect(() => { if (currentInstitution === undefined) return; load(); }, [load, remindersRefreshKey, currentInstitution]);
 
 
   useEffect(() => {
@@ -75,22 +87,18 @@ export default function RemindersPage() {
       return;
     }
     setMentionError('');
-    setSaving(true);
-    await createReminder({ text, due_date: dueDate || null }, currentInstitution?.id);
+    await createMutation.mutateAsync({ text, dueDate });
     setText('');
     setDueDate(todayIso());
-    setSaving(false);
     setToast('Lembrete adicionado');
-    refreshSidebarReminders?.();
   }
 
   async function handleDelete(id) {
     if (!confirm('Remover lembrete?')) return;
     try {
-      await deleteReminder(id);
-      refreshSidebarReminders?.();
+      await deleteMutation.mutateAsync(id);
       setToast('Lembrete removido');
-    } catch (e) {
+    } catch {
       setToast('Não foi possível remover');
     }
   }
@@ -98,6 +106,7 @@ export default function RemindersPage() {
   const pending = reminders.filter(r => !r.done);
   const done = reminders.filter(r => r.done);
   const minDue = todayIso();
+  const saving = createMutation.isPending;
 
   return (
     <div className="min-h-full bg-gray-50">

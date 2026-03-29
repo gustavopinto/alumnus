@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import ResearcherForm from './ResearcherForm';
 import { deleteResearcher, getProfessors, getGroups, updateGroup, getReminders, createReminder, updateReminder, deleteReminder, getDeadlines, deleteDeadline, getTips } from '../api';
+import { keys } from '../queryKeys';
 import { canDeleteReminder, creatorDisplayName, isReminderFromSomeoneElse } from '../reminderAccess';
 import { slugify, invalidMentions, renderWithMentions, useMentions, MentionDropdown } from '../mentionUtils.jsx';
 import { isModEnter } from '../platform';
@@ -11,13 +13,11 @@ function today() {
   return new Date().toISOString().split('T')[0];
 }
 
-function RemindersDropdown({ rail = false, refreshKey = 0, onRefresh = null, currentUser = null, researchers = [], institutionId = null }) {
+function RemindersDropdown({ rail = false, currentUser = null, researchers = [], institutionId = null }) {
   const [open, setOpen] = useState(false);
   const [showOld, setShowOld] = useState(false);
-  const [reminders, setReminders] = useState([]);
   const [text, setText] = useState('');
   const [date, setDate] = useState(today());
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const ref = useRef();
   const dateRef = useRef();
@@ -27,13 +27,31 @@ function RemindersDropdown({ rail = false, refreshKey = 0, onRefresh = null, cur
   const { mentionSuggestions, mentionIndex, setMentionIndex, handleTextChange, insertMention, handleMentionKeyDown } =
     useMentions({ text, setText, inputRef, researchers, maxLength: 50 });
 
-  const load = useCallback(async () => {
-    const data = await getReminders(institutionId);
-    setReminders(data || []);
-  }, [institutionId]);
+  const queryClient = useQueryClient();
+  const instId = institutionId;
+  const { data: reminders = [] } = useQuery({
+    queryKey: keys.reminders(instId),
+    queryFn: () => getReminders(instId),
+    enabled: instId !== undefined,
+  });
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: keys.reminders(instId) });
 
-  useEffect(() => { if (institutionId === undefined) return; load(); }, [refreshKey, load, institutionId]);
+  const createMutation = useMutation({
+    mutationFn: ({ text: t, date: d }) => createReminder({ text: t.trim(), due_date: d }, instId),
+    onSuccess: () => { invalidate(); setText(''); setDate(''); },
+    onError: () => setError('Erro ao adicionar lembrete'),
+  });
 
+  const toggleMutation = useMutation({
+    mutationFn: (r) => updateReminder(r.id, { done: !r.done }),
+    onSuccess: () => invalidate(),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => deleteReminder(id),
+    onSuccess: () => invalidate(),
+    onError: (e) => setError(e?.message || 'Não foi possível remover'),
+  });
 
   useEffect(() => {
     function handler(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
@@ -41,7 +59,7 @@ function RemindersDropdown({ rail = false, refreshKey = 0, onRefresh = null, cur
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  async function handleAdd(e) {
+  function handleAdd(e) {
     e.preventDefault();
     if (!text.trim() || !date) return;
     const bad = invalidMentions(text.trim(), researchers);
@@ -49,37 +67,15 @@ function RemindersDropdown({ rail = false, refreshKey = 0, onRefresh = null, cur
       setError(`Menção não encontrada: ${bad.join(', ')}`);
       return;
     }
-    setSaving(true);
     setError('');
-    try {
-      const result = await createReminder({ text: text.trim(), due_date: date }, institutionId);
-      if (result && result.id) {
-        setText('');
-        setDate('');
-        onRefresh ? onRefresh() : load();
-      } else {
-        setError('Erro ao adicionar lembrete');
-      }
-    } catch {
-      setError('Erro ao adicionar lembrete');
-    } finally {
-      setSaving(false);
-    }
+    createMutation.mutate({ text, date });
   }
 
-  async function toggleDone(r) {
-    await updateReminder(r.id, { done: !r.done });
-    load();
-  }
+  function toggleDone(r) { toggleMutation.mutate(r); }
 
-  async function handleDelete(id) {
+  function handleDelete(id) {
     setError('');
-    try {
-      await deleteReminder(id);
-      onRefresh ? onRefresh() : await load();
-    } catch (e) {
-      setError(e?.message || 'Não foi possível remover');
-    }
+    deleteMutation.mutate(id);
   }
 
   const todayStr = today();
@@ -180,7 +176,7 @@ function RemindersDropdown({ rail = false, refreshKey = 0, onRefresh = null, cur
                 </label>
                 <button
                   type="submit"
-                  disabled={saving || !text.trim() || !date}
+                  disabled={createMutation.isPending || !text.trim() || !date}
                   className="bg-blue-600 text-white px-3 py-1.5 rounded text-xs hover:bg-blue-700 disabled:opacity-40"
                 >
                   +
@@ -377,12 +373,13 @@ const INSTITUTION_ICON = (
 );
 
 /** Barra estreita com ícones quando o menu principal está recolhido */
-export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshKey = 0, currentUser = null, role = null, isAdmin = false, currentInstitution = null }) {
-  const [railDeadlines, setRailDeadlines] = useState([]);
-  useEffect(() => {
-    if (currentInstitution === undefined) return;
-    getDeadlines(currentInstitution?.id).then(d => setRailDeadlines(d || [])).catch(() => {});
-  }, [currentInstitution]);
+export function SidebarRail({ researchers, onExpand, onLogout, currentUser = null, role = null, isAdmin = false, currentInstitution = undefined }) {
+  const instId = currentInstitution !== undefined ? (currentInstitution?.id ?? null) : undefined;
+  const { data: railDeadlines = [] } = useQuery({
+    queryKey: keys.deadlines(instId),
+    queryFn: () => getDeadlines(instId),
+    enabled: instId !== undefined,
+  });
   const upcomingDeadlines = railDeadlines.filter(d => daysUntil(d.date) >= 0);
 
   return (
@@ -412,7 +409,7 @@ export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshK
           )}
         </Link>
 
-        <RemindersDropdown rail refreshKey={remindersRefreshKey} currentUser={currentUser} institutionId={currentInstitution === undefined ? undefined : (currentInstitution?.id ?? null)} />
+        <RemindersDropdown rail currentUser={currentUser} institutionId={currentInstitution === undefined ? undefined : (currentInstitution?.id ?? null)} />
 
         <Link
           to="/app/deadlines"
@@ -452,41 +449,50 @@ export function SidebarRail({ researchers, onExpand, onLogout, remindersRefreshK
   );
 }
 
-export default function Sidebar({ researchers, onRefresh, onRefreshReminders = null, onRefreshDeadlines = null, role, isAdmin = false, remindersRefreshKey = 0, deadlinesRefreshKey = 0, tipsRefreshKey = 0, currentUser = null, currentInstitution = null, institutions = [] }) {
+export default function Sidebar({ researchers, onRefresh, role, isAdmin = false, currentUser = null, currentInstitution = undefined, institutions = [] }) {
   const [view, setView] = useState('list');
   const [editResearcher, setEditResearcher] = useState(null);
-  const [professors, setProfessors] = useState([]);
-  const [currentGroup, setCurrentGroup] = useState(null); // { id, name }
+  const [currentGroup, setCurrentGroup] = useState(null);
   const [groupLabel, setGroupLabel] = useState('Grupo');
   const [renamingGroup, setRenamingGroup] = useState(false);
   const [renameInput, setRenameInput] = useState('');
-  const [sidebarDeadlines, setSidebarDeadlines] = useState([]);
+
+  const queryClient = useQueryClient();
+  const instId = currentInstitution !== undefined ? (currentInstitution?.id ?? null) : undefined;
+
+  const { data: sidebarDeadlines = [] } = useQuery({
+    queryKey: keys.deadlines(instId),
+    queryFn: () => getDeadlines(instId),
+    enabled: instId !== undefined,
+  });
+
+  const { data: sidebarTips = [] } = useQuery({
+    queryKey: keys.tips(instId),
+    queryFn: () => getTips(instId),
+    enabled: instId !== undefined,
+  });
+  const sidebarTipCount = sidebarTips.length;
+
+  const { data: professors = [] } = useQuery({
+    queryKey: keys.professors(),
+    queryFn: getProfessors,
+    enabled: isAdmin,
+  });
+
+  const { data: allGroups = [] } = useQuery({
+    queryKey: keys.groups(),
+    queryFn: getGroups,
+    enabled: instId !== undefined,
+  });
+
   useEffect(() => {
-    if (currentInstitution === undefined) return;
-    getDeadlines(currentInstitution?.id).then(d => setSidebarDeadlines(d || [])).catch(() => {});
-  }, [currentInstitution, deadlinesRefreshKey]);
-  const [sidebarTipCount, setSidebarTipCount] = useState(0);
-  useEffect(() => {
-    if (currentInstitution === undefined) return;
-    getTips(currentInstitution?.id).then(d => setSidebarTipCount(Array.isArray(d) ? d.length : 0)).catch(() => {});
-  }, [currentInstitution, tipsRefreshKey]);
-  useEffect(() => {
-    if (currentInstitution === undefined) return;
-    if (isAdmin) {
-      getProfessors().then(data => setProfessors(data || [])).catch(() => {});
-    }
-    getGroups().then(data => {
-      const groups = Array.isArray(data) ? data : [];
-      const filtered = currentInstitution
-        ? groups.filter(g => g.institution_id === currentInstitution.id)
-        : groups;
-      const first = filtered[0] || groups[0] || null;
-      if (first) {
-        setCurrentGroup(first);
-        setGroupLabel(first.name);
-      }
-    }).catch(() => {});
-  }, [isAdmin, currentInstitution]);
+    if (!Array.isArray(allGroups) || allGroups.length === 0) return;
+    const filtered = instId != null
+      ? allGroups.filter(g => g.institution_id === instId)
+      : allGroups;
+    const first = filtered[0] || allGroups[0] || null;
+    if (first) { setCurrentGroup(first); setGroupLabel(first.name); }
+  }, [allGroups, instId]); // eslint-disable-line
 
   function handleEdit(s) { setEditResearcher(s); setView('researcher-form'); }
 
@@ -577,7 +583,7 @@ export default function Sidebar({ researchers, onRefresh, onRefreshReminders = n
       )}
 
       {/* Lembretes */}
-      <RemindersDropdown refreshKey={remindersRefreshKey} onRefresh={onRefreshReminders} currentUser={currentUser} researchers={researchers} institutionId={currentInstitution === undefined ? undefined : (currentInstitution?.id ?? null)} />
+      <RemindersDropdown currentUser={currentUser} researchers={researchers} institutionId={currentInstitution === undefined ? undefined : (currentInstitution?.id ?? null)} />
 
       {/* Deadlines */}
       <Dropdown label="Próximos deadlines" icon={CALENDAR_ICON} badge={upcomingDeadlines.length} linkTo="/app/deadlines" disabled={sidebarDeadlines.length <= 1}>
@@ -587,7 +593,7 @@ export default function Sidebar({ researchers, onRefresh, onRefreshReminders = n
           async function handleDeleteDeadline(id) {
             try {
               await deleteDeadline(id);
-              onRefreshDeadlines?.();
+              queryClient.invalidateQueries({ queryKey: keys.deadlines(instId) });
             } catch {}
           }
           return (

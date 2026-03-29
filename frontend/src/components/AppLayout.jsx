@@ -177,9 +177,6 @@ export default function AppLayout() {
   const [edges, setEdges] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(() => localStorage.getItem('sidebarOpen') !== 'false');
   const [loadingData, setLoadingData] = useState(true);
-  const [remindersRefreshKey, setRemindersRefreshKey] = useState(0);
-  const [deadlinesRefreshKey, setDeadlinesRefreshKey] = useState(0);
-  const [tipsRefreshKey, setTipsRefreshKey] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [institutionName, setInstitutionName] = useState(null);
@@ -317,16 +314,6 @@ export default function AppLayout() {
     }).catch(() => {});
   }, []);
 
-  const refreshSidebarReminders = useCallback(() => {
-    setRemindersRefreshKey((k) => k + 1);
-  }, []);
-  const refreshSidebarDeadlines = useCallback(() => {
-    setDeadlinesRefreshKey((k) => k + 1);
-  }, []);
-  const refreshSidebarTips = useCallback(() => {
-    setTipsRefreshKey((k) => k + 1);
-  }, []);
-
   // Fecha dropdown ao clicar fora
   useEffect(() => {
     function handler(e) {
@@ -397,11 +384,6 @@ export default function AppLayout() {
       loadData,
       graphNodes: nodes,
       graphEdges: edges,
-      refreshSidebarReminders,
-      refreshSidebarDeadlines,
-      refreshSidebarTips,
-      remindersRefreshKey,
-      deadlinesRefreshKey,
       updateGraphNodePosition,
       currentUser,
       setProfileTopbar,
@@ -410,7 +392,7 @@ export default function AppLayout() {
       institutions,
       refreshInstitutions,
     }),
-    [sidebarOpen, setSidebarOpenPersist, researchers, loadData, nodes, edges, refreshSidebarReminders, refreshSidebarDeadlines, refreshSidebarTips, remindersRefreshKey, deadlinesRefreshKey, updateGraphNodePosition, currentUser, currentInstitution, institutions, refreshInstitutions],
+    [sidebarOpen, setSidebarOpenPersist, researchers, loadData, nodes, edges, updateGraphNodePosition, currentUser, currentInstitution, institutions, refreshInstitutions],
   );
 
   const { pathname } = useLocation();
@@ -475,13 +457,8 @@ export default function AppLayout() {
               <Sidebar
                 researchers={researchers}
                 onRefresh={loadData}
-                onRefreshReminders={refreshSidebarReminders}
-                onRefreshDeadlines={refreshSidebarDeadlines}
                 role={payload?.role}
                 isAdmin={['professor','superadmin'].includes(payload?.role)}
-                remindersRefreshKey={remindersRefreshKey}
-                deadlinesRefreshKey={deadlinesRefreshKey}
-                tipsRefreshKey={tipsRefreshKey}
                 currentUser={currentUser}
                 currentInstitution={currentInstitution}
                 institutions={institutions}
@@ -505,7 +482,6 @@ export default function AppLayout() {
             researchers={researchers}
             onExpand={() => setSidebarOpenPersist(true)}
             onLogout={handleLogout}
-            remindersRefreshKey={remindersRefreshKey}
             currentUser={currentUser}
             role={payload?.role}
             isAdmin={['professor','superadmin'].includes(payload?.role)}

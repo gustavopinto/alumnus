@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getAdminStats, getAdminUsers, updateUserRole, deleteUser, deletePendingResearcher, bulkDeleteUsers, createResearcher } from '../api';
+import { keys } from '../queryKeys';
 import { getTokenPayload } from '../auth';
 import { useAppLayout } from '../components/AppLayout';
 import Toast from '../components/Toast';
@@ -36,11 +38,27 @@ function slugify(nome) {
     .toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
 }
 
+const SORT_USERS = (u) => [u.pending ? 1 : 0, ROLE_ORDER[u.role] ?? 99, u.nome || ''];
+
 export default function AdminPage() {
   const navigate = useNavigate();
   const { institutions = [] } = useAppLayout();
-  const [stats, setStats] = useState(null);
-  const [users, setUsers] = useState([]);
+  const queryClient = useQueryClient();
+  const { data: stats = null } = useQuery({ queryKey: keys.adminStats(), queryFn: getAdminStats });
+  const { data: rawUsers = [] } = useQuery({ queryKey: keys.adminUsers(), queryFn: getAdminUsers });
+  const users = [...rawUsers].sort((a, b) => {
+    const [ap, ar, an] = SORT_USERS(a);
+    const [bp, br, bn] = SORT_USERS(b);
+    if (ap !== bp) return ap - bp;
+    if (ar !== br) return ar - br;
+    return an.localeCompare(bn, 'pt-BR');
+  });
+
+  const invalidateAdmin = () => {
+    queryClient.invalidateQueries({ queryKey: keys.adminUsers() });
+    queryClient.invalidateQueries({ queryKey: keys.adminStats() });
+  };
+
   const [editingId, setEditingId] = useState(undefined);
   const [editRole, setEditRole] = useState('');
   const [saving, setSaving] = useState(false);
@@ -74,20 +92,6 @@ export default function AdminPage() {
 
   const ROLE_ORDER = { superadmin: 0, professor: 1, researcher: 2 };
 
-  async function load() {
-    const [s, u] = await Promise.all([getAdminStats(), getAdminUsers()]);
-    setStats(s);
-    const sorted = (u || []).sort((a, b) => {
-      if (a.pending !== b.pending) return a.pending ? 1 : -1;
-      const ra = ROLE_ORDER[a.role] ?? 99;
-      const rb = ROLE_ORDER[b.role] ?? 99;
-      if (ra !== rb) return ra - rb;
-      return (a.nome || '').localeCompare(b.nome || '', 'pt-BR');
-    });
-    setUsers(sorted);
-  }
-
-  useEffect(() => { load(); }, []);
 
   useEffect(() => {
     if (institutions.length > 0 && !newStudentInstId) {
@@ -128,7 +132,7 @@ export default function AdminPage() {
     await bulkDeleteUsers(user_ids, researcher_ids);
     setSelected(new Set());
     setBulkDeleting(false);
-    load();
+    invalidateAdmin();
   }
 
   async function handleRoleChange(userId) {
@@ -136,7 +140,7 @@ export default function AdminPage() {
     await updateUserRole(userId, editRole, editRole === 'superadmin');
     setEditingId(null);
     setSaving(false);
-    load();
+    invalidateAdmin();
   }
 
   async function handleDelete(u) {
@@ -147,7 +151,7 @@ export default function AdminPage() {
       await deleteUser(u.id);
     }
     setToast(`"${u.nome}" removido`);
-    load();
+    invalidateAdmin();
   }
 
   async function handleAddStudent(e) {
@@ -167,7 +171,7 @@ export default function AdminPage() {
         setNewStudentEmail('');
         setNewStudentStatus('mestrado');
         setNewStudentInstId(institutions.length > 0 ? String(institutions[0].id) : '');
-        load();
+        invalidateAdmin();
       } else {
         setAddStudentError(r?.detail || 'Erro ao cadastrar aluno');
       }

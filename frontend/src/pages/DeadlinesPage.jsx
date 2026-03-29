@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getDeadlines, createDeadline, deleteDeadline, getDeadlineInterests, toggleDeadlineInterest, extractDeadlineFromUrl } from '../api';
 import { getTokenPayload, isDashboardRole } from '../auth';
 import { daysUntil, slugify } from '../deadlines';
 import { modKey, isModEnter } from '../platform';
 import { useAppLayout } from '../components/AppLayout';
 import Toast from '../components/Toast';
+import { keys } from '../queryKeys';
 
 function profileSlugForInterest(i) {
   const fromApi = i.profile_slug && String(i.profile_slug).trim();
@@ -28,29 +30,56 @@ function Avatar({ name, photoUrl, size = 7 }) {
 }
 
 export default function DeadlinesPage() {
-  const { currentInstitution, refreshSidebarDeadlines, deadlinesRefreshKey = 0 } = useAppLayout();
-  const [deadlines, setDeadlines] = useState([]);
-  const [interests, setInterests] = useState([]);
-  const [showPast, setShowPast] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const { currentInstitution } = useAppLayout();
+  const instId = currentInstitution !== undefined ? (currentInstitution?.id ?? null) : undefined;
+  const queryClient = useQueryClient();
   const payload = getTokenPayload();
   const myUserId = payload?.sub != null ? Number(payload.sub) : null;
   const canManage = isDashboardRole(payload?.role);
 
+  const { data: deadlines = [] } = useQuery({
+    queryKey: keys.deadlines(instId),
+    queryFn: () => getDeadlines(instId),
+    enabled: instId !== undefined,
+  });
+
+  const { data: interests = [] } = useQuery({
+    queryKey: [...keys.deadlines(instId), 'interests'],
+    queryFn: () => getDeadlineInterests(instId),
+    enabled: instId !== undefined,
+  });
+
+  const invalidateDeadlines = () => {
+    queryClient.invalidateQueries({ queryKey: keys.deadlines(instId) });
+  };
+
+  const toggleMutation = useMutation({
+    mutationFn: (deadlineId) => toggleDeadlineInterest(deadlineId),
+    onSuccess: invalidateDeadlines,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (deadlineId) => deleteDeadline(deadlineId),
+    onSuccess: () => { invalidateDeadlines(); setToast('Deadline removido'); },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: (data) => createDeadline({ ...data, institution_id: instId }),
+    onSuccess: () => { invalidateDeadlines(); setToast('Deadline adicionado'); },
+  });
+
+  const [showPast, setShowPast] = useState(false);
   const [extractOpen, setExtractOpen] = useState(false);
   const [extractUrl, setExtractUrl] = useState('');
   const [extracting, setExtracting] = useState(false);
   const [extracted, setExtracted] = useState(null);
   const [extractError, setExtractError] = useState('');
   const [saving, setSaving] = useState({});
-
   const [toast, setToast] = useState('');
-
   const [addOpen, setAddOpen] = useState(false);
   const [addLabel, setAddLabel] = useState('');
   const [addUrl, setAddUrl] = useState('');
   const [addDate, setAddDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState('');
 
   const isValidUrl = (() => {
@@ -58,57 +87,31 @@ export default function DeadlinesPage() {
     catch { return false; }
   })();
 
-  const load = useCallback(async (instId) => {
-    const [dl, iv] = await Promise.all([getDeadlines(instId), getDeadlineInterests(instId)]);
-    setDeadlines(dl || []);
-    setInterests(iv || []);
-  }, []);
-
-  useEffect(() => { if (currentInstitution === undefined) return; load(currentInstitution?.id); }, [load, currentInstitution, deadlinesRefreshKey]);
-
   async function handleToggle(deadlineId) {
-    if (loading) return;
-    setLoading(true);
-    try {
-      await toggleDeadlineInterest(deadlineId);
-    } catch (e) { console.error(e); }
-    finally {
-      await load(currentInstitution?.id);
-      setLoading(false);
-    }
+    try { await toggleMutation.mutateAsync(deadlineId); }
+    catch (e) { console.error(e); }
   }
 
   async function handleDelete(deadlineId) {
     if (!confirm('Remover este deadline?')) return;
-    await deleteDeadline(deadlineId);
-    await load(currentInstitution?.id);
-    refreshSidebarDeadlines?.();
-    setToast('Deadline removido');
+    await deleteMutation.mutateAsync(deadlineId);
   }
 
   async function handleAddManual(e) {
     e.preventDefault();
     if (!addLabel.trim() || !addUrl.trim() || !addDate) return;
-    setAddSaving(true);
     setAddError('');
     try {
-      await createDeadline({ label: addLabel.trim(), url: addUrl.trim(), date: addDate, institution_id: currentInstitution?.id });
+      await createMutation.mutateAsync({ label: addLabel.trim(), url: addUrl.trim(), date: addDate });
       setAddLabel(''); setAddUrl(''); setAddDate(new Date().toISOString().split('T')[0]); setAddOpen(false);
-      setToast('Deadline adicionado');
-      await load(currentInstitution?.id);
-      refreshSidebarDeadlines?.();
     } catch { setAddError('Erro ao adicionar deadline'); }
-    finally { setAddSaving(false); }
   }
 
   async function handleSaveExtracted(d, idx) {
     setSaving(s => ({ ...s, [idx]: true }));
     try {
-      await createDeadline({ label: d.label, url: d.url, date: d.date, institution_id: currentInstitution?.id });
+      await createMutation.mutateAsync({ label: d.label, url: d.url, date: d.date });
       setExtracted(prev => prev.filter((_, i) => i !== idx));
-      setToast('Deadline adicionado');
-      await load(currentInstitution?.id);
-      refreshSidebarDeadlines?.();
     } catch (e) { console.error(e); }
     finally { setSaving(s => ({ ...s, [idx]: false })); }
   }
@@ -194,7 +197,7 @@ export default function DeadlinesPage() {
           {!isPast && (
             <button
               type="button"
-              disabled={loading}
+              disabled={toggleMutation.isPending}
               onClick={() => handleToggle(d.id)}
               className={`inline-flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg border font-medium transition-colors disabled:opacity-50 ${
                 myInterest ? 'bg-green-50 border-green-300 text-green-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600'
@@ -259,8 +262,8 @@ export default function DeadlinesPage() {
               />
               {addError && <p className="text-xs text-red-500">{addError}</p>}
               <div className="flex gap-2">
-                <button type="submit" disabled={addSaving} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
-                  {addSaving ? 'Adicionando…' : 'Adicionar'}
+                <button type="submit" disabled={createMutation.isPending} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
+                  {createMutation.isPending ? 'Adicionando…' : 'Adicionar'}
                 </button>
                 <button type="button" onClick={() => setAddOpen(false)} className="bg-gray-200 px-4 py-2 rounded-lg text-sm hover:bg-gray-300">Cancelar</button>
               </div>
