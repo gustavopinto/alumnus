@@ -318,6 +318,7 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, isOwnProfile, 
   const [instagramError, setInstagramError] = useState('');
   const [twitterError, setTwitterError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [statusSaving, setStatusSaving] = useState(false);
   const [toast, setToast] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -422,6 +423,20 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, isOwnProfile, 
       setSaveError(err?.message || 'Não foi possível salvar o perfil');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleStatusChange(newStatus) {
+    if (!researcher?.id || newStatus === researcher.status) return;
+    setStatusSaving(true);
+    try {
+      await updateResearcher(researcher.id, { status: newStatus });
+      setToast('Nível atualizado');
+      onSaved();
+    } catch {
+      setToast('Erro ao atualizar nível');
+    } finally {
+      setStatusSaving(false);
     }
   }
 
@@ -688,41 +703,60 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, isOwnProfile, 
               <p className="text-sm text-gray-700">{user.interesses}</p>
             </div>
           )}
-          {isProfessor && researcher && (researcher.matricula || researcher.curso || researcher.enrollment_date) && (
-            <div className="border-t pt-3 mt-1 flex gap-6 flex-wrap">
-              {researcher.matricula && (
-                <div>
-                  <p className="text-xs font-medium text-gray-500">Matrícula</p>
-                  <p className="text-sm text-gray-700">{researcher.matricula}</p>
+          {isProfessor && researcher && (
+            <div className="border-t pt-3 mt-1 space-y-3">
+              <div className="flex items-center gap-3">
+                <p className="text-xs font-medium text-gray-500 w-16 shrink-0">Nível</p>
+                <select
+                  value={researcher.status}
+                  onChange={e => handleStatusChange(e.target.value)}
+                  disabled={statusSaving}
+                  className="text-sm border rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50"
+                >
+                  <option value="graduacao">Graduação</option>
+                  <option value="mestrado">Mestrado</option>
+                  <option value="doutorado">Doutorado</option>
+                  <option value="postdoc">Pós-doc</option>
+                </select>
+                {statusSaving && <span className="text-xs text-gray-400">Salvando...</span>}
+              </div>
+              {(researcher.matricula || researcher.curso || researcher.enrollment_date) && (
+                <div className="flex gap-6 flex-wrap">
+                  {researcher.matricula && (
+                    <div>
+                      <p className="text-xs font-medium text-gray-500">Matrícula</p>
+                      <p className="text-sm text-gray-700">{researcher.matricula}</p>
+                    </div>
+                  )}
+                  {researcher.curso && (
+                    <div>
+                      <p className="text-xs font-medium text-gray-500">Curso</p>
+                      <p className="text-sm text-gray-700">{researcher.curso}</p>
+                    </div>
+                  )}
+                  {researcher.enrollment_date && (
+                    <div>
+                      <p className="text-xs font-medium text-gray-500">Ingresso</p>
+                      <p className="text-sm text-gray-700">
+                        {new Date(researcher.enrollment_date + 'T00:00:00').toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' })}
+                      </p>
+                    </div>
+                  )}
+                  {researcher.enrollment_date && (researcher.status === 'mestrado' || researcher.status === 'doutorado') && (() => {
+                    const years = researcher.status === 'mestrado' ? 2 : 4;
+                    const d = new Date(researcher.enrollment_date + 'T00:00:00');
+                    d.setFullYear(d.getFullYear() + years);
+                    return (
+                      <div>
+                        <p className="text-xs font-medium text-gray-500">Possível Formatura</p>
+                        <p className="text-sm text-gray-700">
+                          {d.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' })}
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
-              {researcher.curso && (
-                <div>
-                  <p className="text-xs font-medium text-gray-500">Curso</p>
-                  <p className="text-sm text-gray-700">{researcher.curso}</p>
-                </div>
-              )}
-              {researcher.enrollment_date && (
-                <div>
-                  <p className="text-xs font-medium text-gray-500">Ingresso</p>
-                  <p className="text-sm text-gray-700">
-                    {new Date(researcher.enrollment_date + 'T00:00:00').toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' })}
-                  </p>
-                </div>
-              )}
-              {researcher.enrollment_date && (researcher.status === 'mestrado' || researcher.status === 'doutorado') && (() => {
-                const years = researcher.status === 'mestrado' ? 2 : 4;
-                const d = new Date(researcher.enrollment_date + 'T00:00:00');
-                d.setFullYear(d.getFullYear() + years);
-                return (
-                  <div>
-                    <p className="text-xs font-medium text-gray-500">Possível Formatura</p>
-                    <p className="text-sm text-gray-700">
-                      {d.toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' })}
-                    </p>
-                  </div>
-                );
-              })()}
             </div>
           )}
         </div>
