@@ -38,6 +38,7 @@ function slugify(nome) {
     .toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
 }
 
+const ROLE_ORDER = { superadmin: 0, professor: 1, researcher: 2 };
 const SORT_USERS = (u) => [u.pending ? 1 : 0, ROLE_ORDER[u.role] ?? 99, u.nome || ''];
 
 export default function AdminPage() {
@@ -89,9 +90,6 @@ export default function AdminPage() {
       setToast('Link de convite copiado com sucesso');
     });
   }
-
-  const ROLE_ORDER = { superadmin: 0, professor: 1, researcher: 2 };
-
 
   useEffect(() => {
     if (institutions.length > 0 && !newStudentInstId) {
