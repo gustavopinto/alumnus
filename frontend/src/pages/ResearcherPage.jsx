@@ -5,10 +5,11 @@ import { getProfileBySlug, updateResearcher, updateMyProfile, updateUserProfile,
 import { getTokenPayload } from '../auth';
 import { modKey, isModEnter } from '../platform';
 import Toast from '../components/Toast';
+import MilestoneTimeline from '../components/MilestoneTimeline';
 import { slugify, renderWithMentions, invalidMentions, useMentions, MentionDropdown } from '../mentionUtils.jsx';
 
-const STATUS_LABELS = { graduacao: 'Graduação', mestrado: 'Mestrado', doutorado: 'Doutorado', postdoc: 'Pós-doc', professor: 'Professor' };
-const STATUS_COLORS = { graduacao: '#3B82F6', mestrado: '#F59E0B', doutorado: '#10B981', postdoc: '#06B6D4', professor: '#7C3AED' };
+const STATUS_LABELS = { graduacao: 'Graduação', mestrado: 'Mestrado', doutorado: 'Doutorado', postdoc: 'Pós-doc', professor: 'Professor', egresso: 'Egresso' };
+const STATUS_COLORS = { graduacao: '#3B82F6', mestrado: '#F59E0B', doutorado: '#10B981', postdoc: '#06B6D4', professor: '#7C3AED', egresso: '#6B7280' };
 
 function formatDate(iso) {
   return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -141,6 +142,7 @@ function buildProfileForm(u) {
 }
 
 function NotesSection({ userId, institutionId, canAdd, isProfessor, currentUserId, researchers = [] }) {
+  const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState([]);
   const [text, setText] = useState('');
   const [file, setFile] = useState(null);
@@ -150,6 +152,7 @@ function NotesSection({ userId, institutionId, canAdd, isProfessor, currentUserI
   const fileRef = useRef();
   const textareaRef = useRef();
   const loadNotesInFlight = useRef(false);
+  const loaded = useRef(false);
 
   const { mentionSuggestions, mentionIndex, setMentionIndex, handleTextChange, insertMention, handleMentionKeyDown } =
     useMentions({ text, setText, inputRef: textareaRef, researchers });
@@ -180,7 +183,13 @@ function NotesSection({ userId, institutionId, canAdd, isProfessor, currentUserI
     }
   }
 
-  useEffect(() => { load(); }, [userId, institutionId]);
+  // Reset cache when user/institution changes
+  useEffect(() => { loaded.current = false; setNotes([]); }, [userId, institutionId]);
+
+  // Lazy load: only fetch when first expanded
+  useEffect(() => {
+    if (open && !loaded.current) { loaded.current = true; load(); }
+  }, [open]); // eslint-disable-line
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -204,108 +213,116 @@ function NotesSection({ userId, institutionId, canAdd, isProfessor, currentUserI
     load();
   }
 
-  const lastNote = notes.length > 0 ? notes[0] : null;
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-0">
     <Toast message={toast} onClose={() => setToast('')} />
-    {canAdd && <section className="bg-white rounded-xl shadow-sm border p-6">
-      <div className="flex items-center justify-between mb-4">
+    <section className="bg-white rounded-xl shadow-sm border overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors"
+      >
         <h2 className="text-lg font-bold text-gray-800">Anotações de reuniões</h2>
-        {lastNote && (
-          <span className="flex items-center gap-1 text-xs text-gray-400">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            Última: {formatDate(lastNote.created_at)}
-          </span>
-        )}
-      </div>
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
+          fill="none" viewBox="0 0 24 24" stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
 
-      <form onSubmit={handleSubmit} className="space-y-2">
-        <div className={`relative border rounded-lg focus-within:ring-2 ${mentionError ? 'border-red-400 focus-within:ring-red-300' : mentionSuggestions.length > 0 ? 'border-blue-400 ring-2 ring-blue-200' : 'focus-within:ring-blue-400'}`}>
-          <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 border-b rounded-t-lg">
-            <button type="button" onClick={() => wrapFormat('**', '**')}
-              className="w-6 h-6 flex items-center justify-center rounded text-sm font-bold text-gray-700 hover:bg-gray-200 transition-colors" title="Negrito">B</button>
-            <button type="button" onClick={() => wrapFormat('*', '*')}
-              className="w-6 h-6 flex items-center justify-center rounded text-sm italic text-gray-700 hover:bg-gray-200 transition-colors" title="Itálico">I</button>
-            <button type="button" onClick={() => wrapFormat('_', '_')}
-              className="w-6 h-6 flex items-center justify-center rounded text-sm underline text-gray-700 hover:bg-gray-200 transition-colors" title="Sublinhado">S</button>
-            <span className="text-xs text-gray-400 ml-1">Selecione o texto e clique no estilo · @ para mencionar</span>
-          </div>
-          <textarea
-            ref={textareaRef}
-            className="w-full px-3 py-2 text-sm h-24 resize-none focus:outline-none rounded-b-lg"
-            placeholder="Nova anotação... (@ para mencionar alguém)"
-            value={text}
-            onChange={(e) => { handleTextChange(e); setMentionError(''); }}
-            onKeyDown={(e) => {
-              if (handleMentionKeyDown(e)) return;
-              if (isModEnter(e)) { e.preventDefault(); handleSubmit(e); }
-            }}
-          />
-          <MentionDropdown suggestions={mentionSuggestions} activeIndex={mentionIndex} onSelect={insertMention} onHover={setMentionIndex} />
-        </div>
-        {mentionError && <p className="text-xs text-red-500">{mentionError}</p>}
-        <div className="flex items-center gap-3">
-          <label className="text-sm text-gray-500 cursor-pointer hover:text-blue-600 flex items-center gap-1">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-            </svg>
-            {file ? file.name : 'Anexar arquivo'}
-            <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => setFile(e.target.files[0] || null)} />
-          </label>
-          {file && (
-            <button type="button" onClick={() => { setFile(null); fileRef.current.value = ''; }} className="text-xs text-red-400 hover:text-red-600">
-              remover
-            </button>
-          )}
-          <button type="submit" disabled={saving || !text.trim()} className="ml-auto bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
-            {saving ? 'Salvando...' : <>Adicionar <span className="opacity-50 text-xs">{modKey}+Enter</span></>}
-          </button>
-        </div>
-      </form>
-    </section>}
-
-    {notes.length > 0 && (
-    <section className="bg-white rounded-xl shadow-sm border p-6">
-      <h2 className="text-lg font-bold text-gray-800 mb-4">Histórico de anotações</h2>
-      <div className="max-h-96 overflow-y-auto">
-        <ul className="divide-y divide-gray-100">
-          {notes.map(note => (
-            <li key={note.id} className="py-4 first:pt-0 last:pb-0">
-              <div className="flex items-center justify-between mb-1">
-                <div>
-                  <span className="text-xs text-gray-400">{formatDate(note.created_at)}</span>
-                  {note.created_by_name && (
-                    <span className="ml-1.5 text-xs text-gray-500">
-                      por <Link to={`/app/profile/${slugify(note.created_by_name)}`} className="font-semibold text-gray-700 hover:underline hover:text-blue-600">{note.created_by_name}</Link>
-                    </span>
-                  )}
+      {open && (
+        <div className="px-6 pb-6 space-y-4 border-t">
+          {canAdd && (
+            <form onSubmit={handleSubmit} className="space-y-2 pt-4">
+              <div className={`relative border rounded-lg focus-within:ring-2 ${mentionError ? 'border-red-400 focus-within:ring-red-300' : mentionSuggestions.length > 0 ? 'border-blue-400 ring-2 ring-blue-200' : 'focus-within:ring-blue-400'}`}>
+                <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 border-b rounded-t-lg">
+                  <button type="button" onClick={() => wrapFormat('**', '**')}
+                    className="w-6 h-6 flex items-center justify-center rounded text-sm font-bold text-gray-700 hover:bg-gray-200 transition-colors" title="Negrito">B</button>
+                  <button type="button" onClick={() => wrapFormat('*', '*')}
+                    className="w-6 h-6 flex items-center justify-center rounded text-sm italic text-gray-700 hover:bg-gray-200 transition-colors" title="Itálico">I</button>
+                  <button type="button" onClick={() => wrapFormat('_', '_')}
+                    className="w-6 h-6 flex items-center justify-center rounded text-sm underline text-gray-700 hover:bg-gray-200 transition-colors" title="Sublinhado">S</button>
+                  <span className="text-xs text-gray-400 ml-1">Selecione o texto e clique no estilo · @ para mencionar</span>
                 </div>
-                {(isProfessor || note.created_by_id === currentUserId) && (
-                  <button onClick={() => handleDelete(note.id)} title="Remover anotação" className="p-1 rounded text-red-400 hover:text-red-600 hover:bg-red-50">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                  </button>
-                )}
+                <textarea
+                  ref={textareaRef}
+                  className="w-full px-3 py-2 text-sm h-24 resize-none focus:outline-none rounded-b-lg"
+                  placeholder="Nova anotação... (@ para mencionar alguém)"
+                  value={text}
+                  onChange={(e) => { handleTextChange(e); setMentionError(''); }}
+                  onKeyDown={(e) => {
+                    if (handleMentionKeyDown(e)) return;
+                    if (isModEnter(e)) { e.preventDefault(); handleSubmit(e); }
+                  }}
+                />
+                <MentionDropdown suggestions={mentionSuggestions} activeIndex={mentionIndex} onSelect={insertMention} onHover={setMentionIndex} />
               </div>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">{renderWithMentions(note.text, researchers)}</p>
-              {note.file_url && (
-                <a href={note.file_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 mt-1 text-xs text-blue-600 hover:underline">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {mentionError && <p className="text-xs text-red-500">{mentionError}</p>}
+              <div className="flex items-center gap-3">
+                <label className="text-sm text-gray-500 cursor-pointer hover:text-blue-600 flex items-center gap-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                   </svg>
-                  {note.file_name || 'Anexo'}
-                </a>
-              )}
-            </li>
-          ))}
-        </ul>
-      </div>
+                  {file ? file.name : 'Anexar arquivo'}
+                  <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => setFile(e.target.files[0] || null)} />
+                </label>
+                {file && (
+                  <button type="button" onClick={() => { setFile(null); fileRef.current.value = ''; }} className="text-xs text-red-400 hover:text-red-600">
+                    remover
+                  </button>
+                )}
+                <button type="submit" disabled={saving || !text.trim()} className="ml-auto bg-blue-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">
+                  {saving ? 'Salvando...' : <>Adicionar <span className="opacity-50 text-xs">{modKey}+Enter</span></>}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {notes.length > 0 && (
+            <div className="max-h-96 overflow-y-auto">
+              <ul className="divide-y divide-gray-100">
+                {notes.map(note => (
+                  <li key={note.id} className="py-4 first:pt-0 last:pb-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <div>
+                        <span className="text-xs text-gray-400">{formatDate(note.created_at)}</span>
+                        {note.created_by_name && (
+                          <span className="ml-1.5 text-xs text-gray-500">
+                            por <Link to={`/app/profile/${slugify(note.created_by_name)}`} className="font-semibold text-gray-700 hover:underline hover:text-blue-600">{note.created_by_name}</Link>
+                          </span>
+                        )}
+                      </div>
+                      {(isProfessor || note.created_by_id === currentUserId) && (
+                        <button onClick={() => handleDelete(note.id)} title="Remover anotação" className="p-1 rounded text-red-400 hover:text-red-600 hover:bg-red-50">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{renderWithMentions(note.text, researchers)}</p>
+                    {note.file_url && (
+                      <a href={note.file_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 mt-1 text-xs text-blue-600 hover:underline">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                        </svg>
+                        {note.file_name || 'Anexo'}
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {notes.length === 0 && loaded.current && (
+            <p className="text-xs text-gray-400 py-2">Nenhuma anotação ainda.</p>
+          )}
+        </div>
+      )}
     </section>
-    )}
     </div>
   );
 }
@@ -717,6 +734,7 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, isOwnProfile, 
                   <option value="mestrado">Mestrado</option>
                   <option value="doutorado">Doutorado</option>
                   <option value="postdoc">Pós-doc</option>
+                  <option value="egresso">Egresso</option>
                 </select>
                 {statusSaving && <span className="text-xs text-gray-400">Salvando...</span>}
               </div>
@@ -768,7 +786,7 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, isOwnProfile, 
 
 export default function ResearcherPage() {
   const { slug } = useParams();
-  const { setProfileTopbar, researchers = [], currentInstitution } = useAppLayout();
+  const { setProfileTopbar, researchers = [], currentInstitution, loadData } = useAppLayout();
   const [researcher, setResearcher] = useState(null);
   const [researcherUser, setResearcherUser] = useState(null);
   const [myDeadlines, setMyDeadlines] = useState([]);
@@ -886,7 +904,7 @@ export default function ResearcherPage() {
             </div>
           </div>
         )}
-        <ProfileSection researcher={researcher} user={researcherUser} canEdit={canEdit} isProfessor={isProfessor} isOwnProfile={isOwnProfile} onSaved={load} />
+        <ProfileSection researcher={researcher} user={researcherUser} canEdit={canEdit} isProfessor={isProfessor} isOwnProfile={isOwnProfile} onSaved={() => { load(); loadData?.(); }} />
         {myDeadlines.length > 0 && (
           <section className="bg-white rounded-xl border shadow-sm p-5 space-y-3">
             <h2 className="text-sm font-semibold text-gray-700">Trabalhando em</h2>
@@ -907,6 +925,12 @@ export default function ResearcherPage() {
               ))}
             </div>
           </section>
+        )}
+        {researcher && (
+          <MilestoneTimeline
+            researcher={researcher}
+            canEdit={isProfessor || isOwnProfile}
+          />
         )}
         {researcherUser && (
           <NotesSection

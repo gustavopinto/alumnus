@@ -7,6 +7,7 @@ const STATUS_COLOR = {
   doutorado:  '#10B981',
   mestrado:   '#F59E0B',
   graduacao:  '#3B82F6',
+  egresso:    '#6B7280',
 };
 
 const STATUS_LABEL = {
@@ -15,6 +16,7 @@ const STATUS_LABEL = {
   doutorado:  'Doutorado',
   mestrado:   'Mestrado',
   graduacao:  'Graduação',
+  egresso:    'Egresso',
 };
 
 function slugify(nome) {
@@ -45,8 +47,45 @@ function Avatar({ researcher, color }) {
   );
 }
 
+function ResearcherCard({ r, color }) {
+  const pending = r.registered === false;
+  const cardColor = pending ? '#9CA3AF' : color;
+  return (
+    <Link
+      to={`/app/profile/${slugify(r.nome)}`}
+      className={`bg-white rounded-xl border shadow-sm p-4 flex items-start gap-3 hover:shadow-md hover:border-gray-300 transition-all group${pending ? ' opacity-50' : ''}`}
+      style={{ borderLeftColor: cardColor, borderLeftWidth: 4 }}
+    >
+      <Avatar researcher={r} color={cardColor} />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-gray-800 group-hover:text-blue-700 leading-snug truncate">
+          {r.nome}
+        </p>
+        {r.email && (
+          <p className="text-xs text-gray-400 truncate mt-0.5">{r.email}</p>
+        )}
+        {r.curso && (
+          <p className="text-xs text-gray-500 truncate mt-1">{r.curso}</p>
+        )}
+        {r.interesses && (
+          <p className="text-xs text-gray-400 mt-1 line-clamp-2 leading-snug">
+            {r.interesses}
+          </p>
+        )}
+        {r.enrollment_date && (
+          <p className="text-xs text-gray-400 mt-1">
+            Ingresso: {new Date(r.enrollment_date + 'T00:00:00').toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' })}
+          </p>
+        )}
+      </div>
+    </Link>
+  );
+}
+
 export default function BoxView({ researchers, hiddenStatuses }) {
-  const visible = researchers.filter(r => r.ativo && !hiddenStatuses.has(r.status));
+  const active = researchers.filter(r => r.ativo && r.status !== 'egresso');
+  const visible = active.filter(r => !hiddenStatuses.has(r.status));
+  const egressos = researchers.filter(r => r.ativo && r.status === 'egresso');
 
   const groups = [
     { status: 'professor', items: visible.filter(r => r.status === 'professor') },
@@ -70,45 +109,25 @@ export default function BoxView({ researchers, hiddenStatuses }) {
               <span className="text-xs text-gray-400">({items.length})</span>
             </div>
             <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {items.map(r => {
-                const pending = r.registered === false;
-                const cardColor = pending ? '#9CA3AF' : color;
-                return (
-                <Link
-                  key={r.id}
-                  to={`/app/profile/${slugify(r.nome)}`}
-                  className={`bg-white rounded-xl border shadow-sm p-4 flex items-start gap-3 hover:shadow-md hover:border-gray-300 transition-all group${pending ? ' opacity-50' : ''}`}
-                  style={{ borderLeftColor: cardColor, borderLeftWidth: 4 }}
-                >
-                  <Avatar researcher={r} color={cardColor} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-gray-800 group-hover:text-blue-700 leading-snug truncate">
-                      {r.nome}
-                    </p>
-                    {r.email && (
-                      <p className="text-xs text-gray-400 truncate mt-0.5">{r.email}</p>
-                    )}
-                    {r.curso && (
-                      <p className="text-xs text-gray-500 truncate mt-1">{r.curso}</p>
-                    )}
-                    {r.interesses && (
-                      <p className="text-xs text-gray-400 mt-1 line-clamp-2 leading-snug">
-                        {r.interesses}
-                      </p>
-                    )}
-                    {r.enrollment_date && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        Ingresso: {new Date(r.enrollment_date + 'T00:00:00').toLocaleDateString('pt-BR', { month: '2-digit', year: 'numeric' })}
-                      </p>
-                    )}
-                  </div>
-                </Link>
-                );
-              })}
+              {items.map(r => <ResearcherCard key={r.id} r={r} color={color} />)}
             </div>
           </section>
         );
       })}
+      {egressos.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-3">
+            <span className="w-3 h-3 rounded-full" style={{ backgroundColor: STATUS_COLOR.egresso }} />
+            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">
+              {STATUS_LABEL.egresso}
+            </h2>
+            <span className="text-xs text-gray-400">({egressos.length})</span>
+          </div>
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 opacity-60">
+            {egressos.map(r => <ResearcherCard key={r.id} r={r} color={STATUS_COLOR.egresso} />)}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

@@ -17,6 +17,7 @@ STATUS_COLORS = {
     "doutorado": "#10B981",
     "postdoc":   "#06B6D4",
     "professor": "#7C3AED",
+    "egresso":   "#6B7280",
 }
 
 

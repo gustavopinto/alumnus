@@ -117,6 +117,7 @@ class Researcher(Base):
     orientador = relationship("Professor", back_populates="researchers")
     group      = relationship("ResearchGroup", back_populates="researchers")
     user       = relationship("User", primaryjoin="User.researcher_id == Researcher.id", foreign_keys="[User.researcher_id]", uselist=False, viewonly=True)
+    milestones = relationship("Milestone", back_populates="researcher", cascade="all, delete-orphan")
 
     # Propriedades delegadas ao User vinculado
     @property
@@ -152,6 +153,22 @@ class Researcher(Base):
     @property
     def orientador_nome(self) -> str | None:
         return self.orientador.nome if self.orientador else None
+
+
+class Milestone(Base):
+    __tablename__ = "milestones"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    researcher_id = Column(Integer, ForeignKey("researchers.id"), nullable=False)
+    type          = Column(String(50), nullable=False)   # publicacao | qualificacao | defesa | premio | outro
+    title         = Column(String(500), nullable=False)
+    date          = Column(Date, nullable=False)
+    description   = Column(Text, nullable=True)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at    = Column(DateTime, default=datetime.utcnow)
+
+    researcher = relationship("Researcher", back_populates="milestones")
+    created_by = relationship("User", foreign_keys=[created_by_id])
 
 
 class Relationship(Base):

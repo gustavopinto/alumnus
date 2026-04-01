@@ -6,6 +6,7 @@ const ALL_ITEMS = [
   { label: 'Doutorado', color: '#10B981', status: 'doutorado' },
   { label: 'Mestrado',  color: '#F59E0B', status: 'mestrado' },
   { label: 'Graduação', color: '#3B82F6', status: 'graduacao' },
+  { label: 'Egresso',   color: '#6B7280', status: 'egresso' },
 ];
 
 function IconGraph() {

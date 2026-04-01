@@ -125,6 +125,54 @@ class TestUpdateResearcher:
         assert resp.status_code == 403
 
 
+class TestEgressoPermission:
+    def test_professor_can_set_egresso(self, client, db):
+        r = researcher_service.create(db, ResearcherCreate(email="egresso_set@univ.br", nome="Egresso Set", status="mestrado"))
+        user = make_user(db, email="prof_egresso@univ.br", role="professor")
+        token = make_token(user)
+        resp = client.put(
+            f"/api/researchers/{r.id}",
+            json={"status": "egresso"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "egresso"
+
+    def test_researcher_cannot_set_own_egresso(self, client, db):
+        r = researcher_service.create(db, ResearcherCreate(email="self_egresso@univ.br", nome="Self Egresso", status="mestrado"))
+        user = researcher_service.get_linked_user(db, r.id)
+        token = make_token(user)
+        resp = client.put(
+            f"/api/researchers/{r.id}",
+            json={"status": "egresso"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 403
+
+    def test_researcher_cannot_change_from_egresso(self, client, db):
+        r = researcher_service.create(db, ResearcherCreate(email="from_egresso@univ.br", nome="From Egresso", status="egresso"))
+        user = researcher_service.get_linked_user(db, r.id)
+        token = make_token(user)
+        resp = client.put(
+            f"/api/researchers/{r.id}",
+            json={"status": "mestrado"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 403
+
+    def test_professor_can_change_from_egresso(self, client, db):
+        r = researcher_service.create(db, ResearcherCreate(email="unegresso@univ.br", nome="Un Egresso", status="egresso"))
+        user = make_user(db, email="prof_unegresso@univ.br", role="professor")
+        token = make_token(user)
+        resp = client.put(
+            f"/api/researchers/{r.id}",
+            json={"status": "mestrado"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "mestrado"
+
+
 class TestDeactivateResearcher:
     def test_deactivates(self, client, db):
         r = researcher_service.create(db, ResearcherCreate(email="deact_router@univ.br", nome="Deact Router", status="mestrado"))

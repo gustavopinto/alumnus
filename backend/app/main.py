@@ -14,7 +14,7 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
 from .database import engine, Base
-from .routers import researchers, relationships, graph, upload, notes, auth, files, reminders, tips, deadlines, admin, groups, institutions, professors, users, profiles
+from .routers import researchers, relationships, graph, upload, notes, auth, files, reminders, tips, deadlines, admin, groups, institutions, professors, users, profiles, milestones
 
 # ── Logging estruturado (JSON em prod, texto legível em dev) ───────────────────
 
@@ -112,6 +112,7 @@ app.include_router(institutions.router, prefix="/api")
 app.include_router(professors.router,  prefix="/api")
 app.include_router(users.router,       prefix="/api")
 app.include_router(profiles.router,    prefix="/api")
+app.include_router(milestones.router,  prefix="/api")
 
 
 @app.on_event("startup")

@@ -162,3 +162,9 @@ export const updateUserRole = (id, role) => request(`/admin/users/${id}`, { meth
 export const deleteUser = (id) => request(`/admin/users/${id}`, { method: 'DELETE' });
 export const deletePendingResearcher = (id) => request(`/admin/researchers/${id}`, { method: 'DELETE' });
 export const bulkDeleteUsers = (user_ids, researcher_ids) => request('/admin/bulk-delete', { method: 'POST', body: JSON.stringify({ user_ids, researcher_ids }) });
+
+// Milestones
+export const getMilestones      = (researcherId) => request(`/researchers/${researcherId}/milestones/`);
+export const createMilestone    = (researcherId, data) => request(`/researchers/${researcherId}/milestones/`, { method: 'POST', body: JSON.stringify(data) });
+export const updateMilestone    = (researcherId, milestoneId, data) => request(`/researchers/${researcherId}/milestones/${milestoneId}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteMilestone    = (researcherId, milestoneId) => request(`/researchers/${researcherId}/milestones/${milestoneId}`, { method: 'DELETE' });

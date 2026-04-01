@@ -69,6 +69,10 @@ def update_researcher(
     is_own = current_user.researcher_id == researcher_id
     if current_user.role not in ("professor", "superadmin") and not is_own:
         raise HTTPException(status_code=403, detail="Você só pode editar o seu próprio perfil")
+    # Apenas professores podem atribuir ou remover o status "egresso"
+    egresso_involved = data.status == "egresso" or researcher.status == "egresso"
+    if egresso_involved and current_user.role not in ("professor", "superadmin"):
+        raise HTTPException(status_code=403, detail="Apenas professores podem alterar o vínculo de egresso")
     return researcher_service.update(db, researcher, data)
 
 

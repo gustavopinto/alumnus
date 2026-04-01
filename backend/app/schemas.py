@@ -427,3 +427,48 @@ class DeadlineInterestOut(BaseModel):
     profile_slug: Optional[str] = None
 
     model_config = {"from_attributes": True}
+
+
+# --- Milestone ---
+
+MILESTONE_TYPES = {"publicacao", "qualificacao", "defesa", "premio", "outro"}
+
+class MilestoneCreate(BaseModel):
+    type: str
+    title: str
+    date: date
+    description: Optional[str] = None
+
+    @field_validator("type")
+    @classmethod
+    def validate_type(cls, v: str) -> str:
+        if v not in MILESTONE_TYPES:
+            raise ValueError(f"Tipo inválido. Use: {', '.join(sorted(MILESTONE_TYPES))}")
+        return v
+
+
+class MilestoneUpdate(BaseModel):
+    type: Optional[str] = None
+    title: Optional[str] = None
+    date: Optional[date] = None
+    description: Optional[str] = None
+
+    @field_validator("type")
+    @classmethod
+    def validate_type(cls, v: str | None) -> str | None:
+        if v is not None and v not in MILESTONE_TYPES:
+            raise ValueError(f"Tipo inválido. Use: {', '.join(sorted(MILESTONE_TYPES))}")
+        return v
+
+
+class MilestoneOut(BaseModel):
+    id: int
+    researcher_id: int
+    type: str
+    title: str
+    date: date
+    description: Optional[str] = None
+    created_by_id: Optional[int] = None
+    created_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}

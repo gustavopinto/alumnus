@@ -61,6 +61,7 @@ export default function ProtectedRoute({ children, professorOnly = false, adminO
         const path = location.pathname;
         const allowedStudent =
           path === '/app' ||
+          path === '/app/group' ||
           path === `/app/profile/${slug}` ||
           path === '/app/manual' ||
           path === '/app/reminders' ||
