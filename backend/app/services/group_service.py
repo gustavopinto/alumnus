@@ -7,12 +7,12 @@ from ..models import Professor, ProfessorGroup, ProfessorInstitution, ResearchGr
 logger = logging.getLogger(__name__)
 
 
-def list_professor_groups(db: Session, professor: Professor) -> list[ResearchGroup]:
+def list_professor_groups(db: Session, professor_id: int) -> list[ResearchGroup]:
     return (
         db.query(ResearchGroup)
         .join(ProfessorGroup, ProfessorGroup.group_id == ResearchGroup.id)
         .options(joinedload(ResearchGroup.institution))
-        .filter(ProfessorGroup.professor_id == professor.id)
+        .filter(ProfessorGroup.professor_id == professor_id)
         .all()
     )
 

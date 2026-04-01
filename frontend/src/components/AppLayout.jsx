@@ -191,12 +191,16 @@ export default function AppLayout() {
   const settingsRef = useRef(null);
   const currentInstIdRef = useRef(null);
   const currentUserRef = useRef(null);
+  const loadDataInFlight = useRef(false);
   const navigate = useNavigate();
 
   useEffect(() => { currentInstIdRef.current = currentInstitution?.id ?? null; }, [currentInstitution]);
 
   const loadData = useCallback(async () => {
+    if (loadDataInFlight.current) return;
+    loadDataInFlight.current = true;
     const instId = currentInstIdRef.current;
+    try {
     const [graphData, researchersData] = await Promise.all([getGraph(instId), getResearchers(instId, true)]);
     // Include professor nodes in the researchers list so they appear in BoxView,
     // @ mentions, sidebar count, etc.
@@ -228,6 +232,9 @@ export default function AppLayout() {
     );
     setEdges(graphData?.edges || []);
     setLoadingData(false);
+    } finally {
+      loadDataInFlight.current = false;
+    }
   }, []);
 
   // Reload data when institution changes

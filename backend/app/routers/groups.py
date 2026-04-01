@@ -34,10 +34,9 @@ def list_my_groups(
             .all()
         )
     elif current.role == "professor":
-        professor = professor_service.get_by_user(db, current)
-        if not professor:
+        if not current.professor_id:
             return []
-        groups = group_service.list_professor_groups(db, professor)
+        groups = group_service.list_professor_groups(db, current.professor_id)
     else:
         # Student: retorna apenas o grupo ao qual pertence
         if current.researcher and current.researcher.group_id:

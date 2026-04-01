@@ -44,13 +44,9 @@ def list_ordered(db: Session, institution_id: int | None = None) -> list[Reminde
 
 
 def list_reminders_out(db: Session, viewer_id: int | None, institution_id: int | None = None) -> list[ReminderOut]:
+    # created_by já está carregado via joinedload em list_ordered — query extra desnecessária
     reminders = list_ordered(db, institution_id)
-    creator_ids = {r.created_by_id for r in reminders if r.created_by_id is not None}
-    creator_name_map: dict[int, str] = {}
-    if creator_ids:
-        for uid, nome in db.query(User.id, User.nome).filter(User.id.in_(creator_ids)).all():
-            creator_name_map[uid] = nome
-    return [reminder_to_out(r, viewer_id, creator_name_map) for r in reminders]
+    return [reminder_to_out(r, viewer_id) for r in reminders]
 
 
 def create(

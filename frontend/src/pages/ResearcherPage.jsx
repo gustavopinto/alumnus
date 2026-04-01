@@ -149,6 +149,7 @@ function NotesSection({ userId, institutionId, canAdd, isProfessor, currentUserI
   const [mentionError, setMentionError] = useState('');
   const fileRef = useRef();
   const textareaRef = useRef();
+  const loadNotesInFlight = useRef(false);
 
   const { mentionSuggestions, mentionIndex, setMentionIndex, handleTextChange, insertMention, handleMentionKeyDown } =
     useMentions({ text, setText, inputRef: textareaRef, researchers });
@@ -169,8 +170,14 @@ function NotesSection({ userId, institutionId, canAdd, isProfessor, currentUserI
   }
 
   async function load() {
-    const data = await getNotes(userId, institutionId);
-    setNotes(Array.isArray(data) ? data : []);
+    if (loadNotesInFlight.current) return;
+    loadNotesInFlight.current = true;
+    try {
+      const data = await getNotes(userId, institutionId);
+      setNotes(Array.isArray(data) ? data : []);
+    } finally {
+      loadNotesInFlight.current = false;
+    }
   }
 
   useEffect(() => { load(); }, [userId, institutionId]);
@@ -738,8 +745,11 @@ export default function ResearcherPage() {
   const isProfessor = payload?.role === 'professor' || payload?.role === 'superadmin';
   const isOwnProfile = researcherUser?.id != null && Number(payload?.sub) === Number(researcherUser.id);
   const canEdit = isProfessor || isOwnProfile;
+  const loadInFlight = useRef(false);
 
   async function load() {
+    if (loadInFlight.current) return;
+    loadInFlight.current = true;
     let r = null;
     let u = null;
     const profile = await getProfileBySlug(slug);
@@ -766,6 +776,8 @@ export default function ResearcherPage() {
       }
     } catch {
       setMyDeadlines([]);
+    } finally {
+      loadInFlight.current = false;
     }
   }
 

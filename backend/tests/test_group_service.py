@@ -52,14 +52,14 @@ def link_professor_institution(db, professor, institution, email=None):
 class TestListProfessorGroups:
     def test_empty_when_no_groups(self, db):
         prof = make_professor(db, "Prof Sem Grupos", "semgrupos@inst.br")
-        result = group_service.list_professor_groups(db, prof)
+        result = group_service.list_professor_groups(db, prof.id)
         assert result == []
 
     def test_returns_groups(self, db):
         inst = make_institution(db, "UFMG", "ufmg.br")
         prof = make_professor(db, "Prof Com Grupos", "comgrupos@ufmg.br")
         group = group_service.create_group(db, prof, "Grupo A", inst.id)
-        result = group_service.list_professor_groups(db, prof)
+        result = group_service.list_professor_groups(db, prof.id)
         assert len(result) == 1
         assert result[0].id == group.id
 

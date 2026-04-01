@@ -33,6 +33,7 @@ function RemindersDropdown({ rail = false, currentUser = null, researchers = [],
     queryKey: keys.reminders(instId),
     queryFn: () => getReminders(instId),
     enabled: instId !== undefined,
+    staleTime: 30_000,
   });
   const invalidate = () => queryClient.invalidateQueries({ queryKey: keys.reminders(instId) });
 
@@ -379,6 +380,7 @@ export function SidebarRail({ researchers, onExpand, onLogout, currentUser = nul
     queryKey: keys.deadlines(instId),
     queryFn: () => getDeadlines(instId),
     enabled: instId !== undefined,
+    staleTime: 30_000,
   });
   const upcomingDeadlines = railDeadlines.filter(d => daysUntil(d.date) >= 0);
 
@@ -464,12 +466,14 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
     queryKey: keys.deadlines(instId),
     queryFn: () => getDeadlines(instId),
     enabled: instId !== undefined,
+    staleTime: 30_000,
   });
 
   const { data: sidebarTips = [] } = useQuery({
     queryKey: keys.tips(instId),
     queryFn: () => getTips(instId),
     enabled: instId !== undefined,
+    staleTime: 30_000,
   });
   const sidebarTipCount = sidebarTips.length;
 
@@ -477,12 +481,14 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
     queryKey: keys.professors(),
     queryFn: getProfessors,
     enabled: isAdmin,
+    staleTime: 30_000,
   });
 
   const { data: allGroups = [] } = useQuery({
     queryKey: keys.groups(),
     queryFn: getGroups,
     enabled: instId !== undefined,
+    staleTime: 30_000,
   });
 
   useEffect(() => {

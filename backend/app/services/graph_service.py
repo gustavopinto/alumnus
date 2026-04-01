@@ -74,11 +74,12 @@ def build_graph_payload(db: Session, institution_id: int | None = None) -> dict:
             "type": "researcher",
             "position": pos,
             "data": {
-                "name":     p.nome,
-                "slug":     slugify(p.nome),
-                "photoUrl": p.user.photo_url if p.user else None,
-                "status":   "professor",
-                "color":    STATUS_COLORS["professor"],
+                "name":       p.nome,
+                "slug":       slugify(p.nome),
+                "photoUrl":   p.user.photo_url if p.user else None,
+                "status":     "professor",
+                "color":      STATUS_COLORS["professor"],
+                "registered": bool(p.user and p.user.password_hash),
             },
         })
 
@@ -97,11 +98,12 @@ def build_graph_payload(db: Session, institution_id: int | None = None) -> dict:
             "type": "researcher",
             "position": pos,
             "data": {
-                "name":     r.nome,
-                "slug":     slugify(r.nome),
-                "photoUrl": r.user.photo_url if r.user else None,
-                "status":   r.status,
-                "color":    STATUS_COLORS.get(r.status, "#6B7280"),
+                "name":       r.nome,
+                "slug":       slugify(r.nome),
+                "photoUrl":   r.user.photo_url if r.user else None,
+                "status":     r.status,
+                "color":      STATUS_COLORS.get(r.status, "#6B7280"),
+                "registered": bool(r.user and r.user.password_hash),
             },
         })
 

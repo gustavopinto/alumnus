@@ -1,13 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, contains_eager
 
 from ..database import get_db
 from ..deps import get_current_user
-from ..models import User
+from ..models import Researcher, User
 from ..schemas import ProfileBySlugOut, ResearcherOut
 from ..slug import slugify
 from ..plan import refresh_user_plan_status, user_to_out
-from ..services import researcher_service
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
@@ -18,26 +17,31 @@ def get_profile_by_slug(
     db: Session = Depends(get_db),
     _: User = Depends(get_current_user),
 ):
-    users = db.query(User).all()
-    for user in users:
-        if slugify(user.nome) != slug:
-            continue
+    # Tenta achar pelo lado do Researcher (users com researcher_id)
+    # contains_eager(Researcher.user) garante que .nome/.email/.registered funcionam sem lazy load
+    researchers = (
+        db.query(Researcher)
+        .outerjoin(User, User.researcher_id == Researcher.id)
+        .options(contains_eager(Researcher.user))
+        .filter(User.ativo == True)
+        .all()
+    )
+    researcher = next((r for r in researchers if r.user and slugify(r.user.nome) == slug), None)
+    if researcher:
+        user = researcher.user
         refresh_user_plan_status(db, user)
         db.refresh(user)
-        researcher_out = None
-        if user.researcher_id:
-            researcher = researcher_service.get_by_id(db, user.researcher_id)
-            if researcher:
-                researcher_out = ResearcherOut.model_validate(researcher)
-        return ProfileBySlugOut(user=user_to_out(user), researcher=researcher_out)
+        return ProfileBySlugOut(user=user_to_out(user), researcher=ResearcherOut.model_validate(researcher))
 
-    researcher = researcher_service.find_by_slug(db, slug)
-    if not researcher:
+    # Fallback: professores / superadmins (sem researcher_id)
+    users = (
+        db.query(User)
+        .filter(User.ativo == True, User.researcher_id.is_(None))
+        .all()
+    )
+    user = next((u for u in users if slugify(u.nome) == slug), None)
+    if not user:
         raise HTTPException(status_code=404, detail="Perfil não encontrado")
-    linked_user = researcher_service.get_linked_user(db, researcher.id)
-    user_out = None
-    if linked_user:
-        refresh_user_plan_status(db, linked_user)
-        db.refresh(linked_user)
-        user_out = user_to_out(linked_user)
-    return ProfileBySlugOut(user=user_out, researcher=ResearcherOut.model_validate(researcher))
+    refresh_user_plan_status(db, user)
+    db.refresh(user)
+    return ProfileBySlugOut(user=user_to_out(user), researcher=None)

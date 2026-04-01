@@ -28,8 +28,8 @@ function Avatar({ researcher, color }) {
       <img
         src={researcher.photo_url}
         alt={researcher.nome}
-        className="w-14 h-14 rounded-full object-cover shrink-0 ring-2"
-        style={{ ringColor: color, borderColor: color, border: `2px solid ${color}` }}
+        className={`w-14 h-14 rounded-full object-cover shrink-0${researcher.registered === false ? ' grayscale' : ''}`}
+        style={{ border: `2px solid ${color}` }}
       />
     );
   }
@@ -70,14 +70,17 @@ export default function BoxView({ researchers, hiddenStatuses }) {
               <span className="text-xs text-gray-400">({items.length})</span>
             </div>
             <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {items.map(r => (
+              {items.map(r => {
+                const pending = r.registered === false;
+                const cardColor = pending ? '#9CA3AF' : color;
+                return (
                 <Link
                   key={r.id}
                   to={`/app/profile/${slugify(r.nome)}`}
-                  className="bg-white rounded-xl border shadow-sm p-4 flex items-start gap-3 hover:shadow-md hover:border-gray-300 transition-all group"
-                  style={{ borderLeftColor: color, borderLeftWidth: 4 }}
+                  className={`bg-white rounded-xl border shadow-sm p-4 flex items-start gap-3 hover:shadow-md hover:border-gray-300 transition-all group${pending ? ' opacity-50' : ''}`}
+                  style={{ borderLeftColor: cardColor, borderLeftWidth: 4 }}
                 >
-                  <Avatar researcher={r} color={color} />
+                  <Avatar researcher={r} color={cardColor} />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-gray-800 group-hover:text-blue-700 leading-snug truncate">
                       {r.nome}
@@ -100,7 +103,8 @@ export default function BoxView({ researchers, hiddenStatuses }) {
                     )}
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
           </section>
         );

@@ -43,7 +43,7 @@ const SORT_USERS = (u) => [u.pending ? 1 : 0, ROLE_ORDER[u.role] ?? 99, u.nome |
 
 export default function AdminPage() {
   const navigate = useNavigate();
-  const { institutions = [] } = useAppLayout();
+  const { institutions = [], loadData } = useAppLayout();
   const queryClient = useQueryClient();
   const { data: stats = null } = useQuery({ queryKey: keys.adminStats(), queryFn: getAdminStats });
   const { data: rawUsers = [] } = useQuery({ queryKey: keys.adminUsers(), queryFn: getAdminUsers });
@@ -170,6 +170,7 @@ export default function AdminPage() {
         setNewStudentStatus('mestrado');
         setNewStudentInstId(institutions.length > 0 ? String(institutions[0].id) : '');
         invalidateAdmin();
+        loadData?.();
       } else {
         setAddStudentError(r?.detail || 'Erro ao cadastrar aluno');
       }
