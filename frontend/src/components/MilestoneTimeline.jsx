@@ -209,7 +209,7 @@ function TimelineItem({ item, position, canEdit, onEdit, onDelete, isPast }) {
 
 // ── Componente principal ─────────────────────────────────────────────────────
 
-export default function MilestoneTimeline({ researcher, canEdit }) {
+export default function MilestoneTimeline({ userId, researcher, canEdit }) {
   const [open,          setOpen]          = useState(false);
   const [milestones,    setMilestones]    = useState([]);
   const [modalOpen,     setModalOpen]     = useState(false);
@@ -219,11 +219,11 @@ export default function MilestoneTimeline({ researcher, canEdit }) {
   const loaded = useRef(false);
 
   useEffect(() => {
-    if (open && !loaded.current && researcher?.id) {
+    if (open && !loaded.current && userId) {
       loaded.current = true;
-      getMilestones(researcher.id).then(data => setMilestones(Array.isArray(data) ? data : []));
+      getMilestones(userId).then(data => setMilestones(Array.isArray(data) ? data : []));
     }
-  }, [open, researcher?.id]); // eslint-disable-line
+  }, [open, userId]); // eslint-disable-line
 
   const autoItems = [];
   const registrationDate = isoToDate(researcher?.created_at);
@@ -254,11 +254,11 @@ export default function MilestoneTimeline({ researcher, canEdit }) {
 
   async function handleSave(data) {
     if (editing) {
-      const updated = await updateMilestone(researcher.id, editing.id, data);
+      const updated = await updateMilestone(userId, editing.id, data);
       setMilestones(ms => ms.map(m => m.id === editing.id ? updated : m));
       setToast('Marco atualizado');
     } else {
-      const created = await createMilestone(researcher.id, data);
+      const created = await createMilestone(userId, data);
       setMilestones(ms => [...ms, created]);
       setToast('Marco adicionado');
     }
@@ -266,13 +266,13 @@ export default function MilestoneTimeline({ researcher, canEdit }) {
   }
 
   async function handleDelete(milestoneId) {
-    await deleteMilestone(researcher.id, milestoneId);
+    await deleteMilestone(userId, milestoneId);
     setMilestones(ms => ms.filter(m => m.id !== milestoneId));
     setPendingDelete(null);
     setToast('Marco removido');
   }
 
-  if (!researcher) return null;
+  if (!userId) return null;
 
   return (
     <section className="bg-white rounded-xl border shadow-sm overflow-hidden">
@@ -281,7 +281,7 @@ export default function MilestoneTimeline({ researcher, canEdit }) {
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors"
       >
-        <h2 className="text-lg font-bold text-gray-800">Marcos temporais</h2>
+        <h2 className="text-lg font-bold text-gray-800">🏁 Marcos temporais</h2>
         <svg
           xmlns="http://www.w3.org/2000/svg"
           className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}

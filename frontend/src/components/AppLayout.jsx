@@ -469,6 +469,7 @@ export default function AppLayout() {
                 currentUser={currentUser}
                 currentInstitution={currentInstitution}
                 institutions={institutions}
+                profileSlug={profileSlug}
               />
             </div>
             <div className="shrink-0 py-2.5 px-4 border-t border-gray-200/80 bg-white">
@@ -493,6 +494,7 @@ export default function AppLayout() {
             role={payload?.role}
             isAdmin={['professor','superadmin'].includes(payload?.role)}
             currentInstitution={currentInstitution}
+            profileSlug={profileSlug}
           />
         )}
       </aside>

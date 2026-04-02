@@ -463,7 +463,7 @@ class MilestoneUpdate(BaseModel):
 
 class MilestoneOut(BaseModel):
     id: int
-    researcher_id: int
+    user_id: int
     type: str
     title: str
     date: date
@@ -472,3 +472,71 @@ class MilestoneOut(BaseModel):
     created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
+
+# --- Reading ---
+
+READING_STATUSES = {"quero_ler", "lendo", "lido"}
+
+
+class ReadingCreate(BaseModel):
+    url: str
+
+    @field_validator("url")
+    @classmethod
+    def url_strip(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("URL é obrigatória")
+        return v
+
+
+class ReadingStatusUpdate(BaseModel):
+    status: str
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str) -> str:
+        if v not in READING_STATUSES:
+            raise ValueError(f"Status inválido. Use: {', '.join(sorted(READING_STATUSES))}")
+        return v
+
+
+class ReadingStatusHistoryOut(BaseModel):
+    id: int
+    status: str
+    changed_at: Optional[datetime] = None
+    changed_by_id: Optional[int] = None
+    changed_by_name: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class ReadingOut(BaseModel):
+    id: int
+    user_id: int
+    url: str
+    title: Optional[str] = None
+    status: str
+    summary: Optional[str] = None
+    created_by_id: Optional[int] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    status_history: list[ReadingStatusHistoryOut] = []
+
+    model_config = {"from_attributes": True}
+
+    @classmethod
+    def from_orm_with_history(cls, reading):
+        obj = cls.model_validate(reading)
+        obj.status_history = [
+            ReadingStatusHistoryOut(
+                id=h.id,
+                status=h.status,
+                changed_at=h.changed_at,
+                changed_by_id=h.changed_by_id,
+                changed_by_name=h.changed_by.nome if h.changed_by else None,
+            )
+            for h in reading.status_history
+        ]
+        return obj

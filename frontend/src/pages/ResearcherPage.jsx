@@ -6,6 +6,7 @@ import { getTokenPayload } from '../auth';
 import { modKey, isModEnter } from '../platform';
 import Toast from '../components/Toast';
 import MilestoneTimeline from '../components/MilestoneTimeline';
+import ReadingList from '../components/ReadingList';
 import { slugify, renderWithMentions, invalidMentions, useMentions, MentionDropdown } from '../mentionUtils.jsx';
 
 const STATUS_LABELS = { graduacao: 'Graduação', mestrado: 'Mestrado', doutorado: 'Doutorado', postdoc: 'Pós-doc', professor: 'Professor', egresso: 'Egresso' };
@@ -222,7 +223,7 @@ function NotesSection({ userId, institutionId, canAdd, isProfessor, currentUserI
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors"
       >
-        <h2 className="text-lg font-bold text-gray-800">Anotações de reuniões</h2>
+        <h2 className="text-lg font-bold text-gray-800">📝 Anotações de reuniões</h2>
         <svg
           xmlns="http://www.w3.org/2000/svg"
           className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`}
@@ -520,7 +521,7 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, isOwnProfile, 
     <Toast message={toast} onClose={() => setToast('')} />
     <section className="bg-white rounded-xl shadow-sm border p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-gray-800">Perfil</h2>
+        <h2 className="text-lg font-bold text-gray-800">👤 Perfil</h2>
         {canEdit && !editing && user && (
           <button
             type="button"
@@ -926,9 +927,16 @@ export default function ResearcherPage() {
             </div>
           </section>
         )}
-        {researcher && (
+        {researcherUser && (
           <MilestoneTimeline
+            userId={researcherUser.id}
             researcher={researcher}
+            canEdit={isProfessor || isOwnProfile}
+          />
+        )}
+        {researcherUser && (
+          <ReadingList
+            userId={researcherUser.id}
             canEdit={isProfessor || isOwnProfile}
           />
         )}

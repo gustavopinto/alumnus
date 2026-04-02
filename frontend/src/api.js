@@ -164,7 +164,14 @@ export const deletePendingResearcher = (id) => request(`/admin/researchers/${id}
 export const bulkDeleteUsers = (user_ids, researcher_ids) => request('/admin/bulk-delete', { method: 'POST', body: JSON.stringify({ user_ids, researcher_ids }) });
 
 // Milestones
-export const getMilestones      = (researcherId) => request(`/researchers/${researcherId}/milestones/`);
-export const createMilestone    = (researcherId, data) => request(`/researchers/${researcherId}/milestones/`, { method: 'POST', body: JSON.stringify(data) });
-export const updateMilestone    = (researcherId, milestoneId, data) => request(`/researchers/${researcherId}/milestones/${milestoneId}`, { method: 'PUT', body: JSON.stringify(data) });
-export const deleteMilestone    = (researcherId, milestoneId) => request(`/researchers/${researcherId}/milestones/${milestoneId}`, { method: 'DELETE' });
+export const getMilestones      = (userId) => request(`/users/${userId}/milestones/`);
+export const createMilestone    = (userId, data) => request(`/users/${userId}/milestones/`, { method: 'POST', body: JSON.stringify(data) });
+export const updateMilestone    = (userId, milestoneId, data) => request(`/users/${userId}/milestones/${milestoneId}`, { method: 'PUT', body: JSON.stringify(data) });
+export const deleteMilestone    = (userId, milestoneId) => request(`/users/${userId}/milestones/${milestoneId}`, { method: 'DELETE' });
+
+// Readings
+export const getReadings        = (userId) => request(`/users/${userId}/readings/`);
+export const createReading      = (userId, url) => request(`/users/${userId}/readings/`, { method: 'POST', body: JSON.stringify({ url }) });
+export const updateReadingStatus = (userId, readingId, status) => request(`/users/${userId}/readings/${readingId}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+export const deleteReading      = (userId, readingId) => request(`/users/${userId}/readings/${readingId}`, { method: 'DELETE' });
+export const summarizeReading   = (userId, readingId) => request(`/users/${userId}/readings/${readingId}/summarize`, { method: 'POST' });

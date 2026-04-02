@@ -117,7 +117,6 @@ class Researcher(Base):
     orientador = relationship("Professor", back_populates="researchers")
     group      = relationship("ResearchGroup", back_populates="researchers")
     user       = relationship("User", primaryjoin="User.researcher_id == Researcher.id", foreign_keys="[User.researcher_id]", uselist=False, viewonly=True)
-    milestones = relationship("Milestone", back_populates="researcher", cascade="all, delete-orphan")
 
     # Propriedades delegadas ao User vinculado
     @property
@@ -155,11 +154,43 @@ class Researcher(Base):
         return self.orientador.nome if self.orientador else None
 
 
+class Reading(Base):
+    __tablename__ = "readings"
+
+    id            = Column(Integer, primary_key=True, index=True)
+    user_id       = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    url           = Column(Text, nullable=False)
+    title         = Column(String(500), nullable=True)   # preenchido async via GPT
+    status        = Column(String(20), nullable=False, default="quero_ler")  # quero_ler | lendo | lido
+    summary       = Column(Text, nullable=True)
+    created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    created_at    = Column(DateTime, default=datetime.utcnow)
+    updated_at    = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user           = relationship("User", foreign_keys=[user_id])
+    created_by     = relationship("User", foreign_keys=[created_by_id])
+    status_history = relationship("ReadingStatusHistory", back_populates="reading",
+                                  cascade="all, delete-orphan", order_by="ReadingStatusHistory.changed_at")
+
+
+class ReadingStatusHistory(Base):
+    __tablename__ = "reading_status_history"
+
+    id             = Column(Integer, primary_key=True, index=True)
+    reading_id     = Column(Integer, ForeignKey("readings.id"), nullable=False)
+    status         = Column(String(20), nullable=False)
+    changed_at     = Column(DateTime, default=datetime.utcnow)
+    changed_by_id  = Column(Integer, ForeignKey("users.id"), nullable=True)
+
+    reading    = relationship("Reading", back_populates="status_history")
+    changed_by = relationship("User", foreign_keys=[changed_by_id])
+
+
 class Milestone(Base):
     __tablename__ = "milestones"
 
     id            = Column(Integer, primary_key=True, index=True)
-    researcher_id = Column(Integer, ForeignKey("researchers.id"), nullable=False)
+    user_id       = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     type          = Column(String(50), nullable=False)   # publicacao | qualificacao | defesa | premio | outro
     title         = Column(String(500), nullable=False)
     date          = Column(Date, nullable=False)
@@ -167,7 +198,7 @@ class Milestone(Base):
     created_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at    = Column(DateTime, default=datetime.utcnow)
 
-    researcher = relationship("Researcher", back_populates="milestones")
+    user       = relationship("User", foreign_keys=[user_id])
     created_by = relationship("User", foreign_keys=[created_by_id])
 
 
