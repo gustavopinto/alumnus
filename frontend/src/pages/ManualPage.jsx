@@ -299,7 +299,8 @@ export default function ManualPage() {
       <Toast message={toast} onClose={() => setToast('')} />
       <main className="max-w-2xl mx-auto py-8 px-4 space-y-6">
         <section className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-base font-semibold text-gray-800 mb-4">Nova entrada</h2>
+            <h2 className="text-lg font-bold text-gray-800 mb-4">📖 Manual</h2>
+            <h3 className="text-base font-semibold text-gray-800 mb-4">Nova entrada</h3>
             <form onSubmit={handleSubmit} className="space-y-3">
               <div>
                 <label htmlFor="manual-question" className="block text-xs font-medium text-gray-700 mb-1">

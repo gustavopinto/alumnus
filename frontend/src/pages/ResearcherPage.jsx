@@ -20,7 +20,7 @@ function formatLastLogin(iso) {
   const now = new Date();
   const loginDate = new Date(iso);
   const diffMs = now - loginDate;
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffDays = Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)));
   if (diffDays === 0) return 'Último acesso: hoje';
   if (diffDays === 1) return 'Último acesso: ontem';
   if (diffDays <= 10) return `Último acesso: há ${diffDays} dias`;
@@ -928,15 +928,16 @@ export default function ResearcherPage() {
           </section>
         )}
         {researcherUser && (
-          <MilestoneTimeline
+          <ReadingList
             userId={researcherUser.id}
-            researcher={researcher}
             canEdit={isProfessor || isOwnProfile}
+            slug={slug}
           />
         )}
         {researcherUser && (
-          <ReadingList
+          <MilestoneTimeline
             userId={researcherUser.id}
+            researcher={researcher}
             canEdit={isProfessor || isOwnProfile}
           />
         )}

@@ -113,6 +113,7 @@ export default function RemindersPage() {
       <Toast message={toast} onClose={() => setToast('')} />
       <main className="max-w-2xl mx-auto py-8 px-4 space-y-6">
         <section className="bg-white rounded-xl shadow-sm border p-6">
+          <h2 className="text-lg font-bold text-gray-800 mb-4">🔔 Lembretes</h2>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className={`relative border rounded-lg transition-colors focus-within:ring-2 ${mentionError ? 'border-red-400 focus-within:ring-red-300' : mentionSuggestions.length > 0 ? 'border-blue-400 ring-2 ring-blue-200 focus-within:ring-blue-400' : 'focus-within:ring-blue-400'}`}>
               <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 border-b">

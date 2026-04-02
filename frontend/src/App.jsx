@@ -11,6 +11,7 @@ import AdminPage from './pages/AdminPage';
 import InstitutionPage from './pages/InstitutionPage';
 import AuthPage from './pages/AuthPage';
 import LandingPage from './pages/LandingPage';
+import ReadingsPage from './pages/ReadingsPage';
 
 
 export default function App() {
@@ -43,6 +44,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ResearcherPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="profile/:slug/readings"
+          element={
+            <ProtectedRoute>
+              <ReadingsPage />
             </ProtectedRoute>
           }
         />
