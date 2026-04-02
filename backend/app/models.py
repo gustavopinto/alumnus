@@ -258,6 +258,7 @@ class User(Base):
     whatsapp             = Column(String(20), nullable=True)
     interesses           = Column(Text, nullable=True)
     bio                  = Column(Text, nullable=True)
+    birth_date           = Column(Date, nullable=True)
     created_at           = Column(DateTime, default=datetime.utcnow, server_default="now()")
 
     professor  = relationship("Professor", back_populates="user", foreign_keys=[professor_id])

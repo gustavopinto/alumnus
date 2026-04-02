@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS users (
     whatsapp             VARCHAR(20),
     interesses           TEXT,
     bio                  TEXT,
+    birth_date           DATE,
     created_at           TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

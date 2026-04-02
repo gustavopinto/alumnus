@@ -138,7 +138,7 @@ const COLUMNS = [
 export default function ReadingsPage() {
   const { slug }       = useParams();
   const [profile, setProfile] = useState(null);
-  const [search, setSearch]   = useState('');
+
   const { setProfileTopbar } = useAppLayout();
 
   const payload     = getTokenPayload();
@@ -183,13 +183,7 @@ export default function ReadingsPage() {
     if (userId) load();
   }, [userId]);
 
-  const filtered = search.trim()
-    ? readings.filter(r =>
-        (r.title || r.url).toLowerCase().includes(search.trim().toLowerCase())
-      )
-    : readings;
-
-  const byStatus = (status) => filtered.filter(r => r.status === status);
+  const byStatus = (status) => readings.filter(r => r.status === status);
 
   const nome = profile?.user?.nome ?? '';
 
@@ -216,16 +210,6 @@ export default function ReadingsPage() {
         {/* Formulário de adição */}
         {canEdit && <AddForm onAdd={handleAdd} />}
 
-        {/* Busca */}
-        {readings.length > 0 && (
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por título ou URL…"
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-          />
-        )}
 
         {/* Kanban */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

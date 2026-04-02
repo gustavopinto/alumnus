@@ -4,7 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session, contains_eager, joinedload
 
-from ..models import Professor, ProfessorGroup, ProfessorInstitution, ResearchGroup, Researcher, User
+from ..models import Milestone, Professor, ProfessorGroup, ProfessorInstitution, ResearchGroup, Researcher, User
 from ..schemas import ResearcherCreate, ResearcherUpdate
 from ..slug import slugify
 
@@ -88,6 +88,16 @@ def create(db: Session, data: ResearcherCreate) -> Researcher:
         researcher_id=researcher.id,
     )
     db.add(user)
+    db.flush()  # gera user.id antes de criar o milestone
+
+    milestone = Milestone(
+        user_id=user.id,
+        type="entrada",
+        title="Entrada no Alumnus",
+        date=user.created_at.date(),
+        created_by_id=user.id,
+    )
+    db.add(milestone)
     db.commit()
 
     logger.info("Researcher+User created: %s (researcher_id=%s)", data.email, researcher.id)

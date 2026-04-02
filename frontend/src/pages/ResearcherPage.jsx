@@ -127,8 +127,10 @@ function validateTwitterForm(value) {
   return '';
 }
 
+const DEFAULT_BIRTH_DATE = '1990-01-01';
+
 function buildProfileForm(u) {
-  if (!u) return { lattes_url: '', scholar_url: '', linkedin_url: '', github_url: '', instagram_url: '', twitter_url: '', whatsapp: '', interesses: '', bio: '' };
+  if (!u) return { lattes_url: '', scholar_url: '', linkedin_url: '', github_url: '', instagram_url: '', twitter_url: '', whatsapp: '', interesses: '', bio: '', birth_date: '' };
   return {
     lattes_url: u.lattes_url || '',
     scholar_url: u.scholar_url || '',
@@ -139,6 +141,7 @@ function buildProfileForm(u) {
     whatsapp: u.whatsapp || '',
     interesses: u.interesses || '',
     bio: u.bio || '',
+    birth_date: u.birth_date ? u.birth_date.slice(0, 10) : '',
   };
 }
 
@@ -406,6 +409,7 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, isOwnProfile, 
     try {
       if (user) {
         const payload = {
+          birth_date: form.birth_date || null,
           lattes_url: form.lattes_url || null,
           scholar_url: form.scholar_url || null,
           linkedin_url: form.linkedin_url || null,
@@ -568,6 +572,16 @@ function ProfileSection({ researcher, user, canEdit, isProfessor, isOwnProfile, 
                 <input ref={photoRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoSelect} />
               </div>
             </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Data de nascimento *</label>
+            <input
+              type="date"
+              required
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              value={form.birth_date}
+              onChange={set('birth_date')}
+            />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">WhatsApp *</label>
@@ -894,7 +908,7 @@ export default function ResearcherPage() {
       )}
 
       <main className="max-w-3xl mx-auto py-8 px-4 space-y-6">
-        {isOwnProfile && researcherUser && !researcherUser.bio && !researcherUser.whatsapp && !researcherUser.interesses && !researcherUser.lattes_url && !researcherUser.scholar_url && (
+        {isOwnProfile && researcherUser && (!researcherUser.bio && !researcherUser.whatsapp && !researcherUser.interesses && !researcherUser.lattes_url && !researcherUser.scholar_url || researcherUser.birth_date?.slice(0, 10) === DEFAULT_BIRTH_DATE) && (
           <div className="bg-amber-50 border border-amber-300 rounded-xl px-5 py-4 flex items-start gap-3">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -902,6 +916,9 @@ export default function ResearcherPage() {
             <div>
               <p className="text-sm font-semibold text-amber-800">Nenhuma informação de perfil cadastrada.</p>
               <p className="text-xs text-amber-700 mt-0.5">Clique em "Editar" no seu perfil para adicionar suas informações.</p>
+              {researcherUser.birth_date?.slice(0, 10) === DEFAULT_BIRTH_DATE && (
+                <p className="text-xs text-amber-700 mt-0.5">Sua data de nascimento ainda não foi definida — ajuste-a ao editar o perfil.</p>
+              )}
             </div>
           </div>
         )}

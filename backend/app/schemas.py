@@ -249,6 +249,7 @@ class UserOut(BaseModel):
     whatsapp:        Optional[str] = None
     interesses:      Optional[str] = None
     bio:             Optional[str] = None
+    birth_date:      Optional[date] = None
 
     model_config = {"from_attributes": True}
 
@@ -265,6 +266,7 @@ class UserProfileUpdate(BaseModel):
     whatsapp:        Optional[str] = None
     interesses:      Optional[str] = None
     bio:             Optional[str] = None
+    birth_date:      Optional[date] = None
     password:        Optional[str] = None
 
     @field_validator("lattes_url")
@@ -431,7 +433,7 @@ class DeadlineInterestOut(BaseModel):
 
 # --- Milestone ---
 
-MILESTONE_TYPES = {"publicacao", "qualificacao", "defesa", "premio", "outro"}
+MILESTONE_TYPES = {"publicacao", "qualificacao", "defesa", "premio", "outro", "entrada"}
 
 class MilestoneCreate(BaseModel):
     type: str

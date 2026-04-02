@@ -3,15 +3,18 @@ import { getMilestones, createMilestone, updateMilestone, deleteMilestone } from
 import Toast from './Toast';
 
 const TYPE_CONFIG = {
-  publicacao:   { label: 'Publicação',   emoji: '📄', color: '#3B82F6', bg: '#EFF6FF' },
-  qualificacao: { label: 'Qualificação', emoji: '📋', color: '#7C3AED', bg: '#F5F3FF' },
-  defesa:       { label: 'Defesa',       emoji: '🎓', color: '#10B981', bg: '#ECFDF5' },
-  premio:       { label: 'Prêmio',       emoji: '🏆', color: '#F59E0B', bg: '#FFFBEB' },
-  outro:        { label: 'Outro',        emoji: '📌', color: '#6B7280', bg: '#F9FAFB' },
+  entrada:      { label: 'Entrada no Alumnus', emoji: '🚀', color: '#0EA5E9', bg: '#F0F9FF' },
+  publicacao:   { label: 'Publicação',         emoji: '📄', color: '#3B82F6', bg: '#EFF6FF' },
+  qualificacao: { label: 'Qualificação',       emoji: '📋', color: '#7C3AED', bg: '#F5F3FF' },
+  defesa:       { label: 'Defesa',             emoji: '🎓', color: '#10B981', bg: '#ECFDF5' },
+  premio:       { label: 'Prêmio',             emoji: '🏆', color: '#F59E0B', bg: '#FFFBEB' },
+  outro:        { label: 'Outro',              emoji: '📌', color: '#6B7280', bg: '#F9FAFB' },
 };
 
 const DURATION_YEARS = { graduacao: 4, mestrado: 2, doutorado: 4, postdoc: 1 };
-const TYPE_OPTIONS = Object.entries(TYPE_CONFIG).map(([value, { label, emoji }]) => ({ value, label, emoji }));
+const TYPE_OPTIONS = Object.entries(TYPE_CONFIG)
+  .filter(([value]) => value !== 'entrada')
+  .map(([value, { label, emoji }]) => ({ value, label, emoji }));
 
 function isoToDate(iso) {
   if (!iso) return null;
@@ -210,33 +213,20 @@ function TimelineItem({ item, position, canEdit, onEdit, onDelete, isPast }) {
 // ── Componente principal ─────────────────────────────────────────────────────
 
 export default function MilestoneTimeline({ userId, researcher, canEdit }) {
-  const [open,          setOpen]          = useState(false);
+  const [open,          setOpen]          = useState(true);
   const [milestones,    setMilestones]    = useState([]);
   const [modalOpen,     setModalOpen]     = useState(false);
   const [editing,       setEditing]       = useState(null);
   const [pendingDelete, setPendingDelete] = useState(null);
   const [toast,         setToast]         = useState('');
-  const loaded = useRef(false);
 
   useEffect(() => {
-    if (open && !loaded.current && userId) {
-      loaded.current = true;
+    if (userId) {
       getMilestones(userId).then(data => setMilestones(Array.isArray(data) ? data : []));
     }
-  }, [open, userId]); // eslint-disable-line
+  }, [userId]);
 
   const autoItems = [];
-  const registrationDate = isoToDate(researcher?.created_at);
-  if (registrationDate) {
-    autoItems.push({
-      id: '_registro',
-      _auto: true,
-      _autoLabel: 'Registro',
-      type: 'outro',
-      title: 'Entrada no programa',
-      date: registrationDate,
-    });
-  }
   const predictedEnd = getPredictedEnd(researcher);
   if (predictedEnd && researcher?.status !== 'egresso') {
     autoItems.push({
