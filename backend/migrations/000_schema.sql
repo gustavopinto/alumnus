@@ -172,6 +172,37 @@ CREATE TABLE IF NOT EXISTS deadline_interests (
     CONSTRAINT deadline_interests_key UNIQUE (deadline_id, user_id)
 );
 
+CREATE TABLE IF NOT EXISTS milestones (
+    id            SERIAL PRIMARY KEY,
+    user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type          VARCHAR(50)  NOT NULL,
+    title         VARCHAR(500) NOT NULL,
+    date          DATE         NOT NULL,
+    description   TEXT,
+    created_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS readings (
+    id            SERIAL PRIMARY KEY,
+    user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    url           TEXT    NOT NULL,
+    title         VARCHAR(500),
+    status        VARCHAR(20)  NOT NULL DEFAULT 'quero_ler',
+    summary       TEXT,
+    created_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS reading_status_history (
+    id            SERIAL PRIMARY KEY,
+    reading_id    INTEGER NOT NULL REFERENCES readings(id) ON DELETE CASCADE,
+    status        VARCHAR(20) NOT NULL,
+    changed_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    changed_by_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+);
+
 CREATE TABLE IF NOT EXISTS schema_migrations (
     id      SERIAL PRIMARY KEY,
     name    TEXT UNIQUE NOT NULL,
