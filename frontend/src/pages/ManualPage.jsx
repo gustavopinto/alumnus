@@ -1,82 +1,19 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { modKey, isModEnter } from '../platform';
-
-function slugify(nome) {
-  return (nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
-}
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getTips, createTip, deleteTip,
   toggleTipVote, addTipComment, deleteTipComment,
+  uploadImage,
 } from '../api';
 import { getTokenPayload, isDashboardRole } from '../auth';
 import { useAppLayout } from '../components/AppLayout';
 import { keys } from '../queryKeys';
 import Toast from '../components/Toast';
-
-function renderFormatted(text) {
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|_[^_]+_)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i}>{part.slice(2, -2)}</strong>;
-    }
-    if (part.startsWith('*') && part.endsWith('*')) {
-      return <em key={i}>{part.slice(1, -1)}</em>;
-    }
-    if (part.startsWith('_') && part.endsWith('_')) {
-      return <u key={i}>{part.slice(1, -1)}</u>;
-    }
-    return part;
-  });
-}
-
-function RichTextarea({ value, onChange, placeholder, rows = 4, id, required, onKeyDown }) {
-  const ref = useRef();
-
-  function wrap(prefix, suffix) {
-    const el = ref.current;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const selected = value.slice(start, end);
-    if (!selected) return;
-    onChange(value.slice(0, start) + prefix + selected + suffix + value.slice(end));
-    setTimeout(() => {
-      el.setSelectionRange(start + prefix.length, end + prefix.length);
-      el.focus();
-    }, 0);
-  }
-
-  return (
-    <div className="border rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-blue-400">
-      <div className="flex items-center gap-2 px-2 py-1 bg-gray-50 border-b">
-        <button type="button" onClick={() => wrap('**', '**')}
-          className="w-6 h-6 flex items-center justify-center rounded text-sm font-bold text-gray-700 hover:bg-gray-200 transition-colors"
-          title="Negrito">B</button>
-        <button type="button" onClick={() => wrap('*', '*')}
-          className="w-6 h-6 flex items-center justify-center rounded text-sm italic text-gray-700 hover:bg-gray-200 transition-colors"
-          title="Itálico">I</button>
-        <button type="button" onClick={() => wrap('_', '_')}
-          className="w-6 h-6 flex items-center justify-center rounded text-sm underline text-gray-700 hover:bg-gray-200 transition-colors"
-          title="Sublinhado">S</button>
-        <span className="text-xs text-gray-400">Selecione o texto e clique no estilo</span>
-      </div>
-      <textarea
-        ref={ref}
-        id={id}
-        required={required}
-        aria-required={required ? true : undefined}
-        className="w-full px-3 py-2 text-sm resize-none focus:outline-none"
-        placeholder={placeholder}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        onKeyDown={onKeyDown}
-        rows={rows}
-      />
-    </div>
-  );
-}
+import RichEditor from '../components/RichEditor';
+import RichContent from '../components/RichContent';
+import { slugify } from '../mentionUtils.jsx';
 
 function sameUser(a, b) {
   if (a == null || b == null) return false;
@@ -173,9 +110,7 @@ function EntryCard({ entry, authUserId, canModerate, onVote, onDelete, onComment
             </p>
 
             <div className="mt-3 rounded-lg bg-gray-50 border border-gray-100 px-3 py-3">
-              <p className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
-                {renderFormatted(entry.answer)}
-              </p>
+              <RichContent html={entry.answer} className="text-sm text-gray-800 leading-relaxed" />
             </div>
 
             <button
@@ -256,7 +191,7 @@ function EntryCard({ entry, authUserId, canModerate, onVote, onDelete, onComment
 }
 
 export default function ManualPage() {
-  const { currentInstitution } = useAppLayout();
+  const { currentInstitution, researchers = [] } = useAppLayout();
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [toast, setToast] = useState('');
@@ -297,7 +232,7 @@ export default function ManualPage() {
   return (
     <div className="min-h-full bg-gray-50">
       <Toast message={toast} onClose={() => setToast('')} />
-      <main className="max-w-2xl mx-auto py-8 px-4 space-y-6">
+      <main className="max-w-3xl mx-auto py-8 px-8 space-y-6">
         <section className="bg-white rounded-xl shadow-sm border p-6">
             <h2 className="text-lg font-bold text-gray-800 mb-4">📖 Manual</h2>
             <h3 className="text-base font-semibold text-gray-800 mb-4">Nova entrada</h3>
@@ -326,14 +261,14 @@ export default function ManualPage() {
                 <label htmlFor="manual-answer" className="block text-xs font-medium text-gray-700 mb-1">
                   Resposta <span className="text-red-500" aria-hidden="true">*</span>
                 </label>
-                <RichTextarea
-                  id="manual-answer"
-                  required
+                <RichEditor
+                  variant="full"
+                  researchers={researchers}
                   value={answer}
                   onChange={setAnswer}
-                  placeholder="Resposta... (selecione texto e clique B para negrito)"
-                  rows={4}
-                  onKeyDown={e => isModEnter(e) && handleSubmit(e)}
+                  onSubmit={handleSubmit}
+                  placeholder="Resposta..."
+                  uploadImage={uploadImage}
                 />
               </div>
               <div className="flex items-center gap-3">

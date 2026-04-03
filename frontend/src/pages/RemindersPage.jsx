@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAppLayout } from '../components/AppLayout';
 import { getReminders, createReminder, deleteReminder } from '../api';
 import { keys } from '../queryKeys';
 import Toast from '../components/Toast';
 import { canDeleteReminder, creatorDisplayName } from '../reminderAccess';
-import { slugify, invalidMentions, renderWithMentions, useMentions, MentionDropdown } from '../mentionUtils.jsx';
+import { slugify } from '../mentionUtils.jsx';
+import RichEditor from '../components/RichEditor';
+import RichContent from '../components/RichContent';
 
 function formatDue(dateStr) {
   if (!dateStr) return null;
@@ -47,12 +49,7 @@ export default function RemindersPage() {
 
   const [text, setText] = useState('');
   const [dueDate, setDueDate] = useState(todayIso);
-  const [mentionError, setMentionError] = useState('');
   const [toast, setToast] = useState('');
-  const textareaRef = useRef();
-  const { mentionSuggestions, mentionIndex, setMentionIndex, handleTextChange, insertMention, handleMentionKeyDown } =
-    useMentions({ text, setText, inputRef: textareaRef, researchers });
-
 
   useEffect(() => {
     function syncMinDate() {
@@ -63,30 +60,9 @@ export default function RemindersPage() {
     return () => window.removeEventListener('focus', syncMinDate);
   }, []);
 
-  function wrapFormat(prefix, suffix) {
-    const el = textareaRef.current;
-    if (!el) return;
-    const start = el.selectionStart;
-    const end = el.selectionEnd;
-    const selected = text.slice(start, end);
-    if (!selected) return;
-    const newText = text.slice(0, start) + prefix + selected + suffix + text.slice(end);
-    setText(newText);
-    setTimeout(() => {
-      el.setSelectionRange(start + prefix.length, end + prefix.length);
-      el.focus();
-    }, 0);
-  }
-
   async function handleSubmit(e) {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!text.trim()) return;
-    const bad = invalidMentions(text.trim(), researchers);
-    if (bad.length > 0) {
-      setMentionError(`Menção não encontrada: ${bad.join(', ')}`);
-      return;
-    }
-    setMentionError('');
     await createMutation.mutateAsync({ text, dueDate });
     setText('');
     setDueDate(todayIso());
@@ -115,30 +91,14 @@ export default function RemindersPage() {
         <section className="bg-white rounded-xl shadow-sm border p-6">
           <h2 className="text-lg font-bold text-gray-800 mb-4">🔔 Lembretes</h2>
           <form onSubmit={handleSubmit} className="space-y-3">
-            <div className={`relative border rounded-lg transition-colors focus-within:ring-2 ${mentionError ? 'border-red-400 focus-within:ring-red-300' : mentionSuggestions.length > 0 ? 'border-blue-400 ring-2 ring-blue-200 focus-within:ring-blue-400' : 'focus-within:ring-blue-400'}`}>
-              <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 border-b">
-                <button type="button" onClick={() => wrapFormat('**', '**')}
-                  className="w-6 h-6 flex items-center justify-center rounded text-sm font-bold text-gray-700 hover:bg-gray-200 transition-colors" title="Negrito">B</button>
-                <button type="button" onClick={() => wrapFormat('*', '*')}
-                  className="w-6 h-6 flex items-center justify-center rounded text-sm italic text-gray-700 hover:bg-gray-200 transition-colors" title="Itálico">I</button>
-                <button type="button" onClick={() => wrapFormat('_', '_')}
-                  className="w-6 h-6 flex items-center justify-center rounded text-sm underline text-gray-700 hover:bg-gray-200 transition-colors" title="Sublinhado">S</button>
-                <span className="text-xs text-gray-400 ml-1">Selecione o texto e clique no estilo</span>
-              </div>
-              <textarea
-                ref={textareaRef}
-                className="w-full px-3 py-2 text-sm h-20 resize-none focus:outline-none"
-                placeholder="Novo lembrete... (@ para mencionar alguém)"
-                value={text}
-                onChange={e => { handleTextChange(e); setMentionError(''); }}
-                onKeyDown={e => {
-                  if (handleMentionKeyDown(e)) return;
-                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleSubmit(e); }
-                }}
-              />
-              <MentionDropdown suggestions={mentionSuggestions} activeIndex={mentionIndex} onSelect={insertMention} onHover={setMentionIndex} />
-            </div>
-            {mentionError && <p className="text-xs text-red-500">{mentionError}</p>}
+            <RichEditor
+              variant="simple"
+              researchers={researchers}
+              value={text}
+              onChange={setText}
+              onSubmit={handleSubmit}
+              placeholder="Novo lembrete... (@ para mencionar alguém)"
+            />
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <label className="text-xs text-gray-500">Data limite</label>
@@ -176,7 +136,7 @@ export default function RemindersPage() {
                 return (
                   <li key={r.id} className="flex items-start gap-3 border-b pb-3 last:border-0 last:pb-0">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm whitespace-pre-wrap mb-2 text-gray-800">{renderWithMentions(r.text, researchers)}</p>
+                      <p className="text-sm mb-2 text-gray-800"><RichContent html={r.text} researchers={researchers} inline /></p>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                         {r.due_date && (
                           <span className={`text-xs ${overdue ? 'text-red-500 font-semibold' : urgent ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
@@ -226,7 +186,7 @@ export default function RemindersPage() {
                   className="flex items-start gap-3 border-b pb-3 last:border-0 last:pb-0 opacity-50"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm whitespace-pre-wrap mb-2 line-through text-gray-500">{renderWithMentions(r.text, researchers)}</p>
+                    <p className="text-sm mb-2 line-through text-gray-500"><RichContent html={r.text} researchers={researchers} inline /></p>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       {r.due_date && (
                         <span className={`text-xs ${overdue ? 'text-red-500 font-semibold' : urgent ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>

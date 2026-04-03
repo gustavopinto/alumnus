@@ -140,3 +140,29 @@ class TestDeleteComment:
         token = make_token(other)
         resp = client.delete(f"/api/tips/comments/{comment.id}", headers={"Authorization": f"Bearer {token}"})
         assert resp.status_code == 403
+
+
+class TestCreateTipWithHtml:
+    def test_stores_html_content(self, client, db):
+        user = make_user(db, email="htmltip@univ.br", role="researcher")
+        token = make_token(user)
+        html_answer = '<p>Resposta com <strong>negrito</strong></p>'
+        resp = client.post(
+            "/api/tips/",
+            json={"question": "HTML Q?", "answer": html_answer},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["answer"] == html_answer
+
+    def test_stores_mention_html(self, client, db):
+        user = make_user(db, email="mentiontip@univ.br", role="researcher")
+        token = make_token(user)
+        html = '<p>Ver com <span data-type="mention" data-id="gustavo-pinto" class="mention">@Gustavo Pinto</span></p>'
+        resp = client.post(
+            "/api/tips/",
+            json={"question": "Mention Q?", "answer": html},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 200
+        assert 'data-type="mention"' in resp.json()["answer"]

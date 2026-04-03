@@ -5,7 +5,9 @@ import ResearcherForm from './ResearcherForm';
 import { deleteResearcher, getProfessors, getGroups, updateGroup, getReminders, createReminder, updateReminder, deleteReminder, getDeadlines, deleteDeadline, getTips } from '../api';
 import { keys } from '../queryKeys';
 import { canDeleteReminder, creatorDisplayName, isReminderFromSomeoneElse } from '../reminderAccess';
-import { slugify, invalidMentions, renderWithMentions, useMentions, MentionDropdown } from '../mentionUtils.jsx';
+import { slugify } from '../mentionUtils.jsx';
+import RichEditor from './RichEditor';
+import RichContent from './RichContent';
 import { isModEnter } from '../platform';
 import { daysUntil } from '../deadlines';
 
@@ -21,11 +23,7 @@ function RemindersDropdown({ rail = false, currentUser = null, researchers = [],
   const [error, setError] = useState('');
   const ref = useRef();
   const dateRef = useRef();
-  const inputRef = useRef();
   const navigate = useNavigate();
-
-  const { mentionSuggestions, mentionIndex, setMentionIndex, handleTextChange, insertMention, handleMentionKeyDown } =
-    useMentions({ text, setText, inputRef, researchers, maxLength: 50 });
 
   const queryClient = useQueryClient();
   const instId = institutionId;
@@ -61,13 +59,8 @@ function RemindersDropdown({ rail = false, currentUser = null, researchers = [],
   }, []);
 
   function handleAdd(e) {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (!text.trim() || !date) return;
-    const bad = invalidMentions(text.trim(), researchers);
-    if (bad.length > 0) {
-      setError(`Menção não encontrada: ${bad.join(', ')}`);
-      return;
-    }
     setError('');
     createMutation.mutate({ text, date });
   }
@@ -145,21 +138,15 @@ function RemindersDropdown({ rail = false, currentUser = null, researchers = [],
           {/* Caixa de criação */}
           <div className="p-3 border-b bg-gray-50">
             <form onSubmit={handleAdd} className="space-y-2">
-              <div className="relative">
-                <input
-                  ref={inputRef}
-                  className={`w-full border rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 bg-white transition-colors ${mentionSuggestions.length > 0 ? 'border-blue-400 ring-2 ring-blue-200 focus:ring-blue-400' : 'focus:ring-blue-400'}`}
-                  placeholder="Novo lembrete... (@ para mencionar)"
-                  value={text}
-                  maxLength={50}
-                  onChange={handleTextChange}
-                  onKeyDown={e => {
-                    if (handleMentionKeyDown(e)) return;
-                    if (isModEnter(e)) { e.preventDefault(); handleAdd(e); }
-                  }}
-                />
-                <MentionDropdown suggestions={mentionSuggestions} activeIndex={mentionIndex} onSelect={insertMention} onHover={setMentionIndex} zIndex="z-[70]" />
-              </div>
+              <RichEditor
+                variant="compact"
+                researchers={researchers}
+                value={text}
+                onChange={setText}
+                onSubmit={handleAdd}
+                placeholder="Novo lembrete... (@ para mencionar)"
+                className="text-sm"
+              />
               <div className="flex items-center gap-2">
                 <label className="flex-1 flex items-center gap-1.5 border rounded px-2 py-1.5 text-sm text-gray-600 cursor-pointer hover:border-blue-400 hover:text-blue-600 transition-colors bg-white">
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -199,7 +186,7 @@ function RemindersDropdown({ rail = false, currentUser = null, researchers = [],
                 return (
                   <li key={r.id} className="group flex items-start gap-2 px-3 py-2.5 hover:bg-gray-50 transition-colors">
                     <div className="flex-1 min-w-0 space-y-0.5">
-                      <p className="text-sm text-gray-800 leading-snug break-words">{renderWithMentions(r.text, researchers)}</p>
+                      <RichContent html={r.text} researchers={researchers} inline className="text-sm text-gray-800 leading-snug break-words" />
                       <p className="text-xs text-gray-500">
                         <span className="text-gray-800">{creatorDisplayName(r, { viewerName: currentUser?.nome })}</span>
                         {' · '}
@@ -236,7 +223,7 @@ function RemindersDropdown({ rail = false, currentUser = null, researchers = [],
                     {old.map(r => (
                       <li key={r.id} className="group flex items-start gap-2 px-3 py-2.5 hover:bg-gray-50 transition-colors">
                         <div className="flex-1 min-w-0 space-y-0.5">
-                          <p className="text-sm text-gray-700 leading-snug break-words">{renderWithMentions(r.text, researchers)}</p>
+                          <RichContent html={r.text} researchers={researchers} inline className="text-sm text-gray-700 leading-snug break-words" />
                           <p className="text-xs text-gray-500">
                             <span className="text-gray-800">{creatorDisplayName(r, { viewerName: currentUser?.nome })}</span>
                             {' · '}

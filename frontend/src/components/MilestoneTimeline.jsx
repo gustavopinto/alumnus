@@ -22,7 +22,9 @@ function isoToDate(iso) {
 }
 
 function formatDate(isoDate) {
-  return new Date(isoDate + 'T00:00:00').toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
+  const d = isoToDate(isoDate);
+  if (!d) return '';
+  return new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { month: 'short', year: 'numeric' });
 }
 
 function getPredictedEnd(researcher) {
@@ -35,10 +37,15 @@ function getPredictedEnd(researcher) {
 // ── Modal ────────────────────────────────────────────────────────────────────
 
 function MilestoneModal({ initial, onSave, onClose }) {
+  // Opções do select: inclui o tipo atual mesmo que seja 'entrada'
+  const modalTypeOptions = initial?.type && !(TYPE_OPTIONS.find(o => o.value === initial.type))
+    ? [{ value: initial.type, label: TYPE_CONFIG[initial.type]?.label ?? initial.type, emoji: TYPE_CONFIG[initial.type]?.emoji ?? '' }, ...TYPE_OPTIONS]
+    : TYPE_OPTIONS;
+
   const [form, setForm] = useState({
-    type:        initial?.type        ?? 'publicacao',
-    title:       initial?.title       ?? '',
-    date:        initial?.date        ?? new Date().toISOString().slice(0, 10),
+    type:  initial?.type  ?? 'publicacao',
+    title: initial?.title ?? '',
+    date:  isoToDate(initial?.date) ?? new Date().toISOString().slice(0, 10),
   });
   const [saving, setSaving] = useState(false);
   const [error,  setError]  = useState('');
@@ -90,7 +97,7 @@ function MilestoneModal({ initial, onSave, onClose }) {
               onChange={e => set('type', e.target.value)}
               className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
-              {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.emoji} {o.label}</option>)}
+              {modalTypeOptions.map(o => <option key={o.value} value={o.value}>{o.emoji} {o.label}</option>)}
             </select>
           </div>
           <div>
@@ -143,16 +150,16 @@ function TimelineItem({ item, position, canEdit, onEdit, onDelete, isPast }) {
 
   const card = (
     <div
-      className={`group w-28 shrink-0 rounded-lg border p-2 shadow-sm transition-opacity ${isPast ? '' : 'opacity-50'} ${isAuto ? 'border-dashed' : ''}`}
-      style={{ borderColor: isAuto ? '#D1D5DB' : cfg.color, backgroundColor: isAuto ? '#F9FAFB' : cfg.bg }}
+      className={`group w-28 shrink-0 rounded-lg border bg-white p-2 shadow-sm transition-opacity ${isPast ? '' : 'opacity-50'} ${isAuto ? 'border-dashed' : ''}`}
+      style={{ borderColor: isAuto ? '#D1D5DB' : cfg.color }}
     >
-      <div className="flex items-start justify-between gap-1 mb-0.5">
-        <span
-          className="text-[10px] font-semibold leading-tight"
+      <div className="flex items-start justify-between gap-1">
+        <p
+          className="text-[11px] font-medium leading-snug line-clamp-2 flex-1"
           style={{ color: isAuto ? '#9CA3AF' : cfg.color }}
         >
-          {isAuto ? item._autoLabel : `${cfg.emoji} ${cfg.label}`}
-        </span>
+          {item.title}
+        </p>
         {canEdit && !isAuto && (
           <div className="flex gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
             <button type="button" onClick={() => onEdit(item)} className="p-0.5 rounded text-gray-400 hover:text-blue-600 transition-colors" title="Editar">
@@ -168,7 +175,6 @@ function TimelineItem({ item, position, canEdit, onEdit, onDelete, isPast }) {
           </div>
         )}
       </div>
-      <p className="text-[11px] font-medium text-gray-800 leading-snug line-clamp-2">{item.title}</p>
     </div>
   );
 
