@@ -4,12 +4,14 @@ import { getMyEmails, addMyEmail, removeMyEmail, getGroups, updateGroup, getInst
 import { useAppLayout } from '../components/AppLayout';
 import { getTokenPayload } from '../auth';
 import { isModEnter } from '../platform';
+import { useConfirm } from '../components/ConfirmModal';
 
 export default function InstitutionPage() {
   const { refreshInstitutions, setCurrentInstitution } = useAppLayout();
   const payload = getTokenPayload();
   const isSuperadmin = payload?.role === 'superadmin';
   const isProfessor = payload?.role === 'professor' || isSuperadmin;
+  const { confirm, modal: confirmModal } = useConfirm();
 
   const [searchParams] = useSearchParams();
   const instParam = searchParams.get('inst') ? Number(searchParams.get('inst')) : null;
@@ -101,12 +103,12 @@ export default function InstitutionPage() {
   }
 
   async function handleRemoveEmail(piId) {
-    if (!confirm('Remover este vínculo institucional?')) return;
+    if (!await confirm({ title: 'Remover este vínculo institucional?', confirmLabel: 'Remover' })) return;
     try {
       await removeMyEmail(piId);
       await load();
     } catch {
-      alert('Mantenha ao menos um email institucional.');
+      setEmailError('Mantenha ao menos um email institucional.');
     }
   }
 
@@ -152,6 +154,7 @@ export default function InstitutionPage() {
 
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-8">
+      {confirmModal}
       {renderTitle()}
 
       {/* ── Emails / Vínculos institucionais (professor only) ──────── */}

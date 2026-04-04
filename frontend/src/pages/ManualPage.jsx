@@ -12,6 +12,7 @@ import { useAppLayout } from '../components/AppLayout';
 import { keys } from '../queryKeys';
 import Toast from '../components/Toast';
 import RichEditor from '../components/RichEditor';
+import { useConfirm } from '../components/ConfirmModal';
 import RichContent from '../components/RichContent';
 import { slugify } from '../mentionUtils.jsx';
 
@@ -195,6 +196,7 @@ export default function ManualPage() {
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState('');
   const [toast, setToast] = useState('');
+  const { confirm, modal: confirmModal } = useConfirm();
   const payload = getTokenPayload();
   const canModerateManual = isDashboardRole(payload?.role);
   const authUserId = payload?.sub != null ? Number(payload.sub) : null;
@@ -225,12 +227,13 @@ export default function ManualPage() {
   }
 
   async function handleDelete(id) {
-    if (!confirm('Remover esta entrada?')) return;
+    if (!await confirm({ title: 'Remover esta entrada?', description: 'Esta ação não pode ser desfeita.', confirmLabel: 'Remover' })) return;
     deleteMutation.mutate(id);
   }
 
   return (
     <div className="min-h-full bg-gray-50">
+      {confirmModal}
       <Toast message={toast} onClose={() => setToast('')} />
       <main className="max-w-3xl mx-auto py-8 px-8 space-y-6">
         <section className="bg-white rounded-xl shadow-sm border p-6">

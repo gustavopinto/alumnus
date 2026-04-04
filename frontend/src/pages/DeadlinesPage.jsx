@@ -8,6 +8,7 @@ import { modKey, isModEnter } from '../platform';
 import { useAppLayout } from '../components/AppLayout';
 import Toast from '../components/Toast';
 import { keys } from '../queryKeys';
+import { useConfirm } from '../components/ConfirmModal';
 
 function profileSlugForInterest(i) {
   const fromApi = i.profile_slug && String(i.profile_slug).trim();
@@ -36,6 +37,7 @@ export default function DeadlinesPage() {
   const payload = getTokenPayload();
   const myUserId = payload?.sub != null ? Number(payload.sub) : null;
   const canManage = isDashboardRole(payload?.role);
+  const { confirm, modal: confirmModal } = useConfirm();
 
   const { data: deadlines = [] } = useQuery({
     queryKey: keys.deadlines(instId),
@@ -93,7 +95,7 @@ export default function DeadlinesPage() {
   }
 
   async function handleDelete(deadlineId) {
-    if (!confirm('Remover este deadline?')) return;
+    if (!await confirm({ title: 'Remover este deadline?', confirmLabel: 'Remover' })) return;
     await deleteMutation.mutateAsync(deadlineId);
   }
 
@@ -221,6 +223,7 @@ export default function DeadlinesPage() {
 
   return (
     <div className="min-h-full bg-gray-50">
+      {confirmModal}
       <Toast message={toast} onClose={() => setToast('')} />
       <div className="max-w-3xl mx-auto p-6 space-y-8">
 

@@ -10,6 +10,7 @@ import ReadingList from '../components/ReadingList';
 import { slugify } from '../mentionUtils.jsx';
 import RichEditor from '../components/RichEditor';
 import RichContent from '../components/RichContent';
+import { useConfirm } from '../components/ConfirmModal';
 
 const STATUS_LABELS = { graduacao: 'Graduação', mestrado: 'Mestrado', doutorado: 'Doutorado', postdoc: 'Pós-doc', professor: 'Professor', egresso: 'Egresso' };
 const STATUS_COLORS = { graduacao: '#3B82F6', mestrado: '#F59E0B', doutorado: '#10B981', postdoc: '#06B6D4', professor: '#7C3AED', egresso: '#6B7280' };
@@ -154,6 +155,7 @@ function NotesSection({ userId, institutionId, canAdd, isProfessor, currentUserI
   const [file, setFile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState('');
+  const { confirm, modal: confirmModal } = useConfirm();
   const fileRef = useRef();
   const loadNotesInFlight = useRef(false);
   const loaded = useRef(false);
@@ -191,13 +193,14 @@ function NotesSection({ userId, institutionId, canAdd, isProfessor, currentUserI
   }
 
   async function handleDelete(id) {
-    if (!confirm('Remover esta anotação?')) return;
+    if (!await confirm({ title: 'Remover esta anotação?', confirmLabel: 'Remover' })) return;
     await deleteNote(id);
     load();
   }
 
   return (
     <div className="space-y-0">
+    {confirmModal}
     <Toast message={toast} onClose={() => setToast('')} />
     <section className="bg-white rounded-xl shadow-sm border overflow-hidden">
       <button

@@ -10,6 +10,7 @@ import RichEditor from './RichEditor';
 import RichContent from './RichContent';
 import { isModEnter } from '../platform';
 import { daysUntil } from '../deadlines';
+import { useConfirm } from './ConfirmModal';
 
 function today() {
   return new Date().toISOString().split('T')[0];
@@ -461,6 +462,7 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
   const [groupLabel, setGroupLabel] = useState('Grupo');
   const [renamingGroup, setRenamingGroup] = useState(false);
   const [renameInput, setRenameInput] = useState('');
+  const { confirm, modal: confirmModal } = useConfirm();
 
   const queryClient = useQueryClient();
   const instId = currentInstitution !== undefined ? (currentInstitution?.id ?? null) : undefined;
@@ -506,7 +508,7 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
   function handleEdit(s) { setEditResearcher(s); setView('researcher-form'); }
 
   async function handleDeactivate(id) {
-    if (!confirm('Inativar este pesquisador?')) return;
+    if (!await confirm({ title: 'Inativar este pesquisador?', confirmLabel: 'Inativar', variant: 'warning' })) return;
     await deleteResearcher(id);
     onRefresh();
   }
@@ -540,6 +542,7 @@ export default function Sidebar({ researchers, onRefresh, role, isAdmin = false,
 
   return (
     <div className="p-4 space-y-2 overflow-y-auto h-full">
+      {confirmModal}
 
       {/* Meu perfil */}
       {profileSlug && (

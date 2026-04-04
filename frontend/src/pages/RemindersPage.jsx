@@ -8,6 +8,7 @@ import { canDeleteReminder, creatorDisplayName } from '../reminderAccess';
 import { slugify } from '../mentionUtils.jsx';
 import RichEditor from '../components/RichEditor';
 import RichContent from '../components/RichContent';
+import { useConfirm } from '../components/ConfirmModal';
 
 function formatDue(dateStr) {
   if (!dateStr) return null;
@@ -50,6 +51,7 @@ export default function RemindersPage() {
   const [text, setText] = useState('');
   const [dueDate, setDueDate] = useState(todayIso);
   const [toast, setToast] = useState('');
+  const { confirm, modal: confirmModal } = useConfirm();
 
   useEffect(() => {
     function syncMinDate() {
@@ -70,7 +72,7 @@ export default function RemindersPage() {
   }
 
   async function handleDelete(id) {
-    if (!confirm('Remover lembrete?')) return;
+    if (!await confirm({ title: 'Remover lembrete?', confirmLabel: 'Remover' })) return;
     try {
       await deleteMutation.mutateAsync(id);
       setToast('Lembrete removido');
@@ -86,6 +88,7 @@ export default function RemindersPage() {
 
   return (
     <div className="min-h-full bg-gray-50">
+      {confirmModal}
       <Toast message={toast} onClose={() => setToast('')} />
       <main className="max-w-2xl mx-auto py-8 px-4 space-y-6">
         <section className="bg-white rounded-xl shadow-sm border p-6">
