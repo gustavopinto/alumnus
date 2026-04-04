@@ -346,6 +346,7 @@ class Deadline(Base):
     label          = Column(String(255), nullable=False)
     url            = Column(Text, nullable=False)
     date           = Column(Date, nullable=False)
+    abstract_date  = Column(Date, nullable=True)
     institution_id = Column(Integer, ForeignKey("institutions.id", ondelete="CASCADE"), nullable=True)
     created_by_id  = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at     = Column(DateTime, default=datetime.utcnow, server_default="now()")

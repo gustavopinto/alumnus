@@ -1,0 +1,1 @@
+ALTER TABLE deadlines ADD COLUMN IF NOT EXISTS abstract_date DATE;
