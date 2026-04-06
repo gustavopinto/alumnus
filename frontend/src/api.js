@@ -142,6 +142,19 @@ export async function uploadPhoto(file) {
   return res.json();
 }
 
+export async function uploadImage(file) {
+  const form = new FormData();
+  form.append('file', file);
+  const token = getToken();
+  const res = await fetch(`${BASE}/upload/image`, {
+    method: 'POST',
+    body: form,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  const data = await res.json();
+  return data.url;
+}
+
 
 // Institutions
 export const getInstitutions = () => request('/institutions/');

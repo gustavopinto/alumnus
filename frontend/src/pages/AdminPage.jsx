@@ -6,6 +6,7 @@ import { keys } from '../queryKeys';
 import { getTokenPayload } from '../auth';
 import { useAppLayout } from '../components/AppLayout';
 import Toast from '../components/Toast';
+import { useConfirm } from '../components/ConfirmModal';
 
 const ROLE_LABELS = { superadmin: 'Superadmin', professor: 'Professor', researcher: 'Aluno' };
 const STATUS_LABELS = { graduacao: 'Graduação', mestrado: 'Mestrado', doutorado: 'Doutorado', postdoc: 'Pós-doc', professor: 'Professor' };
@@ -106,6 +107,7 @@ export default function AdminPage() {
   const [addStudentError, setAddStudentError] = useState('');
   const [inviteLink, setInviteLink] = useState('');
   const [toast, setToast] = useState('');
+  const { confirm, modal: confirmModal } = useConfirm();
 
   const myRole = getTokenPayload()?.role;
   const isSuperadmin = myRole === 'superadmin';
@@ -150,7 +152,7 @@ export default function AdminPage() {
   }
 
   async function handleBulkDelete() {
-    if (!confirm(`Remover ${selected.size} usuário(s) selecionado(s)? Esta ação não pode ser desfeita.`)) return;
+    if (!await confirm({ title: `Remover ${selected.size} usuário(s)?`, description: 'Esta ação não pode ser desfeita.', confirmLabel: 'Remover', variant: 'danger' })) return;
     setBulkDeleting(true);
     const user_ids = [];
     const researcher_ids = [];
@@ -173,7 +175,7 @@ export default function AdminPage() {
   }
 
   async function handleDelete(u) {
-    if (!confirm(`Remover "${u.nome}"? Esta ação não pode ser desfeita.`)) return;
+    if (!await confirm({ title: `Remover "${u.nome}"?`, description: 'Esta ação não pode ser desfeita.', confirmLabel: 'Remover', variant: 'danger' })) return;
     if (u.pending) {
       await deletePendingResearcher(u.researcher_id);
     } else {
@@ -217,8 +219,20 @@ export default function AdminPage() {
     return new Date(iso).toLocaleDateString('pt-BR');
   }
 
+  function formatLastLogin(iso) {
+    if (!iso) return { text: '—', old: false };
+    const diff = Date.now() - new Date(iso).getTime();
+    const days = Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)));
+    let text;
+    if (days === 0) text = 'hoje';
+    else if (days === 1) text = '1 dia';
+    else text = `${days} dias`;
+    return { text, old: days > 7 };
+  }
+
   return (
     <div className="min-h-full bg-gray-50">
+      {confirmModal}
       <Toast message={toast} onClose={() => setToast('')} />
       <main className="max-w-5xl mx-auto py-8 px-4 space-y-8">
 
@@ -485,7 +499,9 @@ export default function AdminPage() {
                         ? <a href={`https://wa.me/${u.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" className="hover:text-green-600 hover:underline">{u.whatsapp}</a>
                         : '—'}
                     </td>
-                    <td className="px-4 py-3 text-gray-400">{formatDate(u.last_login)}</td>
+                    <td className="px-4 py-3">
+                      {(() => { const { text, old } = formatLastLogin(u.last_login); return <span className={old ? 'text-red-500' : 'text-gray-400'}>{text}</span>; })()}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1 justify-end">
                         {u.pending && editingId !== u.id && (

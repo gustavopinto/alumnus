@@ -102,3 +102,29 @@ class TestDeleteReminder:
         reminder = make_reminder(db, text="Auth required")
         resp = client.delete(f"/api/reminders/{reminder.id}")
         assert resp.status_code in (401, 403)
+
+
+class TestReminderWithHtml:
+    def test_creates_reminder_with_html(self, client, db):
+        user = make_user(db, email="htmlreminder@univ.br", role="professor")
+        token = make_token(user)
+        html = '<p>Lembrete com <span data-type="mention" data-id="ana-silva" class="mention">@Ana Silva</span></p>'
+        resp = client.post(
+            "/api/reminders/",
+            json={"text": html, "due_date": None},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 201
+        assert 'data-type="mention"' in resp.json()["text"]
+
+    def test_creates_reminder_with_bold_html(self, client, db):
+        user = make_user(db, email="boldreminder@univ.br", role="professor")
+        token = make_token(user)
+        html = '<p><strong>Importante:</strong> reunião amanhã</p>'
+        resp = client.post(
+            "/api/reminders/",
+            json={"text": html, "due_date": None},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 201
+        assert '<strong>' in resp.json()["text"]

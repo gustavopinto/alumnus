@@ -8,6 +8,7 @@ import { modKey, isModEnter } from '../platform';
 import { useAppLayout } from '../components/AppLayout';
 import Toast from '../components/Toast';
 import { keys } from '../queryKeys';
+import { useConfirm } from '../components/ConfirmModal';
 
 function profileSlugForInterest(i) {
   const fromApi = i.profile_slug && String(i.profile_slug).trim();
@@ -36,6 +37,7 @@ export default function DeadlinesPage() {
   const payload = getTokenPayload();
   const myUserId = payload?.sub != null ? Number(payload.sub) : null;
   const canManage = isDashboardRole(payload?.role);
+  const { confirm, modal: confirmModal } = useConfirm();
 
   const { data: deadlines = [] } = useQuery({
     queryKey: keys.deadlines(instId),
@@ -80,6 +82,7 @@ export default function DeadlinesPage() {
   const [addLabel, setAddLabel] = useState('');
   const [addUrl, setAddUrl] = useState('');
   const [addDate, setAddDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [addAbstractDate, setAddAbstractDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [addError, setAddError] = useState('');
 
   const isValidUrl = (() => {
@@ -93,17 +96,29 @@ export default function DeadlinesPage() {
   }
 
   async function handleDelete(deadlineId) {
-    if (!confirm('Remover este deadline?')) return;
+    if (!await confirm({ title: 'Remover este deadline?', confirmLabel: 'Remover' })) return;
     await deleteMutation.mutateAsync(deadlineId);
   }
 
   async function handleAddManual(e) {
     e.preventDefault();
     if (!addLabel.trim() || !addUrl.trim() || !addDate) return;
+    if (addAbstractDate && addAbstractDate > addDate) {
+      setAddError('A data do abstract deve ser anterior ou igual à data do deadline.');
+      return;
+    }
     setAddError('');
     try {
-      await createMutation.mutateAsync({ label: addLabel.trim(), url: addUrl.trim(), date: addDate });
-      setAddLabel(''); setAddUrl(''); setAddDate(new Date().toISOString().split('T')[0]); setAddOpen(false);
+      await createMutation.mutateAsync({
+        label: addLabel.trim(),
+        url: addUrl.trim(),
+        date: addDate,
+        abstract_date: addAbstractDate || null,
+      });
+      setAddLabel(''); setAddUrl('');
+      setAddDate(new Date().toISOString().split('T')[0]);
+      setAddAbstractDate(new Date().toISOString().split('T')[0]);
+      setAddOpen(false);
     } catch { setAddError('Erro ao adicionar deadline'); }
   }
 
@@ -141,10 +156,23 @@ export default function DeadlinesPage() {
   const upcoming = deadlines.filter(d => daysUntil(d.date) >= 0).sort((a, b) => new Date(a.date) - new Date(b.date));
   const past = deadlines.filter(d => daysUntil(d.date) < 0).sort((a, b) => new Date(b.date) - new Date(a.date));
 
+  function dateLabel(dateStr, prefix = '') {
+    const days = daysUntil(dateStr);
+    const fmt = new Date(dateStr + 'T00:00:00').toLocaleDateString('pt-BR');
+    let text;
+    if (days < 0) text = `Encerrado · ${fmt}`;
+    else if (days === 0) text = `Hoje! · ${fmt}`;
+    else text = `${days} dia${days !== 1 ? 's' : ''} · ${fmt}`;
+    const critical = days >= 0 && days <= 7;
+    const urgent = days >= 0 && days <= 14;
+    const past = days < 0;
+    const cls = past ? 'text-gray-400' : critical ? 'text-red-500 font-semibold' : urgent ? 'text-orange-500 font-semibold' : 'text-gray-500';
+    return <p className={`text-sm mt-0.5 ${cls}`}>{prefix}{text}</p>;
+  }
+
   function renderCard(d) {
     const days = daysUntil(d.date);
     const isPast = days < 0;
-    const urgent = !isPast && days <= 14;
     const myInterest = interests.some(i => i.deadline_id === d.id && myUserId != null && Number(i.user_id) === myUserId);
     const interested = interests.filter(i => i.deadline_id === d.id);
     return (
@@ -168,18 +196,13 @@ export default function DeadlinesPage() {
 
         <div className="pr-20">
           <a href={d.url} target="_blank" rel="noreferrer" className="text-base font-semibold text-blue-700 hover:underline">{d.label}</a>
-          <p className={`text-sm mt-0.5 ${isPast ? 'text-gray-400' : urgent ? 'text-orange-500 font-semibold' : 'text-gray-500'}`}>
-            {isPast
-              ? `Encerrado · ${new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR')}`
-              : days === 0
-                ? `Hoje! · ${new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR')}`
-                : `${days} dia${days !== 1 ? 's' : ''} · ${new Date(d.date + 'T00:00:00').toLocaleDateString('pt-BR')}`}
-          </p>
+          {d.abstract_date && dateLabel(d.abstract_date, '[Abstract] ')}
+          {dateLabel(d.date, '[Paper] ')}
         </div>
 
         {interested.length > 0 && (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-            <span className="text-gray-400 shrink-0">Quem vai mandar:</span>
+            <span className="text-gray-400 shrink-0">Quem vai mandar?</span>
             {interested.map((i, idx) => {
               const slug = profileSlugForInterest(i);
               return (
@@ -221,6 +244,7 @@ export default function DeadlinesPage() {
 
   return (
     <div className="min-h-full bg-gray-50">
+      {confirmModal}
       <Toast message={toast} onClose={() => setToast('')} />
       <div className="max-w-3xl mx-auto p-6 space-y-8">
 
@@ -253,13 +277,28 @@ export default function DeadlinesPage() {
                 onChange={e => setAddUrl(e.target.value)}
                 className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
-              <input
-                required
-                type="date"
-                value={addDate}
-                onChange={e => setAddDate(e.target.value)}
-                className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs text-gray-500">Data do paper</label>
+                  <input
+                    required
+                    type="date"
+                    value={addDate}
+                    onChange={e => setAddDate(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs text-gray-500">Data do abstract <span className="text-gray-400">(opcional)</span></label>
+                  <input
+                    type="date"
+                    value={addAbstractDate}
+                    max={addDate || undefined}
+                    onChange={e => setAddAbstractDate(e.target.value)}
+                    className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+              </div>
               {addError && <p className="text-xs text-red-500">{addError}</p>}
               <div className="flex gap-2">
                 <button type="submit" disabled={createMutation.isPending} className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50">

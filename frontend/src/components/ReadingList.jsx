@@ -267,7 +267,7 @@ export default function ReadingList({ userId, canEdit, slug }) {
           ))}
         </div>
 
-        {slug && (
+        {slug && readings.length > 1 && (
           <Link
             to={`/app/profile/${slug}/readings`}
             className="text-sm text-blue-600 hover:underline"

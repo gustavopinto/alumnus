@@ -7,7 +7,7 @@ SELECT
     u.id,
     'entrada',
     'Entrada no Alumnus',
-    u.created_at::date,
+    COALESCE(u.created_at, now())::date,
     u.id,
     now()
 FROM users u

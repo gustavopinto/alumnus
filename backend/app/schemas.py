@@ -405,6 +405,7 @@ class DeadlineCreate(BaseModel):
     label: str
     url: str
     date: date
+    abstract_date: Optional[date] = None
     institution_id: Optional[int] = None
 
 
@@ -413,6 +414,7 @@ class DeadlineOut(BaseModel):
     label: str
     url: str
     date: date
+    abstract_date: Optional[date] = None
     institution_id: Optional[int] = None
     created_by_id: Optional[int] = None
     created_at: Optional[datetime] = None

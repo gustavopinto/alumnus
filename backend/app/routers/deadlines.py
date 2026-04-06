@@ -78,6 +78,7 @@ def create_deadline(
         label=data.label,
         url=data.url,
         date=data.date,
+        abstract_date=data.abstract_date,
         institution_id=data.institution_id,
         created_by_id=current_user.id,
     )
