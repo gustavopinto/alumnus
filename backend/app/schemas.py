@@ -526,6 +526,7 @@ class ReadingOut(BaseModel):
     status: str
     summary: Optional[str] = None
     created_by_id: Optional[int] = None
+    created_by_name: Optional[str] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     status_history: list[ReadingStatusHistoryOut] = []
@@ -535,6 +536,7 @@ class ReadingOut(BaseModel):
     @classmethod
     def from_orm_with_history(cls, reading):
         obj = cls.model_validate(reading)
+        obj.created_by_name = reading.created_by.nome if reading.created_by else None
         obj.status_history = [
             ReadingStatusHistoryOut(
                 id=h.id,

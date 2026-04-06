@@ -34,6 +34,13 @@ function StatCard({ label, value, color = 'text-blue-600' }) {
   );
 }
 
+function shortName(nome) {
+  if (!nome) return '';
+  const parts = nome.trim().split(/\s+/);
+  if (parts.length <= 2) return nome;
+  return `${parts[0]} ${parts[parts.length - 1]}`;
+}
+
 function slugify(nome) {
   return (nome || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-');
@@ -427,9 +434,9 @@ export default function AdminPage() {
                           : <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-500 shrink-0">{(u.nome || '?')[0].toUpperCase()}</div>
                         }
                         <span className="font-medium text-gray-800">
-                          {u.researcher_nome
-                            ? <a href={`/app/profile/${slugify(u.nome)}`} className="hover:text-blue-600 hover:underline">{u.nome}</a>
-                            : u.nome}
+                          {!u.pending && u.role !== 'superadmin'
+                            ? <a href={`/app/profile/${slugify(u.nome)}`} className="hover:text-blue-600 hover:underline" title={u.nome}>{shortName(u.nome)}</a>
+                            : shortName(u.nome)}
                         </span>
                       </div>
                     </td>
