@@ -39,7 +39,36 @@ function slugify(nome) {
 }
 
 const ROLE_ORDER = { superadmin: 0, professor: 1, researcher: 2 };
-const SORT_USERS = (u) => [u.pending ? 1 : 0, ROLE_ORDER[u.role] ?? 99, u.nome || ''];
+
+function sortUsers(rawUsers, col, dir) {
+  return [...rawUsers].sort((a, b) => {
+    let av, bv;
+    if (col === 'nome') {
+      // pendentes sempre no final
+      if (a.pending !== b.pending) return a.pending ? 1 : -1;
+      av = (a.nome || '').toLowerCase();
+      bv = (b.nome || '').toLowerCase();
+    } else if (col === 'perfil') {
+      if (a.pending !== b.pending) return a.pending ? 1 : -1;
+      av = ROLE_ORDER[a.role] ?? 99;
+      bv = ROLE_ORDER[b.role] ?? 99;
+      return dir === 'asc' ? av - bv : bv - av;
+    } else if (col === 'instituicao') {
+      av = (a.institutions?.[0] || '').toLowerCase();
+      bv = (b.institutions?.[0] || '').toLowerCase();
+    } else if (col === 'ultimo_acesso') {
+      av = a.last_login || '';
+      bv = b.last_login || '';
+    } else {
+      // default: pendentes → role → nome
+      if (a.pending !== b.pending) return a.pending ? 1 : -1;
+      if (a.role !== b.role) return (ROLE_ORDER[a.role] ?? 99) - (ROLE_ORDER[b.role] ?? 99);
+      return (a.nome || '').localeCompare(b.nome || '', 'pt-BR');
+    }
+    const cmp = typeof av === 'string' ? av.localeCompare(bv, 'pt-BR') : av < bv ? -1 : av > bv ? 1 : 0;
+    return dir === 'asc' ? cmp : -cmp;
+  });
+}
 
 export default function AdminPage() {
   const navigate = useNavigate();
@@ -47,13 +76,15 @@ export default function AdminPage() {
   const queryClient = useQueryClient();
   const { data: stats = null } = useQuery({ queryKey: keys.adminStats(), queryFn: getAdminStats });
   const { data: rawUsers = [] } = useQuery({ queryKey: keys.adminUsers(), queryFn: getAdminUsers });
-  const users = [...rawUsers].sort((a, b) => {
-    const [ap, ar, an] = SORT_USERS(a);
-    const [bp, br, bn] = SORT_USERS(b);
-    if (ap !== bp) return ap - bp;
-    if (ar !== br) return ar - br;
-    return an.localeCompare(bn, 'pt-BR');
-  });
+  const [sortCol, setSortCol] = useState(null);
+  const [sortDir, setSortDir] = useState('asc');
+
+  const users = sortUsers(rawUsers, sortCol, sortDir);
+
+  function handleSort(col) {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(col); setSortDir('asc'); }
+  }
 
   const invalidateAdmin = () => {
     queryClient.invalidateQueries({ queryKey: keys.adminUsers() });
@@ -339,13 +370,32 @@ export default function AdminPage() {
                       <input type="checkbox" checked={users.length > 0 && selected.size === users.length} onChange={toggleAll} className="rounded border-gray-300" />
                     </th>
                   )}
-                  <th className="px-4 py-3">Nome</th>
-                  <th className="px-4 py-3">Email</th>
-                  <th className="px-4 py-3">Perfil</th>
-                  <th className="px-4 py-3">Instituição</th>
-                  <th className="px-4 py-3">WhatsApp</th>
-                  <th className="px-4 py-3">Último acesso</th>
-                  <th className="px-4 py-3">Ações</th>
+                  {[
+                    { key: 'nome',          label: 'Nome' },
+                    { key: null,            label: 'Email' },
+                    { key: 'perfil',        label: 'Perfil' },
+                    { key: 'instituicao',   label: 'Instituição' },
+                    { key: null,            label: 'WhatsApp' },
+                    { key: 'ultimo_acesso', label: 'Último acesso' },
+                    { key: null,            label: 'Ações' },
+                  ].map(({ key, label }) =>
+                    key ? (
+                      <th key={label} className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => handleSort(key)}
+                          className="inline-flex items-center gap-1 hover:text-gray-800 transition-colors"
+                        >
+                          {label}
+                          <span className="text-[10px] leading-none">
+                            {sortCol === key ? (sortDir === 'asc' ? '▲' : '▼') : '⬍'}
+                          </span>
+                        </button>
+                      </th>
+                    ) : (
+                      <th key={label} className="px-4 py-3">{label}</th>
+                    )
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
