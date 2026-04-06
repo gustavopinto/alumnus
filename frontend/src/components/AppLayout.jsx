@@ -313,8 +313,11 @@ export default function AppLayout() {
               setCurrentInstitution(null);
             }
           }).catch(() => { setCurrentInstitution(null); });
+        } else if (u.institution_id) {
+          // researcher: deriva instituição do perfil
+          setCurrentInstitution({ id: u.institution_id, name: u.institution_name || '' });
+          setInstitutionName(u.institution_name || '');
         } else {
-          // researcher: sem filtro de instituição
           setCurrentInstitution(null);
         }
       }

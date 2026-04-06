@@ -221,7 +221,7 @@ export default function ManualPage() {
   });
 
   function handleSubmit(e) {
-    e.preventDefault();
+    e?.preventDefault();
     if (!question.trim() || !answer.trim()) return;
     createMutation.mutate();
   }

@@ -247,9 +247,11 @@ class UserOut(BaseModel):
     instagram_url:   Optional[str] = None
     twitter_url:     Optional[str] = None
     whatsapp:        Optional[str] = None
-    interesses:      Optional[str] = None
-    bio:             Optional[str] = None
-    birth_date:      Optional[date] = None
+    interesses:        Optional[str] = None
+    bio:               Optional[str] = None
+    birth_date:        Optional[date] = None
+    institution_id:    Optional[int] = None
+    institution_name:  Optional[str] = None
 
     model_config = {"from_attributes": True}
 

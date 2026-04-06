@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta, timezone
 from sqlalchemy.orm import Session
 
-from .models import User
+from .models import Researcher, ResearchGroup, User
 
 TRIAL_DAYS = 30
 
@@ -80,8 +80,26 @@ def compute_trial_days_remaining(user: User) -> int | None:
     return max(0, (end_d - today).days)
 
 
+def _resolve_researcher_institution(user: User) -> tuple[int | None, str | None]:
+    """Deriva institution_id/name do researcher via group, sem query extra (usa relacionamentos já carregados)."""
+    if user.researcher_id is None:
+        return None, None
+    researcher = user.researcher
+    if researcher is None or researcher.group_id is None:
+        return None, None
+    group = researcher.group if hasattr(researcher, "group") and researcher.group is not None else None
+    if group is None:
+        return None, None
+    inst = group.institution if hasattr(group, "institution") and group.institution is not None else None
+    if inst is None:
+        return group.institution_id, None
+    return inst.id, inst.name
+
+
 def user_to_out(user: User) -> "UserOut":
     from .schemas import UserOut
+
+    institution_id, institution_name = _resolve_researcher_institution(user)
 
     _profile = dict(
         photo_url=user.photo_url,
@@ -95,6 +113,8 @@ def user_to_out(user: User) -> "UserOut":
         whatsapp=user.whatsapp,
         interesses=user.interesses,
         bio=user.bio,
+        institution_id=institution_id,
+        institution_name=institution_name,
     )
 
     if not is_plan_user(user):
