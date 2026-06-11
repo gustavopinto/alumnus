@@ -235,6 +235,34 @@ class Note(Base):
     updated_at     = Column(DateTime, default=datetime.utcnow, server_default="now()", onupdate=datetime.utcnow)
 
     created_by = relationship("User", foreign_keys=[created_by_id])
+    reactions  = relationship("NoteReaction", back_populates="note", cascade="all, delete-orphan")
+    comments   = relationship("NoteComment",  back_populates="note", cascade="all, delete-orphan", order_by="NoteComment.created_at")
+
+
+class NoteReaction(Base):
+    __tablename__ = "note_reactions"
+
+    note_id    = Column(Integer, ForeignKey("notes.id", ondelete="CASCADE"), primary_key=True)
+    user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    type       = Column(String(20), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    note = relationship("Note", back_populates="reactions")
+    user = relationship("User", foreign_keys=[user_id])
+
+
+class NoteComment(Base):
+    __tablename__ = "note_comments"
+
+    id         = Column(Integer, primary_key=True, index=True)
+    note_id    = Column(Integer, ForeignKey("notes.id", ondelete="CASCADE"), nullable=False)
+    text       = Column(Text, nullable=False)
+    author_id  = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, server_default="now()")
+    updated_at = Column(DateTime, default=datetime.utcnow, server_default="now()", onupdate=datetime.utcnow)
+
+    note   = relationship("Note", back_populates="comments")
+    author = relationship("User", foreign_keys=[author_id])
 
 
 # ── Plano de usuário ──────────────────────────────────────────────────────────

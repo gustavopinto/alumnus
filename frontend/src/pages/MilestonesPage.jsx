@@ -37,6 +37,7 @@ export default function MilestonesPage() {
       onAvatarClick: null,
       uploadingPhoto: false,
       hideSettings:  true,
+      nameLink:      `/app/profile/${slug}`,
     });
     return () => setProfileTopbar(null);
   }, [profile, setProfileTopbar]);

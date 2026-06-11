@@ -37,7 +37,7 @@ function EntryRow({ entry, canModerate, authUserId, onDelete }) {
       {/* Pergunta */}
       <div className="flex-1 min-w-0">
         <Link
-          to={`/app/manual/${entry.id}`}
+          to={`/app/manual/${btoa(String(entry.id))}`}
           className="text-sm font-medium text-blue-700 hover:text-blue-900 hover:underline leading-snug line-clamp-2"
         >
           {entry.question}

@@ -1,12 +1,141 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { getNotes, createNote, deleteNote, updateNote } from '../api';
+import { getNotes, createNote, deleteNote, updateNote, toggleNoteReaction, addNoteComment, deleteNoteComment } from '../api';
 import { modKey } from '../platform';
 import Toast from './Toast';
 import { slugify } from '../mentionUtils.jsx';
 import RichEditor from './RichEditor';
 import RichContent from './RichContent';
 import { useConfirm } from './ConfirmModal';
+
+const REACTIONS = [
+  { type: 'like',  emoji: '👍', label: 'Curtir' },
+  { type: 'happy', emoji: '🎉', label: 'Ótimo' },
+  { type: 'sad',   emoji: '😢', label: 'Triste' },
+];
+
+function ReactionBar({ note, currentUserId, onToggle }) {
+  const counts = REACTIONS.map(r => ({
+    ...r,
+    count: (note.reactions || []).filter(x => x.type === r.type).length,
+    mine:  (note.reactions || []).some(x => x.type === r.type && x.user_id === currentUserId),
+  }));
+  const hasAny = counts.some(r => r.count > 0);
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      {counts.map(r => (
+        <button
+          key={r.type}
+          type="button"
+          onClick={() => onToggle(note.id, r.type)}
+          title={r.label}
+          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-colors ${
+            r.mine
+              ? 'bg-blue-50 border-blue-300 text-blue-700 font-semibold'
+              : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+          }`}
+        >
+          <span>{r.emoji}</span>
+          {r.count > 0 && <span>{r.count}</span>}
+        </button>
+      ))}
+      {!hasAny && (
+        <span className="text-xs text-gray-300 italic">reagir</span>
+      )}
+    </div>
+  );
+}
+
+function CommentsSection({ note, currentUserId, isProfessor, researchers, onCommentAdded, onCommentDeleted }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState('');
+  const [sending, setSending] = useState(false);
+  const count = (note.comments || []).length;
+
+  async function handleAdd(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (!text.trim()) return;
+    setSending(true);
+    try {
+      await addNoteComment(note.id, text.trim());
+      setText('');
+      onCommentAdded();
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleDelete(commentId) {
+    await deleteNoteComment(commentId);
+    onCommentDeleted();
+  }
+
+  return (
+    <div className="border-t border-gray-100">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-1.5 px-5 py-2 text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+        </svg>
+        {count > 0 ? `${count} comentário${count > 1 ? 's' : ''}` : 'Comentar'}
+        <svg xmlns="http://www.w3.org/2000/svg" className={`w-3 h-3 ml-auto transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && (
+        <div className="px-5 pb-4 space-y-3">
+          {(note.comments || []).map(c => (
+            <div key={c.id} className="flex items-start gap-2 group">
+              <div className="w-6 h-6 rounded-full bg-gray-200 text-gray-600 text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                {(c.author_name || '?').slice(0, 2).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-500 font-semibold leading-tight">
+                  {c.author_name || 'Anônimo'}
+                  <span className="font-normal ml-1 text-gray-400">
+                    {c.created_at ? new Date(c.created_at).toLocaleDateString('pt-BR') : ''}
+                  </span>
+                </p>
+                <p className="text-sm text-gray-700 mt-0.5 leading-snug">{c.text}</p>
+              </div>
+              {(isProfessor || c.author_id === currentUserId) && (
+                <button
+                  type="button"
+                  onClick={() => handleDelete(c.id)}
+                  className="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                  title="Remover"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          ))}
+          <form onSubmit={handleAdd} className="flex gap-2 pt-1">
+            <input
+              type="text"
+              value={text}
+              onChange={e => setText(e.target.value)}
+              placeholder="Comentar..."
+              className="flex-1 border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50"
+            />
+            <button
+              type="submit"
+              disabled={sending || !text.trim()}
+              className="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50 shrink-0"
+            >
+              {sending ? '…' : 'Enviar'}
+            </button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function formatDate(iso) {
   return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -85,6 +214,12 @@ export default function NotesSection({ userId, canAdd, isProfessor, currentUserI
     load();
   }
 
+  async function handleReaction(noteId, type) {
+    if (!currentUserId) return;
+    await toggleNoteReaction(noteId, type);
+    load();
+  }
+
   const visibleNotes = preview ? notes.slice(0, 3) : notes;
 
   if (preview) {
@@ -137,6 +272,11 @@ export default function NotesSection({ userId, canAdd, isProfessor, currentUserI
                       )}
                     </div>
                     <RichContent html={note.text} researchers={researchers} className="text-sm text-gray-700 line-clamp-2" />
+                    {currentUserId && (
+                      <div className="mt-2">
+                        <ReactionBar note={note} currentUserId={currentUserId} onToggle={handleReaction} />
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -216,7 +356,7 @@ export default function NotesSection({ userId, canAdd, isProfessor, currentUserI
 
       {/* Cards de anotações — fora do box principal */}
       {(open || alwaysOpen) && notes.length > 0 && (
-        <div className="space-y-4 mt-4">
+        <div className="space-y-4 mt-6">
           {notes.map(note => {
             const initials = (note.created_by_name || '?').split(' ').filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join('');
             return (
@@ -286,6 +426,27 @@ export default function NotesSection({ userId, canAdd, isProfessor, currentUserI
                     </a>
                   )}
                 </div>
+                {/* Reactions */}
+                {currentUserId && (
+                  <div className="px-5 py-2.5 border-t border-gray-100 bg-white">
+                    <ReactionBar
+                      note={note}
+                      currentUserId={currentUserId}
+                      onToggle={handleReaction}
+                    />
+                  </div>
+                )}
+                {/* Comments */}
+                {currentUserId && (
+                  <CommentsSection
+                    note={note}
+                    currentUserId={currentUserId}
+                    isProfessor={isProfessor}
+                    researchers={researchers}
+                    onCommentAdded={load}
+                    onCommentDeleted={load}
+                  />
+                )}
               </div>
             );
           })}

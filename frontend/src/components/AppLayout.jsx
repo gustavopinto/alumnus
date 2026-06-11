@@ -110,6 +110,7 @@ function ProfileTopbarBlock({ data }) {
     lastLoginLine,
     onAvatarClick,
     uploadingPhoto,
+    nameLink,
   } = data;
 
   const avatarFace = photoUrl ? (
@@ -164,7 +165,11 @@ function ProfileTopbarBlock({ data }) {
         )}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-base font-bold text-gray-900 truncate leading-tight">{nome}</p>
+        {nameLink ? (
+          <Link to={nameLink} className="text-base font-bold text-gray-900 truncate leading-tight hover:text-blue-600 hover:underline block">{nome}</Link>
+        ) : (
+          <p className="text-base font-bold text-gray-900 truncate leading-tight">{nome}</p>
+        )}
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           <span className="text-xs px-2 py-0.5 rounded-full text-white shrink-0" style={{ backgroundColor: statusColor }}>
             {statusLabel}

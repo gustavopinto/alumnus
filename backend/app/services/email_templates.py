@@ -104,3 +104,31 @@ def mention_html(creator_name: str, note_html: str, profile_name: str, profile_s
         cta_url=url,
         cta_label="Ver aqui",
     )
+
+
+def reminder_created_html(creator_name: str, reminder_html: str) -> str:
+    url = f"{APP_URL}/app/reminders"
+    return _render(
+        headline="Novo lembrete no grupo",
+        subtext=f"<strong>{creator_name}</strong> adicionou um novo lembrete para o grupo.",
+        excerpt=_excerpt(reminder_html),
+        cta_url=url,
+        cta_label="Ver lembretes",
+    )
+
+
+def login_reminder_html(user_name: str, days_inactive: int | None = None) -> str:
+    url = "https://alumnus.gustavopinto.org/"
+    days_str = f"Fazem <strong>{days_inactive} dias</strong> que você não acessa a plataforma. " if days_inactive else ""
+    subtext = (
+        f"{days_str}Seu grupo de pesquisa está ativo, mas você não está. "
+        f"Lembre-se que se não estiver registrado no Alumnus, "
+        f"seu orientador tem menos chances de saber o que você tem feito."
+    )
+    return _render(
+        headline=f"Olá, {user_name} — você sumiu.",
+        subtext=subtext,
+        excerpt="Quem não aparece, desaparece.",
+        cta_url=url,
+        cta_label="Voltar agora",
+    )

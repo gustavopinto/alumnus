@@ -172,6 +172,28 @@ class NoteCreate(BaseModel):
     text: str
 
 
+class NoteReactionOut(BaseModel):
+    type: str
+    user_id: int
+    model_config = {"from_attributes": True}
+
+
+class NoteCommentOut(BaseModel):
+    id: int
+    note_id: int
+    text: str
+    author_id: Optional[int] = None
+    author_name: Optional[str] = None
+    created_at: Optional[datetime] = None
+    model_config = {"from_attributes": True}
+
+    @classmethod
+    def from_orm_with_author(cls, comment):
+        obj = cls.model_validate(comment)
+        obj.author_name = comment.author.nome if comment.author else None
+        return obj
+
+
 class NoteOut(BaseModel):
     id: int
     user_id: int
@@ -181,6 +203,8 @@ class NoteOut(BaseModel):
     created_by_id: Optional[int] = None
     created_by_name: Optional[str] = None
     created_at: Optional[datetime] = None
+    reactions: list[NoteReactionOut] = []
+    comments: list[NoteCommentOut] = []
 
     model_config = {"from_attributes": True}
 
@@ -189,6 +213,8 @@ class NoteOut(BaseModel):
         obj = cls.model_validate(note)
         obj.created_by_id = note.created_by_id
         obj.created_by_name = note.created_by.nome if note.created_by else None
+        obj.reactions = [NoteReactionOut.model_validate(r) for r in (note.reactions or [])]
+        obj.comments = [NoteCommentOut.from_orm_with_author(c) for c in (note.comments or [])]
         return obj
 
 

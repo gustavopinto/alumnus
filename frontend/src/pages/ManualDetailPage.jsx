@@ -25,8 +25,20 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('pt-BR');
 }
 
+function decodeManualId(param) {
+  try {
+    const decoded = atob(param);
+    const n = Number(decoded);
+    if (Number.isFinite(n) && n > 0 && Number.isInteger(n)) return n;
+  } catch {}
+  // Fallback: ID numérico direto para retrocompatibilidade
+  const n = Number(param);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 export default function ManualDetailPage() {
-  const { id } = useParams();
+  const { id: rawId } = useParams();
+  const numericId = decodeManualId(rawId);
   const { currentInstitution, researchers = [] } = useAppLayout();
   const [toast, setToast] = useState('');
   const [commentText, setCommentText] = useState('');
@@ -44,18 +56,18 @@ export default function ManualDetailPage() {
   const instId = currentInstitution !== undefined ? (currentInstitution?.id ?? null) : undefined;
 
   const { data: entry, isLoading } = useQuery({
-    queryKey: keys.tip(Number(id)),
-    queryFn: () => getTip(id),
-    enabled: !!id,
+    queryKey: keys.tip(numericId),
+    queryFn: () => getTip(numericId),
+    enabled: !!numericId,
   });
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: keys.tip(Number(id)) });
+    queryClient.invalidateQueries({ queryKey: keys.tip(numericId) });
     queryClient.invalidateQueries({ queryKey: keys.tips(instId) });
   };
 
   const deleteMutation = useMutation({
-    mutationFn: () => deleteTip(id),
+    mutationFn: () => deleteTip(numericId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: keys.tips(instId) });
       window.history.back();
@@ -68,7 +80,7 @@ export default function ManualDetailPage() {
   }
 
   async function handleVote() {
-    await toggleTipVote(id);
+    await toggleTipVote(numericId);
     invalidate();
   }
 
@@ -76,7 +88,7 @@ export default function ManualDetailPage() {
     e.preventDefault();
     if (!commentText.trim()) return;
     setSubmitting(true);
-    await addTipComment(id, commentText.trim());
+    await addTipComment(numericId, commentText.trim());
     setCommentText('');
     setSubmitting(false);
     invalidate();
@@ -98,7 +110,7 @@ export default function ManualDetailPage() {
     if (!editQuestion.trim() || !editAnswer.trim()) return;
     setSaving(true);
     try {
-      await updateTip(id, { question: editQuestion.trim(), answer: editAnswer.trim() });
+      await updateTip(numericId, { question: editQuestion.trim(), answer: editAnswer.trim() });
       setEditing(false);
       setToast('Entrada atualizada');
       invalidate();

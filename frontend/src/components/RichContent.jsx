@@ -4,13 +4,29 @@ import { slugify } from '../mentionUtils.jsx';
 
 const URL_RE = /(https?:\/\/[^\s<]+)/;
 
-function linkifyText(text) {
-  if (!URL_RE.test(text)) return text;
-  return text.split(URL_RE).map((seg, i) =>
-    URL_RE.test(seg)
-      ? <a key={i} href={seg} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline break-all">{seg}</a>
-      : seg
-  );
+// Converte markdown simples para HTML (para notas legadas sem HTML do TipTap)
+// Suporta: **bold**, *italic*, _italic_, parágrafos duplos, \n como <br>
+function markdownToHtml(text, inline = false) {
+  if (!text) return '';
+
+  let result = text
+    // Bold: **texto**
+    .replace(/\*\*(.+?)\*\*/gs, '<strong>$1</strong>')
+    // Italic: *texto* (não adjacente a outro *)
+    .replace(/(?<!\*)\*([^*\n]+?)\*(?!\*)/g, '<em>$1</em>')
+    // Italic: _texto_
+    .replace(/(?<!_)_([^_\n]+?)_(?!_)/g, '<em>$1</em>');
+
+  if (inline) {
+    return result.replace(/\n+/g, ' ');
+  }
+
+  // Wrap em parágrafos separados por linha dupla
+  const paragraphs = result.split(/\n\n+/).filter(p => p.trim());
+  if (paragraphs.length === 0) return '';
+  return paragraphs
+    .map(para => `<p>${para.replace(/\n/g, '<br>')}</p>`)
+    .join('');
 }
 
 export default function RichContent({ html = '', researchers = [], className = '', inline = false }) {
@@ -19,10 +35,14 @@ export default function RichContent({ html = '', researchers = [], className = '
 
   const isHtml = typeof html === 'string' && html.includes('<');
 
-  useEffect(() => {
-    if (!isHtml || !ref.current) return;
+  // Para conteúdo não-HTML, converte markdown → HTML para renderizar formatação
+  const renderedHtml = isHtml ? html : markdownToHtml(html, inline);
+  const useHtmlPath = isHtml || (renderedHtml !== '' && renderedHtml !== html);
 
-    // Linkify bare URLs inside text nodes that are not already inside <a>
+  useEffect(() => {
+    if (!ref.current) return;
+
+    // Linkifica URLs bare dentro de text nodes que não estão dentro de <a>
     const walker = document.createTreeWalker(ref.current, NodeFilter.SHOW_TEXT);
     const nodes = [];
     while (walker.nextNode()) nodes.push(walker.currentNode);
@@ -47,7 +67,6 @@ export default function RichContent({ html = '', researchers = [], className = '
     }
 
     function handler(e) {
-      // Let native <a> clicks proceed normally (e.g. linkified URLs)
       if (e.target.closest('a')) return;
       const el = e.target.closest('[data-type="mention"]');
       if (el) {
@@ -58,19 +77,21 @@ export default function RichContent({ html = '', researchers = [], className = '
     const nodeEl = ref.current;
     nodeEl.addEventListener('click', handler);
     return () => nodeEl.removeEventListener('click', handler);
-  }, [html, isHtml, navigate]);
+  }, [html, navigate]);
 
-  if (isHtml) {
+  // Caminho HTML: conteúdo TipTap ou markdown convertido
+  if (useHtmlPath) {
     const Tag = inline ? 'span' : 'div';
     return (
       <Tag
         ref={ref}
         className={`rich-content ${className}`}
-        dangerouslySetInnerHTML={{ __html: html }}
+        dangerouslySetInnerHTML={{ __html: renderedHtml }}
       />
     );
   }
 
+  // Caminho plain text: texto puro sem formatação (sem markdown detectado)
   if (!html) return null;
   const valid = new Set((researchers || []).map(r => slugify(r.nome)));
   const parts = html.split(/(@[a-zA-Z0-9_-]+)/g);
@@ -86,8 +107,8 @@ export default function RichContent({ html = '', researchers = [], className = '
         </span>
       );
     }
-    return <React.Fragment key={i}>{linkifyText(part)}</React.Fragment>;
+    return <React.Fragment key={i}>{part}</React.Fragment>;
   });
   const Tag2 = inline ? 'span' : 'p';
-  return <Tag2 className={`whitespace-pre-wrap ${className}`}>{content}</Tag2>;
+  return <Tag2 ref={ref} className={`whitespace-pre-wrap ${className}`}>{content}</Tag2>;
 }

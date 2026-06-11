@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getAdminStats, getAdminUsers, updateUserRole, deleteUser, deletePendingResearcher, bulkDeleteUsers, createResearcher, inviteProfessor } from '../api';
+import { getAdminStats, getAdminUsers, updateUserRole, deleteUser, deletePendingResearcher, bulkDeleteUsers, createResearcher, inviteProfessor, sendLoginReminder } from '../api';
 import { keys } from '../queryKeys';
 import { getTokenPayload } from '../auth';
 import { useAppLayout } from '../components/AppLayout';
@@ -103,6 +103,7 @@ export default function AdminPage() {
   const [editingId, setEditingId] = useState(undefined);
   const [editRole, setEditRole] = useState('');
   const [saving, setSaving] = useState(false);
+  const [sendingReminderId, setSendingReminderId] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [selected, setSelected] = useState(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -201,6 +202,19 @@ export default function AdminPage() {
       loadData?.();
     } catch (err) {
       setToast(err.message || 'Erro ao remover usuário');
+    }
+  }
+
+  async function handleSendLoginReminder(u) {
+    if (!await confirm({ title: `Enviar lembrete para "${u.nome}"?`, description: 'Um e-mail de lembrete de acesso será enviado ao usuário.', confirmLabel: 'Enviar', variant: 'primary' })) return;
+    setSendingReminderId(u.id);
+    try {
+      await sendLoginReminder(u.id);
+      setToast(`Lembrete enviado para ${u.nome}`);
+    } catch (err) {
+      setToast(err.message || 'Erro ao enviar lembrete');
+    } finally {
+      setSendingReminderId(null);
     }
   }
 
@@ -562,6 +576,18 @@ export default function AdminPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                               </svg>
                             )}
+                          </button>
+                        )}
+                        {editingId !== u.id && !u.pending && (
+                          <button
+                            onClick={() => handleSendLoginReminder(u)}
+                            disabled={sendingReminderId === u.id}
+                            className="p-1.5 rounded text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-40"
+                            title="Enviar lembrete de acesso por e-mail"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                            </svg>
                           </button>
                         )}
                         {editingId !== u.id && isSuperadmin && (

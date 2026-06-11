@@ -76,6 +76,12 @@ export const updateLayout = (positions) => request('/graph/layout', { method: 'P
 export const getNotes = (userId) =>
   request(`/users/${userId}/notes`);
 export const deleteNote = (noteId) => request(`/notes/${noteId}`, { method: 'DELETE' });
+export const toggleNoteReaction = (noteId, type) =>
+  request(`/notes/${noteId}/reactions`, { method: 'POST', body: JSON.stringify({ reaction_type: type }) });
+export const addNoteComment = (noteId, text) =>
+  request(`/notes/${noteId}/comments`, { method: 'POST', body: JSON.stringify({ text }) });
+export const deleteNoteComment = (commentId) =>
+  request(`/notes/comments/${commentId}`, { method: 'DELETE' });
 
 export async function updateNote(noteId, text) {
   const form = new FormData();
@@ -208,6 +214,7 @@ export const deleteUser = (id) => request(`/admin/users/${id}`, { method: 'DELET
 export const deletePendingResearcher = (id) => request(`/admin/researchers/${id}`, { method: 'DELETE' });
 export const bulkDeleteUsers = (user_ids, researcher_ids) => request('/admin/bulk-delete', { method: 'POST', body: JSON.stringify({ user_ids, researcher_ids }) });
 export const inviteProfessor = (data) => request('/admin/invite-professor', { method: 'POST', body: JSON.stringify(data) });
+export const sendLoginReminder = (userId) => request(`/admin/users/${userId}/send-login-reminder`, { method: 'POST' });
 
 // Activity
 export const getMyResearchersActivity = (limit = 100) => request(`/activity/my-researchers?limit=${limit}`);

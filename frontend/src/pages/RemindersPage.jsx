@@ -26,6 +26,59 @@ function todayIso() {
   return new Date().toISOString().split('T')[0];
 }
 
+function ReminderCard({ r, researchers, creatorOpts, onDelete }) {
+  const days = daysLeft(r.due_date);
+  const overdue = days !== null && days < 0;
+  const urgent  = days !== null && days >= 0 && days <= 3;
+
+  const borderColor = overdue ? 'border-l-red-400' : urgent ? 'border-l-orange-400' : 'border-l-blue-300';
+
+  return (
+    <div className={`bg-white rounded-xl border border-gray-200 shadow-sm border-l-4 ${borderColor} overflow-hidden`}>
+      <div className="px-5 py-4">
+        <div className="flex items-start gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-gray-800 leading-relaxed">
+              <RichContent html={r.text} researchers={researchers} inline />
+            </p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
+              {r.due_date && (
+                <span className={`text-xs font-medium ${overdue ? 'text-red-500' : urgent ? 'text-orange-500' : 'text-gray-400'}`}>
+                  {overdue
+                    ? `⚠ Atrasado · ${formatDue(r.due_date)}`
+                    : days === 0
+                    ? '📅 Hoje!'
+                    : `📅 ${days}d · ${formatDue(r.due_date)}`}
+                </span>
+              )}
+              <span className="text-xs text-gray-400">
+                Por{' '}
+                {r.created_by_name
+                  ? <a href={`/app/profile/${slugify(r.created_by_name)}`} className="font-semibold text-gray-600 hover:text-blue-600 hover:underline">{creatorDisplayName(r, creatorOpts)}</a>
+                  : <span className="font-semibold text-gray-600">{creatorDisplayName(r, creatorOpts)}</span>
+                }
+              </span>
+            </div>
+          </div>
+          {canDeleteReminder(r) && (
+            <button
+              type="button"
+              onClick={() => onDelete(r.id)}
+              title="Remover lembrete"
+              aria-label="Remover lembrete"
+              className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function RemindersPage() {
   const { currentUser, researchers = [], currentInstitution } = useAppLayout();
   const creatorOpts = { viewerName: currentUser?.nome };
@@ -91,6 +144,8 @@ export default function RemindersPage() {
       {confirmModal}
       <Toast message={toast} onClose={() => setToast('')} />
       <main className="max-w-2xl mx-auto py-8 px-4 space-y-6">
+
+        {/* Form */}
         <section className="bg-white rounded-xl shadow-sm border p-6">
           <h2 className="text-lg font-bold text-gray-800 mb-4">🔔 Lembretes</h2>
           <form onSubmit={handleSubmit} className="space-y-3">
@@ -128,102 +183,39 @@ export default function RemindersPage() {
           </form>
         </section>
 
+        {/* Pending */}
         {pending.length > 0 && (
-          <section className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-bold text-gray-800 mb-4">Fica ligado!</h2>
-            <ul className="space-y-3">
-              {pending.map(r => {
-                const days = daysLeft(r.due_date);
-                const overdue = days !== null && days < 0;
-                const urgent = days !== null && days >= 0 && days <= 3;
-                return (
-                  <li key={r.id} className="flex items-start gap-3 border-b pb-3 last:border-0 last:pb-0">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm mb-2 text-gray-800"><RichContent html={r.text} researchers={researchers} inline /></p>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                        {r.due_date && (
-                          <span className={`text-xs ${overdue ? 'text-red-500 font-semibold' : urgent ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
-                            {overdue ? `Atrasado · ${formatDue(r.due_date)}` : days === 0 ? 'Hoje!' : `${days}d · ${formatDue(r.due_date)}`}
-                          </span>
-                        )}
-                        <span className="text-xs text-gray-400">
-                          Por{' '}
-                          {r.created_by_name
-                            ? <a href={`/app/profile/${slugify(r.created_by_name)}`} className="font-semibold text-gray-600 hover:text-blue-600 hover:underline">{creatorDisplayName(r, creatorOpts)}</a>
-                            : <span className="font-semibold text-gray-600">{creatorDisplayName(r, creatorOpts)}</span>
-                          }
-                        </span>
-                      </div>
-                    </div>
-                    {canDeleteReminder(r) && (
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(r.id)}
-                        title="Remover"
-                        aria-label="Remover lembrete"
-                        className="p-1 rounded text-red-400 hover:text-red-600 hover:bg-red-50 shrink-0 mt-0.5"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide px-1">Fica ligado!</h3>
+            {pending.map(r => (
+              <ReminderCard
+                key={r.id}
+                r={r}
+                researchers={researchers}
+                creatorOpts={creatorOpts}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
         )}
 
+        {/* Done */}
         {done.length > 0 && (
-          <section className="bg-white rounded-xl shadow-sm border p-6">
-            <h2 className="text-lg font-bold text-gray-800 mb-4">Passados</h2>
-            <ul className="space-y-3">
-              {done.map(r => {
-                const days = daysLeft(r.due_date);
-                const overdue = days !== null && days < 0;
-                const urgent = days !== null && days >= 0 && days <= 3;
-                return (
-                <li
-                  key={r.id}
-                  className="flex items-start gap-3 border-b pb-3 last:border-0 last:pb-0 opacity-50"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm mb-2 line-through text-gray-500"><RichContent html={r.text} researchers={researchers} inline /></p>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                      {r.due_date && (
-                        <span className={`text-xs ${overdue ? 'text-red-500 font-semibold' : urgent ? 'text-orange-500 font-medium' : 'text-gray-400'}`}>
-                          {overdue ? `Atrasado · ${formatDue(r.due_date)}` : days === 0 ? 'Hoje!' : `${days}d · ${formatDue(r.due_date)}`}
-                        </span>
-                      )}
-                      <span className="text-xs text-gray-400">
-                        Por{' '}
-                        {r.created_by_name
-                          ? <a href={`/app/profile/${slugify(r.created_by_name)}`} className="font-semibold text-gray-500 hover:text-blue-600 hover:underline">{creatorDisplayName(r, creatorOpts)}</a>
-                          : <span className="font-semibold text-gray-500">{creatorDisplayName(r, creatorOpts)}</span>
-                        }
-                      </span>
-                    </div>
-                  </div>
-                  {canDeleteReminder(r) && (
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(r.id)}
-                      title="Remover"
-                      aria-label="Remover lembrete"
-                      className="p-1 rounded text-red-400 hover:text-red-600 hover:bg-red-50 shrink-0 ml-auto mt-0.5"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  )}
-                </li>
-              );
-              })}
-            </ul>
-          </section>
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide px-1">Passados</h3>
+            {done.map(r => (
+              <div key={r.id} className="opacity-50">
+                <ReminderCard
+                  r={r}
+                  researchers={researchers}
+                  creatorOpts={creatorOpts}
+                  onDelete={handleDelete}
+                />
+              </div>
+            ))}
+          </div>
         )}
+
       </main>
     </div>
   );

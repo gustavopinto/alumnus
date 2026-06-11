@@ -13,7 +13,7 @@ from sqlalchemy import create_engine, StaticPool
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
-from app.models import User, UserPlan, Researcher, Reminder
+from app.models import User, UserPlan, Researcher, Reminder, Institution, ResearchGroup, Professor, ProfessorGroup
 from app.main import app
 from app.database import get_db
 from passlib.context import CryptContext
@@ -43,6 +43,12 @@ def db(engine):
         yield session
     finally:
         session.close()
+
+
+@pytest.fixture(scope="function")
+def db_factory(engine):
+    """Retorna callable que cria sessões ligadas ao engine de teste (SQLite in-memory)."""
+    return sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 @pytest.fixture(scope="function")
@@ -120,15 +126,75 @@ def make_user(
     return u
 
 
-def make_reminder(db, text="Lembrete teste", due_date=None, done=False, created_by_id=None):
+def make_reminder(db, text="Lembrete teste", due_date=None, done=False, created_by_id=None, institution_id=None):
     r = Reminder(
         text=text,
         due_date=due_date,
         done=done,
         created_by_id=created_by_id,
+        institution_id=institution_id,
         created_at=datetime.utcnow(),
     )
     db.add(r)
     db.commit()
     db.refresh(r)
     return r
+
+
+def make_institution(db, name="UFPA", domain="ufpa.br"):
+    inst = Institution(name=name, domain=domain)
+    db.add(inst)
+    db.commit()
+    db.refresh(inst)
+    return inst
+
+
+def make_group(db, name="Grupo A", institution_id=None):
+    group = ResearchGroup(name=name, institution_id=institution_id)
+    db.add(group)
+    db.commit()
+    db.refresh(group)
+    return group
+
+
+def make_researcher_user(db, email, nome="Pesquisador", group_id=None, ativo=True):
+    """Cria Researcher + User vinculado com group_id opcional."""
+    researcher = Researcher(status="mestrado", group_id=group_id)
+    db.add(researcher)
+    db.flush()
+    user = User(
+        email=email,
+        nome=nome,
+        password_hash=pwd_ctx.hash("senha"),
+        role="researcher",
+        ativo=ativo,
+        researcher_id=researcher.id,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(researcher)
+    db.refresh(user)
+    return researcher, user
+
+
+def make_professor_user(db, email, nome="Professor", group_id=None, ativo=True):
+    """Cria Professor + User vinculado com ProfessorGroup opcional."""
+    professor = Professor()
+    db.add(professor)
+    db.flush()
+    user = User(
+        email=email,
+        nome=nome,
+        password_hash=pwd_ctx.hash("senha"),
+        role="professor",
+        ativo=ativo,
+        professor_id=professor.id,
+    )
+    db.add(user)
+    db.flush()
+    if group_id:
+        pg = ProfessorGroup(professor_id=professor.id, group_id=group_id)
+        db.add(pg)
+    db.commit()
+    db.refresh(user)
+    return professor, user

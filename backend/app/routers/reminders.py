@@ -4,11 +4,13 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from ..database import get_db
+from ..database import get_db, SessionLocal
 from ..models import User
 from ..schemas import ReminderCreate, ReminderUpdate, ReminderOut
 from ..deps import get_optional_user, get_current_user
 from ..services import reminder_service
+from ..notifications import notifies
+from ..notifications.events import ReminderCreatedEvent
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/reminders", tags=["reminders"])
@@ -26,7 +28,15 @@ def list_reminders(
 
 
 @router.post("/", response_model=ReminderOut, status_code=201)
-def create_reminder(
+@notifies(lambda result, kw: ReminderCreatedEvent(
+    reminder_html=result.text,
+    reminder_id=result.id,
+    institution_id=result.institution_id,
+    author_email=kw["current_user"].email if kw.get("current_user") else None,
+    author_name=kw["current_user"].nome if kw.get("current_user") else "Alguém",
+    db_factory=SessionLocal,
+))
+async def create_reminder(
     data: ReminderCreate,
     db: Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_optional_user),

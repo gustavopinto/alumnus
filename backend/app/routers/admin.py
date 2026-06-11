@@ -510,3 +510,29 @@ def delete_pending_researcher(
     if researcher:
         db.delete(researcher)
     db.commit()
+
+
+# ── Login reminder ─────────────────────────────────────────────────────────────
+
+@router.post("/users/{user_id}/send-login-reminder", status_code=204)
+async def send_login_reminder_email(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current: User = Depends(require_dashboard),
+):
+    from ..notifications import dispatcher
+    from ..notifications.events import LoginReminderEvent
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    if not user.email:
+        raise HTTPException(status_code=422, detail="Usuário sem email cadastrado")
+    from datetime import datetime
+    days_inactive = (datetime.utcnow() - user.last_login).days if user.last_login else None
+    logger.info("Lembrete de login enviado para user_id=%s por admin_id=%s", user.id, current.id)
+    await dispatcher.dispatch(LoginReminderEvent(
+        target_email=user.email,
+        target_name=user.nome,
+        days_inactive=days_inactive,
+    ))

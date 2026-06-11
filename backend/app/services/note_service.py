@@ -1,16 +1,26 @@
 import logging
 from typing import Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
-from ..models import Note
+from ..models import Note, NoteComment, NoteReaction
 from ..services import activity_service
 
 logger = logging.getLogger(__name__)
 
 
 def list_by_user(db: Session, user_id: int) -> list[Note]:
-    return db.query(Note).filter(Note.user_id == user_id).order_by(Note.created_at.desc()).all()
+    return (
+        db.query(Note)
+        .options(
+            joinedload(Note.created_by),
+            joinedload(Note.reactions),
+            joinedload(Note.comments).joinedload(NoteComment.author),
+        )
+        .filter(Note.user_id == user_id)
+        .order_by(Note.created_at.desc())
+        .all()
+    )
 
 
 def create(
