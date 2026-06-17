@@ -5,8 +5,8 @@ from ..database import get_db
 from ..deps import get_current_user
 from ..models import User
 from ..schemas import UserProfileUpdate, UserOut
-from ..plan import user_to_out, refresh_user_plan_status
 from ..services import user_service
+from ..services.user_service import user_to_out
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -19,7 +19,6 @@ def update_my_profile(
 ):
     user_service.update_profile(db, current, data.model_dump(exclude_unset=True))
     db.refresh(current)
-    refresh_user_plan_status(db, current)
     return user_to_out(current)
 
 

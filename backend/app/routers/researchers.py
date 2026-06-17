@@ -9,8 +9,8 @@ from ..database import get_db
 from ..models import User
 from ..schemas import ResearcherCreate, ResearcherUpdate, ResearcherOut, UserOut
 from ..deps import get_current_user
-from ..plan import refresh_user_plan_status, user_to_out
 from ..services import researcher_service
+from ..services.user_service import user_to_out
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/researchers", tags=["researchers"])
@@ -51,7 +51,6 @@ def get_researcher_user(researcher_id: int, db: Session = Depends(get_db)):
     u = researcher_service.get_linked_user(db, researcher_id)
     if not u:
         return None
-    refresh_user_plan_status(db, u)
     db.refresh(u)
     return user_to_out(u)
 

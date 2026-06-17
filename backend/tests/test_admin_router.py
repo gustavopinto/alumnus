@@ -307,30 +307,23 @@ class TestUpdateUser:
         resp = client.put("/api/admin/users/99999", json={"role": "researcher"})
         assert resp.status_code == 404
 
-    def test_promotion_to_professor_sets_plan_defaults(self, superadmin_client):
+    def test_promotion_to_professor_succeeds(self, superadmin_client):
         client, sa, db = superadmin_client
         student = make_user(db, email="promote@univ.edu.br", role="researcher")
 
         resp = client.put(f"/api/admin/users/{student.id}", json={"role": "professor"})
         assert resp.status_code == 200
         db.refresh(student)
-        assert student.plan is not None
-        assert student.plan.plan_type == "trial"
+        assert student.role == "professor"
 
-    def test_demotion_to_researcher_clears_plan(self, superadmin_client):
+    def test_demotion_to_researcher_succeeds(self, superadmin_client):
         client, sa, db = superadmin_client
-        prof = make_user(
-            db,
-            email="demote@univ.edu.br",
-            role="professor",
-            plan_type="trial",
-            plan_status="active",
-        )
+        prof = make_user(db, email="demote@univ.edu.br", role="professor")
 
         resp = client.put(f"/api/admin/users/{prof.id}", json={"role": "researcher"})
         assert resp.status_code == 200
         db.refresh(prof)
-        assert prof.plan is None or prof.plan.plan_type is None
+        assert prof.role == "researcher"
 
     def test_is_admin_set_for_superadmin_role(self, superadmin_client):
         client, sa, db = superadmin_client
@@ -627,21 +620,18 @@ class TestInviteProfessor:
         prof = db.query(Professor).filter(Professor.id == user.professor_id).first()
         assert prof is not None
 
-    def test_creates_trial_plan(self, superadmin_client):
+    def test_creates_professor_with_pending_account(self, superadmin_client):
         client, sa, db = superadmin_client
         resp = client.post("/api/admin/invite-professor", json={
-            "nome": "Prof Trial",
-            "email": "proftrial@univ.edu.br",
+            "nome": "Prof Novo",
+            "email": "profnovo@univ.edu.br",
         })
         assert resp.status_code == 201
-        from app.models import UserPlan
         user_id = resp.json()["id"]
-        plan = db.query(UserPlan).filter(UserPlan.user_id == user_id).first()
-        assert plan is not None
-        assert plan.plan_type == "trial"
-        assert plan.plan_status == "active"
-        assert plan.account_activated_at is not None
-        assert plan.plan_period_ends_at is not None
+        user = db.query(User).filter(User.id == user_id).first()
+        assert user is not None
+        assert user.role == "professor"
+        assert user.password_hash is None
 
     def test_links_institution_and_group(self, superadmin_client):
         client, sa, db = superadmin_client

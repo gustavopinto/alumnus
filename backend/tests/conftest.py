@@ -13,7 +13,7 @@ from sqlalchemy import create_engine, StaticPool
 from sqlalchemy.orm import sessionmaker
 
 from app.database import Base
-from app.models import User, UserPlan, Researcher, Reminder, Institution, ResearchGroup, Professor, ProfessorGroup
+from app.models import User, Researcher, Reminder, Institution, ResearchGroup, Professor, ProfessorGroup
 from app.main import app
 from app.database import get_db
 from passlib.context import CryptContext
@@ -98,10 +98,6 @@ def make_user(
     role="professor",
     password="securepassword",
     researcher_id=None,
-    plan_type=None,
-    plan_status=None,
-    account_activated_at=None,
-    plan_period_ends_at=None,
 ):
     u = User(
         email=email,
@@ -112,15 +108,6 @@ def make_user(
         created_at=datetime.utcnow(),
     )
     db.add(u)
-    db.flush()
-    if plan_type is not None or plan_status is not None or account_activated_at is not None or plan_period_ends_at is not None:
-        db.add(UserPlan(
-            user_id=u.id,
-            plan_type=plan_type,
-            plan_status=plan_status,
-            account_activated_at=account_activated_at,
-            plan_period_ends_at=plan_period_ends_at,
-        ))
     db.commit()
     db.refresh(u)
     return u

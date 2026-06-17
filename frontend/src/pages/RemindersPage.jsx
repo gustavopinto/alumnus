@@ -134,9 +134,20 @@ export default function RemindersPage() {
     }
   }
 
-  const pending = reminders.filter(r => !r.done);
-  const done = reminders.filter(r => r.done);
-  const minDue = todayIso();
+  const today = todayIso();
+  const upcoming = reminders
+    .filter(r => !r.due_date || r.due_date >= today)
+    .sort((a, b) => {
+      if (!a.due_date && !b.due_date) return 0;
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+      return a.due_date.localeCompare(b.due_date);
+    });
+  const past = reminders
+    .filter(r => r.due_date && r.due_date < today)
+    .sort((a, b) => b.due_date.localeCompare(a.due_date));
+  const [showPast, setShowPast] = useState(false);
+  const minDue = today;
   const saving = createMutation.isPending;
 
   return (
@@ -183,11 +194,11 @@ export default function RemindersPage() {
           </form>
         </section>
 
-        {/* Pending */}
-        {pending.length > 0 && (
+        {/* Upcoming */}
+        {upcoming.length > 0 && (
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide px-1">Fica ligado!</h3>
-            {pending.map(r => (
+            {upcoming.map(r => (
               <ReminderCard
                 key={r.id}
                 r={r}
@@ -199,21 +210,30 @@ export default function RemindersPage() {
           </div>
         )}
 
-        {/* Done */}
-        {done.length > 0 && (
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wide px-1">Passados</h3>
-            {done.map(r => (
-              <div key={r.id} className="opacity-50">
-                <ReminderCard
-                  r={r}
-                  researchers={researchers}
-                  creatorOpts={creatorOpts}
-                  onDelete={handleDelete}
-                />
+        {/* Past */}
+        {past.length > 0 && (
+          <section>
+            <button type="button" onClick={() => setShowPast(o => !o)} className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 mb-3">
+              <svg xmlns="http://www.w3.org/2000/svg" className={`w-4 h-4 transition-transform ${showPast ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+              {past.length} lembrete{past.length !== 1 ? 's' : ''} passado{past.length !== 1 ? 's' : ''}
+            </button>
+            {showPast && (
+              <div className="space-y-3">
+                {past.map(r => (
+                  <div key={r.id} className="opacity-60">
+                    <ReminderCard
+                      r={r}
+                      researchers={researchers}
+                      creatorOpts={creatorOpts}
+                      onDelete={handleDelete}
+                    />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+          </section>
         )}
 
       </main>

@@ -2,7 +2,7 @@
 Testes de integração para o sistema de notificações via HTTP.
 
 Verifica que:
-- POST /api/users/{id}/notes  → agenda NoteCreatedEvent (asyncio.create_task)
+- POST /api/users/{id}/notes  → não agenda notificação (email de nota removido)
 - POST /api/reminders/        → agenda ReminderCreatedEvent
 - POST /api/admin/users/{id}/send-login-reminder → envia LoginReminderEvent diretamente
 
@@ -17,7 +17,7 @@ from fastapi.testclient import TestClient
 from app.deps import require_dashboard, require_superadmin
 from app.main import app
 from app.database import get_db
-from app.notifications.events import LoginReminderEvent, NoteCreatedEvent, ReminderCreatedEvent
+from app.notifications.events import LoginReminderEvent, ReminderCreatedEvent
 from app.routers.auth import make_token
 
 from .conftest import make_institution, make_group, make_researcher_user, make_user
@@ -54,11 +54,12 @@ def admin_client(db):
 
 
 # ---------------------------------------------------------------------------
-# POST /api/users/{id}/notes — NoteCreatedEvent
+# POST /api/users/{id}/notes — sem notificação por email
 # ---------------------------------------------------------------------------
 
 class TestCreateNoteNotification:
-    def test_create_note_schedules_create_task(self, client, db):
+    def test_create_note_does_not_schedule_notification(self, client, db):
+        """Notas não enviam mais notificações por email."""
         prof = make_user(db, email="profnt@test.br", role="professor")
         target = make_user(db, email="targetnt@test.br", role="researcher")
         token = make_token(prof)
@@ -70,56 +71,19 @@ class TestCreateNoteNotification:
                 headers={"Authorization": f"Bearer {token}"},
             )
             assert resp.status_code == 201
-            assert mock_ct.called, "create_task deve ser chamado após criação de nota"
+            assert not mock_ct.called, "notas não devem disparar notificações"
 
-    def test_create_task_receives_note_created_event(self, client, db):
-        prof = make_user(db, email="profevt@test.br", role="professor")
-        target = make_user(db, email="targetevt@test.br", role="researcher")
-        token = make_token(prof)
-
-        dispatched_events = []
-        collected_coros = []
-
-        async def capture_dispatch(event):
-            dispatched_events.append(event)
-
-        def fake_create_task(coro):
-            # Coleta a coroutine para rodar depois (loop já está rodando)
-            collected_coros.append(coro)
-            return MagicMock()
-
-        with patch("app.notifications.dispatcher.dispatcher.dispatch", capture_dispatch):
-            with patch("app.notifications.dispatcher.asyncio.create_task", fake_create_task):
-                resp = client.post(
-                    f"/api/users/{target.id}/notes",
-                    data={"text": "Evento certo"},
-                    headers={"Authorization": f"Bearer {token}"},
-                )
-                assert resp.status_code == 201
-
-        # Roda as coroutines depois que o loop do TestClient parou
-        for coro in collected_coros:
-            asyncio.run(coro)
-
-        assert len(dispatched_events) == 1
-        ev = dispatched_events[0]
-        assert isinstance(ev, NoteCreatedEvent)
-        assert ev.author_email == prof.email
-        assert ev.profile_user_id == target.id
-
-    def test_create_note_still_returns_201_when_notification_fails(self, client, db):
+    def test_create_note_returns_201(self, client, db):
         prof = make_user(db, email="profnf@test.br", role="professor")
         target = make_user(db, email="targetnf@test.br", role="researcher")
         token = make_token(prof)
 
-        with patch("app.notifications.dispatcher.asyncio.create_task", side_effect=Exception("falhou")):
-            resp = client.post(
-                f"/api/users/{target.id}/notes",
-                data={"text": "Nota deve criar mesmo com erro"},
-                headers={"Authorization": f"Bearer {token}"},
-            )
-            # A nota é criada mesmo que a notificação falhe
-            assert resp.status_code == 201
+        resp = client.post(
+            f"/api/users/{target.id}/notes",
+            data={"text": "Nota deve criar normalmente"},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert resp.status_code == 201
 
 
 # ---------------------------------------------------------------------------

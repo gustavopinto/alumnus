@@ -7,8 +7,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..database import get_db
 from ..deps import require_dashboard, require_superadmin, require_professor
-from ..models import User, UserPlan, Researcher, Reminder, Tip, TipComment, Note, ResearchGroup, ProfessorGroup, Professor, ProfessorInstitution, Milestone
-from ..plan import clear_plan, ensure_professor_plan_defaults
+from ..models import User, Researcher, Reminder, Tip, TipComment, Note, ResearchGroup, ProfessorGroup, Professor, ProfessorInstitution, Milestone
 from ..institutional_email import is_public_email_domain
 
 logger = logging.getLogger(__name__)
@@ -329,11 +328,6 @@ def update_user(
         user.professor_id = None
         user.researcher_id = None
 
-    if data.role == "researcher":
-        clear_plan(user)
-    elif data.role in ("professor", "superadmin") and old_role not in ("professor", "superadmin"):
-        ensure_professor_plan_defaults(user)
-
     db.commit()
     logger.warning("Role alterado: user_id=%s %s → %s por admin_id=%s", user.id, old_role, user.role, current.id)
     return {"id": user.id, "role": user.role, "is_admin": user.role == "superadmin"}
@@ -407,7 +401,6 @@ def invite_professor(
     )
     db.add(milestone)
 
-    ensure_professor_plan_defaults(user)
     db.commit()
 
     logger.info("Professor convidado: email=%s professor_id=%s por admin_id=%s", data.email, professor.id, current.id)
@@ -439,7 +432,6 @@ def delete_user(
     db.query(Reminder).filter(Reminder.created_by_id == user_id).update({"created_by_id": None})
     db.query(Tip).filter(Tip.author_id == user_id).update({"author_id": None})
     db.query(TipComment).filter(TipComment.author_id == user_id).update({"author_id": None})
-    db.query(UserPlan).filter(UserPlan.user_id == user_id).delete()
     db.query(Milestone).filter(Milestone.user_id == user_id).delete()
     professor_id = user.professor_id
     db.delete(user)

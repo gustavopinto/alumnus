@@ -20,8 +20,6 @@ from app.notifications.dispatcher import NotificationDispatcher, notifies
 from app.notifications.events import LoginReminderEvent, NoteCreatedEvent, ReminderCreatedEvent
 from app.services.email_templates import (
     login_reminder_html,
-    mention_html,
-    note_created_html,
     reminder_created_html,
 )
 
@@ -219,8 +217,8 @@ class TestEmailChannelCanHandle:
     def setup_method(self):
         self.ch = EmailChannel()
 
-    def test_handles_note_created_event(self):
-        assert self.ch.can_handle(NoteCreatedEvent)
+    def test_does_not_handle_note_created_event(self):
+        assert not self.ch.can_handle(NoteCreatedEvent)
 
     def test_handles_reminder_created_event(self):
         assert self.ch.can_handle(ReminderCreatedEvent)
@@ -230,18 +228,6 @@ class TestEmailChannelCanHandle:
 
     def test_does_not_handle_unknown_type(self):
         assert not self.ch.can_handle(str)
-
-    def test_handle_routes_note_created(self):
-        ch = EmailChannel()
-        ev = NoteCreatedEvent("<p>t</p>", 1, "a@a.com", "A", lambda: None)
-        calls = []
-
-        async def run():
-            with patch.object(ch, "_handle_note_created", new_callable=AsyncMock) as m:
-                await ch.handle(ev)
-                m.assert_called_once_with(ev)
-
-        asyncio.run(run())
 
     def test_handle_routes_reminder_created(self):
         ch = EmailChannel()
@@ -313,132 +299,6 @@ class TestHandleLoginReminder:
         async def run():
             with patch("app.notifications.channels.email.send_email", side_effect=Exception("network error")):
                 await ch._handle_login_reminder(ev)  # must not raise
-
-        asyncio.run(run())
-
-
-# ── EmailChannel._handle_note_created ────────────────────────────────────────
-
-class TestHandleNoteCreated:
-    def test_sends_to_profile_owner(self, db, db_factory):
-        profile_user = make_user(db, email="owner@test.com", nome="Owner", role="researcher")
-        ev = NoteCreatedEvent(
-            note_html="<p>Boa nota</p>",
-            profile_user_id=profile_user.id,
-            author_email="author@test.com",
-            author_name="Author",
-            db_factory=db_factory,
-        )
-        ch = EmailChannel()
-
-        async def run():
-            with patch("app.notifications.channels.email.send_email", new_callable=AsyncMock) as mock_send:
-                await ch._handle_note_created(ev)
-                recipients = [c[0][0] for c in mock_send.call_args_list]
-                assert "owner@test.com" in recipients
-
-        asyncio.run(run())
-
-    def test_does_not_send_to_author(self, db, db_factory):
-        profile_user = make_user(db, email="prof@test.com", nome="Prof", role="researcher")
-        ev = NoteCreatedEvent(
-            note_html="<p>nota</p>",
-            profile_user_id=profile_user.id,
-            author_email="prof@test.com",  # mesmo email do dono
-            author_name="Prof",
-            db_factory=db_factory,
-        )
-        ch = EmailChannel()
-
-        async def run():
-            with patch("app.notifications.channels.email.send_email", new_callable=AsyncMock) as mock_send:
-                await ch._handle_note_created(ev)
-                assert mock_send.call_count == 0
-
-        asyncio.run(run())
-
-    def test_sends_to_mentioned_users(self, db, db_factory):
-        profile_user = make_user(db, email="owner2@test.com", nome="Owner2", role="researcher")
-        mentioned_user = make_user(db, email="mentioned@test.com", nome="Mentioned", role="researcher")
-        note_html = (
-            f'<p>Boa nota <span data-type="mention" '
-            f'data-id="mentioned" data-email="mentioned@test.com">@Mentioned</span></p>'
-        )
-        ev = NoteCreatedEvent(
-            note_html=note_html,
-            profile_user_id=profile_user.id,
-            author_email="author@other.com",
-            author_name="Author",
-            db_factory=db_factory,
-        )
-        ch = EmailChannel()
-
-        async def run():
-            with patch("app.notifications.channels.email.send_email", new_callable=AsyncMock) as mock_send:
-                await ch._handle_note_created(ev)
-                recipients = {c[0][0] for c in mock_send.call_args_list}
-                assert "mentioned@test.com" in recipients
-
-        asyncio.run(run())
-
-    def test_no_duplicate_for_mentioned_owner(self, db, db_factory):
-        """Dono do perfil mencionado explicitamente não deve receber 2 emails."""
-        profile_user = make_user(db, email="owner3@test.com", nome="Owner3", role="researcher")
-        note_html = (
-            '<p><span data-type="mention" data-id="owner3" '
-            'data-email="owner3@test.com">@Owner3</span></p>'
-        )
-        ev = NoteCreatedEvent(
-            note_html=note_html,
-            profile_user_id=profile_user.id,
-            author_email="other@other.com",
-            author_name="Other",
-            db_factory=db_factory,
-        )
-        ch = EmailChannel()
-
-        async def run():
-            with patch("app.notifications.channels.email.send_email", new_callable=AsyncMock) as mock_send:
-                await ch._handle_note_created(ev)
-                recipients = [c[0][0] for c in mock_send.call_args_list]
-                assert recipients.count("owner3@test.com") == 1
-
-        asyncio.run(run())
-
-    def test_skips_when_profile_user_not_found(self, db, db_factory):
-        ev = NoteCreatedEvent(
-            note_html="<p>nota</p>",
-            profile_user_id=99999,  # inexistente
-            author_email="a@a.com",
-            author_name="A",
-            db_factory=db_factory,
-        )
-        ch = EmailChannel()
-
-        async def run():
-            with patch("app.notifications.channels.email.send_email", new_callable=AsyncMock) as mock_send:
-                await ch._handle_note_created(ev)
-                mock_send.assert_not_called()
-
-        asyncio.run(run())
-
-    def test_all_emails_include_cc(self, db, db_factory):
-        profile_user = make_user(db, email="owner4@test.com", nome="Owner4", role="researcher")
-        ev = NoteCreatedEvent(
-            note_html="<p>nota</p>",
-            profile_user_id=profile_user.id,
-            author_email="notowner@test.com",
-            author_name="Author",
-            db_factory=db_factory,
-        )
-        ch = EmailChannel()
-
-        async def run():
-            with patch("app.notifications.channels.email.send_email", new_callable=AsyncMock) as mock_send:
-                await ch._handle_note_created(ev)
-                for c in mock_send.call_args_list:
-                    cc = c[1].get("cc") or (c[0][3] if len(c[0]) > 3 else None)
-                    assert cc and CC_ADDRESS in cc
 
         asyncio.run(run())
 

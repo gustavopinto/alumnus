@@ -265,23 +265,6 @@ class NoteComment(Base):
     author = relationship("User", foreign_keys=[author_id])
 
 
-# ── Plano de usuário ──────────────────────────────────────────────────────────
-
-class UserPlan(Base):
-    __tablename__ = "user_plans"
-
-    id                   = Column(Integer, primary_key=True, index=True)
-    user_id              = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
-    plan_type            = Column(String(20), nullable=True)
-    plan_status          = Column(String(20), nullable=True)
-    account_activated_at = Column(DateTime, nullable=True)
-    plan_period_ends_at  = Column(DateTime, nullable=True)
-    created_at           = Column(DateTime, default=datetime.utcnow, server_default="now()")
-    updated_at           = Column(DateTime, default=datetime.utcnow, server_default="now()", onupdate=datetime.utcnow)
-
-    user = relationship("User", back_populates="plan")
-
-
 # ── Usuário ───────────────────────────────────────────────────────────────────
 
 class User(Base):
@@ -313,7 +296,6 @@ class User(Base):
 
     professor  = relationship("Professor", back_populates="user", foreign_keys=[professor_id])
     researcher = relationship("Researcher", foreign_keys=[researcher_id])
-    plan       = relationship("UserPlan", back_populates="user", uselist=False)
 
     @property
     def is_admin(self) -> bool:

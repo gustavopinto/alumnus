@@ -29,13 +29,11 @@ def main():
 
     with Session() as db:
         from app.models import User
-        from app.plan import clear_plan
 
         existing = db.query(User).filter(User.email == args.email).first()
         if existing:
             existing.password_hash = pwd_ctx.hash(args.password)
             existing.role = "superadmin"
-            clear_plan(existing)
             db.commit()
             print(f"✓ Usuário '{args.email}' atualizado para superadmin.")
         else:

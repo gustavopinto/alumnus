@@ -33,7 +33,7 @@ def run():
             Deadline, DeadlineInterest, FileUpload, GraphLayout,
             Institution, Milestone, Note, Professor, ProfessorGroup,
             ProfessorInstitution, Reading, Relationship, Reminder,
-            Researcher, ResearchGroup, Tip, User, UserPlan,
+            Researcher, ResearchGroup, Tip, User,
         )
 
         # ── Instituição ────────────────────────────────────────────────────────
@@ -90,14 +90,6 @@ def run():
             )
             db.add(prof_user)
             db.flush()
-
-            db.add(UserPlan(
-                user_id=prof_user.id,
-                plan_type="trial",
-                plan_status="active",
-                account_activated_at=datetime.utcnow() - timedelta(days=5),
-                plan_period_ends_at=datetime.utcnow() + timedelta(days=25),
-            ))
         else:
             prof = db.query(Professor).get(prof_user.professor_id)
             group = db.query(ResearchGroup).filter_by(institution_id=inst_id).first()

@@ -8,7 +8,7 @@ Covers:
 - GET  /auth/me
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from unittest.mock import patch
 
 import pytest
@@ -227,10 +227,7 @@ class TestLogin:
 
 class TestMe:
     def test_me_returns_current_user(self, db):
-        user = make_user(db, email="me@univ.edu.br", role="professor",
-                         plan_type="trial", plan_status="active",
-                         account_activated_at=datetime.utcnow(),
-                         plan_period_ends_at=datetime.utcnow() + timedelta(days=25))
+        user = make_user(db, email="me@univ.edu.br", role="professor")
 
         def override_get_db():
             yield db

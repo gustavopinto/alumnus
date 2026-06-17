@@ -7,13 +7,10 @@ from ...models import Professor, ProfessorGroup, Researcher, ResearchGroup, User
 from ...services.email_service import send_email
 from ...services.email_templates import (
     login_reminder_html,
-    mention_html,
-    note_created_html,
     reminder_created_html,
 )
 from ...services.mention_parser import extract_mentions, resolve_mention_emails
-from ...slug import slugify
-from ..events import LoginReminderEvent, NoteCreatedEvent, ReminderCreatedEvent
+from ..events import LoginReminderEvent, ReminderCreatedEvent
 from .base import NotificationChannel
 
 logger = logging.getLogger(__name__)
@@ -23,57 +20,13 @@ CC_ADDRESS = "gpinto@ufpa.br"
 
 class EmailChannel(NotificationChannel):
     def can_handle(self, event_type: type) -> bool:
-        return event_type in {NoteCreatedEvent, ReminderCreatedEvent, LoginReminderEvent}
+        return event_type in {ReminderCreatedEvent, LoginReminderEvent}
 
     async def handle(self, event) -> None:
-        if isinstance(event, NoteCreatedEvent):
-            await self._handle_note_created(event)
-        elif isinstance(event, ReminderCreatedEvent):
+        if isinstance(event, ReminderCreatedEvent):
             await self._handle_reminder_created(event)
         elif isinstance(event, LoginReminderEvent):
             await self._handle_login_reminder(event)
-
-    async def _handle_note_created(self, event: NoteCreatedEvent) -> None:
-        db: Session = event.db_factory()
-        try:
-            profile_user = db.query(User).get(event.profile_user_id)
-            if not profile_user:
-                return
-
-            profile_slug = slugify(profile_user.nome)
-            profile_email = profile_user.email
-
-            researcher = (
-                db.query(Researcher).filter(Researcher.id == profile_user.researcher_id).first()
-                if profile_user.researcher_id else None
-            )
-            group_id = researcher.group_id if researcher else None
-
-            mentions = extract_mentions(event.note_html)
-            mention_emails = resolve_mention_emails(db, mentions, group_id, event.author_email)
-
-            tasks = []
-            if profile_email and profile_email != event.author_email and profile_email not in mention_emails:
-                tasks.append((
-                    profile_email,
-                    "Nova anotação no seu perfil",
-                    note_created_html(event.author_name, event.note_html, profile_slug),
-                ))
-            for email in mention_emails:
-                tasks.append((
-                    email,
-                    "Oba! Você foi marcado no Alumnus!",
-                    mention_html(event.author_name, event.note_html, profile_user.nome, profile_slug),
-                ))
-            if tasks:
-                await asyncio.gather(*[
-                    send_email(to, subject, html, cc=[CC_ADDRESS])
-                    for to, subject, html in tasks
-                ])
-        except Exception:
-            logger.exception("Erro ao enviar notificações de nota")
-        finally:
-            db.close()
 
     async def _handle_reminder_created(self, event: ReminderCreatedEvent) -> None:
         db: Session = event.db_factory()

@@ -256,11 +256,6 @@ class UserOut(BaseModel):
     researcher_id: Optional[int] = None
     last_login:    Optional[datetime]
     created_at:    Optional[datetime] = None
-    plan_type:     Optional[str] = None
-    plan_status:   Optional[str] = None
-    account_activated_at: Optional[datetime] = None
-    plan_period_ends_at: Optional[datetime] = None
-    trial_days_remaining: Optional[int] = None
     photo_url:       Optional[str] = None
     photo_thumb_url: Optional[str] = None
     lattes_url:      Optional[str] = None

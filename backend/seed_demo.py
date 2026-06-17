@@ -107,7 +107,6 @@ def run():
         # ── Users ──────────────────────────────────────────────────────────
         def ensure_user(email, nome, role, professor_id=None, researcher_id=None, pw='alumnus123'):
             if not db.query(User).filter_by(email=email).first():
-                from app.models import UserPlan
                 now = datetime.utcnow()
                 u = User(
                     email=email, nome=nome, password_hash=h(pw),
@@ -119,14 +118,6 @@ def run():
                 )
                 db.add(u)
                 db.flush()
-                if role == 'professor':
-                    db.add(UserPlan(
-                        user_id=u.id,
-                        plan_type='trial',
-                        plan_status='active',
-                        account_activated_at=now - timedelta(days=5),
-                        plan_period_ends_at=now + timedelta(days=25),
-                    ))
 
         ensure_user('marina.santos@ufpa.br', 'Marina Santos', 'professor', professor_id=prof2_pid)
 

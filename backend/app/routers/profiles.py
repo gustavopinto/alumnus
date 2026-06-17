@@ -6,7 +6,7 @@ from ..deps import get_current_user
 from ..models import Researcher, User
 from ..schemas import ProfileBySlugOut, ResearcherOut
 from ..slug import slugify
-from ..plan import refresh_user_plan_status, user_to_out
+from ..services.user_service import user_to_out
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
@@ -29,7 +29,6 @@ def get_profile_by_slug(
     researcher = next((r for r in researchers if r.user and slugify(r.user.nome) == slug), None)
     if researcher:
         user = researcher.user
-        refresh_user_plan_status(db, user)
         db.refresh(user)
         return ProfileBySlugOut(user=user_to_out(user), researcher=ResearcherOut.model_validate(researcher))
 
@@ -42,6 +41,5 @@ def get_profile_by_slug(
     user = next((u for u in users if slugify(u.nome) == slug), None)
     if not user:
         raise HTTPException(status_code=404, detail="Perfil não encontrado")
-    refresh_user_plan_status(db, user)
     db.refresh(user)
     return ProfileBySlugOut(user=user_to_out(user), researcher=None)

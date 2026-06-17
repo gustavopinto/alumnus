@@ -578,7 +578,7 @@ export default function AdminPage() {
                             )}
                           </button>
                         )}
-                        {editingId !== u.id && !u.pending && (
+                        {editingId !== u.id && !u.pending && formatLastLogin(u.last_login).old && (
                           <button
                             onClick={() => handleSendLoginReminder(u)}
                             disabled={sendingReminderId === u.id}

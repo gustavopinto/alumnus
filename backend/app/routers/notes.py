@@ -3,14 +3,11 @@ import logging
 from fastapi import APIRouter, Body, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
-from ..database import get_db, SessionLocal
+from ..database import get_db
 from ..models import Note, NoteComment, NoteReaction, User
 from ..schemas import NoteCommentOut, NoteOut
 from ..deps import get_current_user
 from ..services import note_service, upload_service
-from ..notifications import notifies
-from ..notifications.events import NoteCreatedEvent
-
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["notes"])
 
@@ -28,13 +25,6 @@ def list_notes(
 
 
 @router.post("/users/{user_id}/notes", response_model=NoteOut, status_code=201)
-@notifies(lambda result, kw: NoteCreatedEvent(
-    note_html=result.text,
-    profile_user_id=kw["user_id"],
-    author_email=kw["current_user"].email,
-    author_name=kw["current_user"].nome,
-    db_factory=SessionLocal,
-))
 async def create_note(
     user_id: int,
     text: str = Form(...),
