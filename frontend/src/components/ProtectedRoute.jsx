@@ -64,6 +64,7 @@ export default function ProtectedRoute({ children, professorOnly = false, adminO
           path === '/app/group' ||
           path === `/app/profile/${slug}` ||
           path === '/app/manual' ||
+          path.startsWith('/app/manual/') ||
           path === '/app/reminders' ||
           path === '/app/deadlines' ||
           path.startsWith('/app/profile/');
