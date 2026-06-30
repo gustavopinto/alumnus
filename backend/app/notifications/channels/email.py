@@ -44,6 +44,11 @@ class EmailChannel(NotificationChannel):
                 all_emails.discard(event.author_email)
 
             if not all_emails:
+                logger.warning(
+                    "Nenhum email para notificação de lembrete "
+                    "— mention_emails=%s, group_emails=%s, institution_id=%s",
+                    mention_emails, group_emails, event.institution_id
+                )
                 return
 
             html = reminder_created_html(event.author_name, event.reminder_html)
