@@ -37,9 +37,18 @@ def notifies(extractor: Callable[[Any, dict], Any]):
             try:
                 event = extractor(result, kwargs)
                 if event is not None:
-                    asyncio.create_task(dispatcher.dispatch(event))
+                    task = asyncio.create_task(dispatcher.dispatch(event))
+                    task.add_done_callback(_handle_notification_error)
             except Exception:
                 logger.exception("Erro ao despachar notificação")
             return result
         return wrapper
     return decorator
+
+
+def _handle_notification_error(task):
+    """Callback para capturar erros em tasks de notificação."""
+    try:
+        task.result()
+    except Exception:
+        logger.exception("Erro em task de notificação de background")
